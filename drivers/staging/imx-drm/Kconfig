@@ -59,3 +59,11 @@ config DRM_IMX_HDMI
 	depends on DRM_IMX
 	help
 	  Choose this if you want to use HDMI on i.MX6.
+
+config DRM_DW_HDMI_CEC
+	tristate "Synopsis Designware CEC interface"
+	depends on DRM_IMX_HDMI != n
+	help
+	  Support the CEC interface which is part of the Synposis
+	  Designware HDMI block.  This is used in conjunction with
+	  the i.MX HDMI driver.
