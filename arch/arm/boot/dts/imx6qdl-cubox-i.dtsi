@@ -60,6 +60,12 @@
 		};
 	};
 
+	imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>;
+		connectors = <&hdmi>;
+	};
+
 	sound-spdif {
 		compatible = "fsl,imx-audio-spdif";
 		model = "imx-spdif";
@@ -67,6 +73,21 @@
 		spdif-controller = <&spdif>;
 		spdif-out;
 	};
+};
+
+&hdmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_cubox_i_hdmi>;
+	ddc = <&i2c2>;
+	status = "okay";
+	crtcs = <&ipu1 0>;
+};
+
+&i2c2 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2_2>;
+	status = "okay";
 };
 
 &i2c3 {
@@ -93,6 +114,12 @@
 		pinctrl_cubox_i_ir: cubox-i-ir {
 			fsl,pins = <
 				MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000
+			>;
+		};
+
+		pinctrl_cubox_i_hdmi: cubox-i-hdmi {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
 			>;
 		};
 
@@ -129,6 +156,28 @@
 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
 			>;
 		};
+
+		pinctrl_cubox_i_usdhc2_100mhz: cubox-i-usdhc2-100mhz {
+			fsl,pins = <
+				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170b9
+				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100b9
+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170b9
+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170b9
+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170b9
+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130b9
+			>;
+		};
+
+		pinctrl_cubox_i_usdhc2_200mhz: cubox-i-usdhc2-200mhz {
+			fsl,pins = <
+				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170f9
+				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100f9
+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170f9
+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170f9
+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170f9
+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130f9
+			>;
+		};
 	};
 };
 
@@ -149,8 +198,10 @@
 };
 
 &usdhc2 {
-	pinctrl-names = "default";
+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
 	pinctrl-0 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2>;
+	pinctrl-1 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2_100mhz>;
+	pinctrl-2 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2_200mhz>;
 	vmmc-supply = <&reg_3p3v>;
 	cd-gpios = <&gpio1 4 0>;
 	status = "okay";
