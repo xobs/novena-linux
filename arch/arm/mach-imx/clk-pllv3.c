@@ -273,9 +273,10 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
 	unsigned long min_rate = parent_rate * 27;
 	unsigned long max_rate = parent_rate * 54;
-	u32 val, div;
+	u32 val, newval, div;
 	u32 mfn, mfd = 1000000;
 	s64 temp64;
+	int ret;
 
 	if (rate < min_rate || rate > max_rate)
 		return -EINVAL;
@@ -287,13 +288,27 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
 	mfn = temp64;
 
 	val = readl_relaxed(pll->base);
-	val &= ~pll->div_mask;
-	val |= div;
-	writel_relaxed(val, pll->base);
-	writel_relaxed(mfn, pll->base + PLL_NUM_OFFSET);
-	writel_relaxed(mfd, pll->base + PLL_DENOM_OFFSET);
 
-	return clk_pllv3_wait_lock(pll);
+	/* set the PLL into bypass mode */
+	newval = val | BM_PLL_BYPASS;
+	writel_relaxed(newval, pll->base);
+
+	/* configure the new frequency */
+	newval &= ~pll->div_mask;
+	newval |= div;
+	writel_relaxed(newval, pll->base);
+	writel_relaxed(mfn, pll->base + PLL_NUM_OFFSET);
+	writel(mfd, pll->base + PLL_DENOM_OFFSET);
+
+	ret = clk_pllv3_wait_lock(pll);
+	if (ret == 0 && val & BM_PLL_POWER) {
+		/* only if it locked can we switch back to the PLL */
+		newval &= ~BM_PLL_BYPASS;
+		newval |= val & BM_PLL_BYPASS;
+		writel(newval, pll->base);
+	}
+
+	return ret;
 }
 
 static const struct clk_ops clk_pllv3_av_ops = {
