@@ -319,6 +319,7 @@ struct ipu_client_platformdata {
 	int dp;
 	int dmfc;
 	int dma[2];
+	int ipu;
 };
 
 #endif /* __DRM_IPU_H__ */
