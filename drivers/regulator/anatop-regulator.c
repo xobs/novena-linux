@@ -196,6 +196,7 @@ static int anatop_regulator_probe(struct platform_device *pdev)
 	config.driver_data = sreg;
 	config.of_node = pdev->dev.of_node;
 	config.regmap = sreg->anatop;
+	config.ena_gpio = -EINVAL;
 
 	/* register regulator */
 	rdev = devm_regulator_register(dev, rdesc, &config);
