@@ -37,7 +37,7 @@ struct spear_sdhci {
 
 /* sdhci ops */
 static const struct sdhci_ops sdhci_pltfm_ops = {
-	/* Nothing to do for now. */
+	.set_bus_width = sdhci_set_bus_width,
 };
 
 /* gpio card detection interrupt handler */
