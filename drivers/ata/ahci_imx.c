@@ -138,6 +138,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
 	writel(reg_val | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
 	imx_sata_clock_disable(ap->dev);
 	imxpriv->no_device = true;
+
+	dev_info(ap->dev, "no device found, disabling link.\n");
+	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
+		 ".hotplug=1 to enable hotplug\n");
 }
 
 static int ahci_imx_softreset(struct ata_link *link, unsigned int *class,
@@ -260,6 +264,10 @@ static int imx_ahci_probe(struct platform_device *pdev)
 	struct platform_device *ahci_pdev;
 	int ret;
 
+	/* Prevent our child ahci device coming back to us */
+	if (!strcmp(dev_name(&pdev->dev), "ahci"))
+		return -ENODEV;
+
 	of_id = of_match_device(imx_ahci_of_match, dev);
 	if (!of_id)
 		return -EINVAL;
@@ -356,10 +364,11 @@ static int imx_ahci_probe(struct platform_device *pdev)
 				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
 				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
 				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
-				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
+				   /* IMX6Q_GPR13_SATA_MPLL_SS_EN | */
 				   IMX6Q_GPR13_SATA_TX_ATTEN_9_16 |
-				   IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
-				   IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
+				   /* IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
+				   IMX6Q_GPR13_SATA_TX_LVL_1_025_V */
+				   IMX6Q_GPR13_SATA_TX_LVL_1_104_V);
 	}
 
 	ret = platform_device_add_resources(ahci_pdev, res, 2);
