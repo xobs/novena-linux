@@ -273,6 +273,56 @@ static struct snd_pcm_hardware dw_hdmi_hw = {
 	.fifo_size = 0,
 };
 
+static unsigned rates_mask[] = {
+	SNDRV_PCM_RATE_32000,
+	SNDRV_PCM_RATE_44100,
+	SNDRV_PCM_RATE_48000,
+	SNDRV_PCM_RATE_88200,
+	SNDRV_PCM_RATE_96000,
+	SNDRV_PCM_RATE_176400,
+	SNDRV_PCM_RATE_192000,
+};
+
+static void dw_hdmi_parse_eld(struct snd_dw_hdmi *dw,
+	struct snd_pcm_runtime *runtime)
+{
+	uint8_t *sad, *eld = imx_hdmi_get_eld(dw->hdmi);
+	unsigned eld_ver,  mnl, sad_count, rates, rate_mask, i;
+	unsigned max_channels;
+
+	eld_ver = eld[0] >> 3;
+	if (eld_ver != 2 && eld_ver != 31)
+		return;
+
+	mnl = eld[4] & 0x1f;
+	if (mnl > 16)
+		return;
+
+	sad_count = eld[5] >> 4;
+	sad = eld + 20 + mnl;
+
+	/* Start from the basic audio settings */
+	max_channels = 2;
+	rates = 7;
+	while (sad_count > 0) {
+		switch (sad[0] & 0x78) {
+		case 0x08: /* PCM */
+			max_channels = max(max_channels, (sad[0] & 7) + 1u);
+			rates |= sad[1];
+			break;
+		}
+		sad += 3;
+		sad_count -= 1;
+	}
+
+	for (rate_mask = i = 0; i < ARRAY_SIZE(rates_mask); i++)
+		if (rates & 1 << i)
+			rate_mask |= rates_mask[i];
+
+	runtime->hw.rates &= rate_mask;
+	runtime->hw.channels_max = min(runtime->hw.channels_max, max_channels);
+}
+
 static int dw_hdmi_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -301,6 +351,7 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
 		       dw->base + HDMI_IH_MUTE_AHBDMAAUD_STAT0);
 
 	runtime->hw = dw_hdmi_hw;
+	dw_hdmi_parse_eld(dw, runtime);
 	snd_pcm_limit_hw_rates(runtime);
 
 	return 0;

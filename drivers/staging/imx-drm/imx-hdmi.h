@@ -1032,5 +1032,6 @@ enum {
 
 struct imx_hdmi;
 void imx_hdmi_set_sample_rate(struct imx_hdmi *hdmi, unsigned int rate);
+uint8_t *imx_hdmi_get_eld(struct imx_hdmi *hdmi);
 
 #endif /* __IMX_HDMI_H__ */
