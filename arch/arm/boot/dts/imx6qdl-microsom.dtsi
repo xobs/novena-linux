@@ -1,13 +1,82 @@
 /*
  * Copyright (C) 2013,2014 Russell King
  */
+#include <dt-bindings/gpio/gpio.h>
+/ {
+	regulators {
+		compatible = "simple-bus";
+
+		reg_brcm_osc: brcm-osc-reg {
+			compatible = "regulator-fixed";
+			enable-active-high;
+			gpio = <&gpio5 5 0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_microsom_brcm_osc_reg>;
+			regulator-name = "brcm_osc_reg";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		reg_brcm: brcm-reg {
+			compatible = "regulator-fixed";
+			enable-active-high;
+			gpio = <&gpio3 19 0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
+			regulator-name = "brcm_reg";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			startup-delay-us = <200000>;
+		};
+	};
+};
 
 &iomuxc {
 	microsom {
+		pinctrl_microsom_brcm_osc_reg: microsom-brcm-osc-reg {
+			fsl,pins = <
+				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05 0x40013070
+			>;
+		};
+
+		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_D19__GPIO3_IO19 0x40013070
+			>;
+		};
+
+		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
+				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
+				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
+				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
+			>;
+		};
+
+		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
+			fsl,pins = <
+				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
+				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
+				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
+			>;
+		};
+
 		pinctrl_microsom_uart1: microsom-uart1 {
 			fsl,pins = <
 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
 				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+			>;
+		};
+
+		pinctrl_microsom_uart4_1: microsom-uart4 {
+			fsl,pins = <
+				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
+				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
+				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
 			>;
 		};
 
@@ -27,7 +96,25 @@
 	status = "okay";
 };
 
+/* UART4 - Connected to optional BRCM Wifi/BT/FM */
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4_1>;
+	fsl,uart-has-rtscts;
+};
+
 &usbotg {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_microsom_usbotg>;
+};
+
+/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
+&usdhc1 {
+	card-external-vcc-supply = <&reg_brcm>;
+	card-reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>, <&gpio6 0 GPIO_ACTIVE_LOW>;
+	keep-power-in-suspend;
+	non-removable;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_usdhc1_2>;
+	vmmc-supply = <&reg_brcm>;
 };
