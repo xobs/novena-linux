@@ -164,7 +164,7 @@ static const DECLARE_TLV_DB_SCALE(pga_tlv, 0, 300, 0);
 static const struct snd_kcontrol_new es8328_snd_controls[] = {
 SOC_DOUBLE_R_TLV("Speaker Playback Volume",
 		ES8328_DACCONTROL26, ES8328_DACCONTROL27, 0, 0x24, 0, play_tlv),
-SOC_DOUBLE_R_TLV("HP Playback Volume",
+SOC_DOUBLE_R_TLV("Headphone Playback Volume",
 		ES8328_DACCONTROL24, ES8328_DACCONTROL25, 0, 0x24, 0, play_tlv),
 
 SOC_DOUBLE_R_TLV("Mic Capture Volume",

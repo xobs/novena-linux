@@ -89,7 +89,7 @@ static int imx_novena_dai_init(struct snd_soc_pcm_runtime *rtd)
 
 static const struct snd_soc_dapm_widget imx_novena_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
-	SND_SOC_DAPM_HP("Headphone Jack", NULL),
+	SND_SOC_DAPM_HP("Headphone", NULL),
 	SND_SOC_DAPM_SPK("Ext Spk", NULL),
 };
 
