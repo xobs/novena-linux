@@ -70,6 +70,10 @@ static void led_pwm_set(struct led_classdev *led_cdev,
 
 	duty *= brightness;
 	do_div(duty, max);
+
+	if (led_dat->active_low)
+		duty = led_dat->period - duty;
+
 	led_dat->duty = duty;
 
 	if (led_dat->can_sleep)
@@ -93,6 +97,10 @@ static int led_pwm_create_of(struct platform_device *pdev,
 	for_each_child_of_node(pdev->dev.of_node, child) {
 		struct led_pwm_data *led_dat = &priv->leds[priv->num_leds];
 
+		led_dat->cdev.brightness_set = led_pwm_set;
+		led_dat->cdev.brightness = LED_OFF;
+		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+
 		led_dat->cdev.name = of_get_property(child, "label",
 						     NULL) ? : child->name;
 
@@ -110,10 +118,9 @@ static int led_pwm_create_of(struct platform_device *pdev,
 						"linux,default-trigger", NULL);
 		of_property_read_u32(child, "max-brightness",
 				     &led_dat->cdev.max_brightness);
-
-		led_dat->cdev.brightness_set = led_pwm_set;
-		led_dat->cdev.brightness = LED_OFF;
-		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+		of_property_read_u32(child, "default-brightness",
+				     &led_dat->cdev.brightness);
+		led_dat->active_low = of_property_read_bool(child, "active-low");
 
 		led_dat->can_sleep = pwm_can_sleep(led_dat->pwm);
 		if (led_dat->can_sleep)
