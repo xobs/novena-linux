@@ -33,7 +33,8 @@
 #define PFUZE100_VGEN4		12
 #define PFUZE100_VGEN5		13
 #define PFUZE100_VGEN6		14
-#define PFUZE100_MAX_REGULATOR	15
+#define PFUZE100_COIN		15
+#define PFUZE100_MAX_REGULATOR	16
 
 struct regulator_init_data;
 
