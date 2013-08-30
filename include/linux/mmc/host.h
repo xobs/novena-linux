@@ -283,6 +283,7 @@ struct mmc_host {
 #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
 #define MMC_CAP2_SANITIZE	(1 << 15)		/* Support Sanitize */
 #define MMC_CAP2_SDIO_NOTHREAD	(1 << 16)	/* don't have separate thread */
+#define MMC_CAP2_BKOPS_EN	(1 << 16)	/* Enable BKOPS */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
