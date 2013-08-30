@@ -1267,6 +1267,24 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	}
 
 	/*
+	 * Enable BKOPS feature (if supported and not enabled)
+	 */
+	if (!card->ext_csd.bkops_en && (host->caps2 & MMC_CAP2_BKOPS_EN) &&
+			(ext_csd[EXT_CSD_BKOPS_SUPPORT] & 0x1)) {
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_BKOPS_EN, 1,
+				card->ext_csd.generic_cmd6_time);
+		if (err && err != -EBADMSG)
+			goto free_card;
+		if (err) {
+			pr_warning("%s: Enabling BKOPS failed\n",
+				   mmc_hostname(card->host));
+			err = 0;
+		} else
+			card->ext_csd.bkops_en = 1;
+	}
+
+	/*
 	 * Enable HPI feature (if supported)
 	 */
 	if (card->ext_csd.hpi) {
