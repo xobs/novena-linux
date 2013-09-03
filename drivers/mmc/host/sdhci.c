@@ -42,7 +42,8 @@
 #define SDHCI_USE_LEDS_CLASS
 #endif
 
-#define MAX_TUNING_LOOP 40
+#define MAX_TUNING_LOOP 	40
+#define MAX_BUSY_WAIT_LOOP 	100
 
 #define ADMA_SIZE	((128 * 2 + 1) * 4)
 
@@ -2068,6 +2069,44 @@ static const struct mmc_host_ops sdhci_ops = {
 
 /*****************************************************************************\
  *                                                                           *
+ * Workqueues								     *
+ *                                                                           *
+\*****************************************************************************/
+
+/* Internal work. Work to wait for the busy signalling to finish. Certain
+ * eMMC operations may take too long time to complete.
+ */
+static void sdhci_work_wait_for_busy(struct work_struct *work)
+{
+	struct sdhci_host *host = container_of(work, struct sdhci_host,
+					      wait_for_busy_work);
+	int wait_cnt = 0;
+
+	/*
+	 * According to Arasan, when DTOERR occured while CMD38/CMD6,
+	 * which is not treated as normal and as an error by the Host,
+	 * host driver should reset CMD & DATA Lines for SDHC internal state.
+	 */
+	pr_debug("Resetting CMD & DATA Lines at once\n");
+	sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
+
+	pr_info("Waiting for BUSY signalling to end\n");
+	while (wait_cnt++ < MAX_BUSY_WAIT_LOOP &&
+		(sdhci_readl(host, SDHCI_PRESENT_STATE) &
+			SDHCI_DATA_LVL_DAT0_MASK) == 0) {
+		msleep(100);
+        }
+	pr_info("End of BUSY signalling\n");
+
+	if (wait_cnt >= MAX_BUSY_WAIT_LOOP)
+		pr_err("%s: Operation takes too long to finish!\n",
+				mmc_hostname(host->mmc));
+
+	sdhci_finish_command(host);
+}
+
+/*****************************************************************************\
+ *                                                                           *
  * Tasklets                                                                  *
  *                                                                           *
 \*****************************************************************************/
@@ -2286,6 +2325,26 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 			if (intmask & SDHCI_INT_DATA_END) {
 				sdhci_finish_command(host);
 				return;
+			}
+
+			/*
+			 * Some eMMC takes a long time for the erase & certain
+			 * operations to finish. Timeout might be triggered well
+			 * before erase or SWITCH operation finishes. If this
+			 * happens schedule a workqueue work item to monitor
+			 * the DAT0 line to wait for operation to finish.
+			 */
+			if (intmask & SDHCI_INT_DATA_TIMEOUT &&
+					(host->cmd->opcode == MMC_ERASE ||
+					 host->cmd->opcode == MMC_SWITCH)) {
+				if ((sdhci_readl(host, SDHCI_PRESENT_STATE) &
+						SDHCI_DATA_LVL_DAT0_MASK) == 0) {
+					schedule_work(&host->wait_for_busy_work);
+					return;
+				} else {
+					sdhci_finish_command(host);
+					return;
+				}
 			}
 		}
 
@@ -2536,6 +2595,9 @@ int sdhci_suspend_host(struct sdhci_host *host)
 		del_timer_sync(&host->tuning_timer);
 		host->flags &= ~SDHCI_NEEDS_RETUNING;
 	}
+
+	/* Flush and wait for busy operation to complete */
+	flush_work(&host->wait_for_busy_work);
 
 	if (!device_may_wakeup(mmc_dev(host->mmc))) {
 		host->ier = 0;
@@ -3186,6 +3248,7 @@ int sdhci_add_host(struct sdhci_host *host)
 		sdhci_tasklet_finish, (unsigned long)host);
 
 	setup_timer(&host->timer, sdhci_timeout_timer, (unsigned long)host);
+	INIT_WORK(&host->wait_for_busy_work, sdhci_work_wait_for_busy);
 
 	if (host->version >= SDHCI_SPEC_300) {
 		init_waitqueue_head(&host->buf_ready_int);
@@ -3288,6 +3351,9 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	sdhci_writel(host, 0, SDHCI_INT_ENABLE);
 	sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
 	free_irq(host->irq, host);
+
+	/* Flush and wait for busy operation to complete */
+	flush_work(&host->wait_for_busy_work);
 
 	del_timer_sync(&host->timer);
 

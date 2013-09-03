@@ -142,6 +142,8 @@ struct sdhci_host {
 	bool runtime_suspended;	/* Host is runtime suspended */
 	bool bus_on;		/* Bus power prevents runtime suspend */
 
+	struct work_struct wait_for_busy_work; /* work to wait for busy to end */
+
 	struct mmc_request *mrq;	/* Current request */
 	struct mmc_command *cmd;	/* Current command */
 	struct mmc_data *data;	/* Current data request */
