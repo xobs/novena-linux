@@ -8,3 +8,6 @@ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
 
 tda998x-y := tda998x_drv.o
 obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
+
+stdp4028-y := stdp4028_drv.o
+obj-$(CONFIG_DRM_I2C_STDP4028) += stdp4028.o
