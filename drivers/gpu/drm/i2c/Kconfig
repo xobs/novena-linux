@@ -25,4 +25,11 @@ config DRM_I2C_NXP_TDA998X
 	help
 	  Support for NXP Semiconductors TDA998X HDMI encoders.
 
+config DRM_I2C_STDP4028
+	tristate "STMicroelectronics STDP4028 DisplayPort encoder"
+	default m if DRM_NOVENA
+	help
+	  Support for STMicroelectronics STDP4028 LVDS to DisplayPort
+	  encoder.
+
 endmenu
