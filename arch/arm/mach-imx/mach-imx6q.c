@@ -323,3 +323,8 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
 	.dt_compat	= imx6q_dt_compat,
 	.restart	= mxc_restart,
 MACHINE_END
+
+void v7_dma_flush_range(void *start, void *end);
+void v7_dma_map_area(void *start, u32 size, u32 dir);
+EXPORT_SYMBOL(v7_dma_flush_range);
+EXPORT_SYMBOL(v7_dma_map_area);
