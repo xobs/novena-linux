@@ -484,7 +484,7 @@ static const struct snd_soc_dai_ops es8328_dai_ops = {
 };
 
 static struct snd_soc_dai_driver es8328_dai = {
-	.name = "es8328",
+	.name = "es8328-hifi-analog",
 	.playback = {
 		.stream_name = "Playback",
 		.channels_min = 2,
@@ -521,7 +521,7 @@ static int es8328_probe(struct snd_soc_codec *codec)
 	int ret;
 	struct device *dev = codec->dev;
 
-	dev_dbg(dev, "probing audio codec\n");
+	dev_dbg(dev, "probing es8328 audio codec\n");
 	ret = snd_soc_codec_set_cache_io(codec, 7, 9, SND_SOC_REGMAP);
 	if (ret < 0) {
 		dev_err(dev, "failed to configure cache I/O: %d\n",
@@ -533,7 +533,7 @@ static int es8328_probe(struct snd_soc_codec *codec)
 	es8328_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	es8328_init(codec);
 
-	return ret;
+	return 0;
 }
 
 static int es8328_remove(struct snd_soc_codec *codec)
@@ -589,6 +589,8 @@ static int es8328_spi_probe(struct spi_device *spi)
 
 	ret = snd_soc_register_codec(&spi->dev,
 			&soc_codec_dev_es8328, &es8328_dai, 1);
+	if (ret < 0)
+		dev_err(&spi->dev, "Unable to register codec: %d\n", ret);
 
 	return ret;
 }
@@ -649,7 +651,7 @@ MODULE_DEVICE_TABLE(i2c, es8328_i2c_id);
 
 static struct i2c_driver es8328_i2c_driver = {
 	.driver = {
-		.name = "es8328",
+		.name = "es8328-codec",
 		.owner = THIS_MODULE,
 		.of_match_table = es8328_of_match,
 	},

@@ -266,9 +266,9 @@ static int imx_novena_probe(struct platform_device *pdev)
 		goto fail;
 
 
-	data->dai.name = "HiFi";
-	data->dai.stream_name = "HiFi";
-	data->dai.codec_dai_name = "es8328";
+	data->dai.name = "hifi";
+	data->dai.stream_name = "hifi";
+	data->dai.codec_dai_name = "es8328-hifi-analog";
 	data->dai.codec_of_node = codec_np;
 	data->dai.cpu_of_node = ssi_np;
 	data->dai.platform_of_node = ssi_np;
