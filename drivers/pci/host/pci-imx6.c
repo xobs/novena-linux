@@ -14,6 +14,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/mfd/syscon.h>
 #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
@@ -206,6 +207,14 @@ static int pcie_phy_write(void __iomem *dbi_base, int addr, int data)
 
 	return 0;
 }
+
+static irqreturn_t imx6_pcie_msi_irq_handler(int irq, void *arg)
+{
+	struct pcie_port *pp = arg;
+	dw_handle_msi_irq(pp);
+	return IRQ_HANDLED;
+}
+
 
 /*  Added for PCI abort handling */
 static int imx6q_pcie_abort_handler(unsigned long addr,
@@ -407,6 +416,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
 
 	imx6_pcie_start_link(pp);
 
+	if (IS_ENABLED(CONFIG_PCI_MSI))
+		dw_pcie_msi_init(pp);
+
 	return;
 }
 
@@ -480,6 +492,22 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
 	if (!pp->irq) {
 		dev_err(&pdev->dev, "failed to get irq\n");
 		return -ENODEV;
+	}
+
+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+		pp->msi_irq = platform_get_irq(pdev, 1);
+		if (!pp->msi_irq) {
+			dev_err(&pdev->dev, "failed to get msi irq\n");
+			return -ENODEV;
+		}
+
+		ret = devm_request_irq(&pdev->dev, pp->msi_irq,
+					imx6_pcie_msi_irq_handler,
+					IRQF_SHARED, "imx6-pcie", pp);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to request msi irq\n");
+			return ret;
+		}
 	}
 
 	pp->root_bus_nr = -1;
