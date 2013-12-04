@@ -1,0 +1,575 @@
+/*
+ * Copyright 2012 Freescale Semiconductor, Inc.
+ * Copyright 2011 Linaro Ltd.
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+#include "imx6q.dtsi"
+
+/ {
+	model = "Kosagi Novena (i.MX6 Quad)";
+	compatible = "fsl,imx6q-novena", "fsl,imx6q";
+        chosen {
+                bootargs = "console=ttymxc1,115200 earlyprintk root=/dev/mmcblk0p2 rootwait rootfstype=ext4";
+        };
+
+	memory {
+		reg = <0x10000000 0x40000000>;
+	};
+
+	soc {
+		gpu {
+			compatible = "fsl,imx6q-gpu";
+			clocks = <&clks 122>, <&clks 74>, <&clks 27>,
+				<&clks 121>, <&clks 26>,
+				<&clks 143>;
+			clock-names = "gpu3d_clk", "gpu3d_shader_clk", "gpu3d_axi_clk",
+				"gpu2d_clk", "gpu2d_axi_clk",
+				"openvg_axi_clk";
+			interrupts = <0 9 0x04>, <0 10 0x04>, <0 11 0x04>;
+			interrupt-names = "irq-3d", "irq-2d", "irq-vg";
+			reg = <0 0>, <0x00130000 0x4000>, <0x00134000 0x4000>, <0x02204000 0x4000>;
+			reg-names = "phys-addr", "iobase-3d", "iobase-2d", "iobase-vg";
+		};
+
+		vpu {
+			compatible = "fsl,imx6q-vpu";
+			clocks = <&clks 122>, <&clks 74>, <&clks 27>,
+				<&clks 121>, <&clks 26>,
+				<&clks 143>,
+				<&clks 168>, <&clks 168>;
+			clock-names = "gpu3d_core", "gpu3d_shader", "gpu3d_axi_clk",
+				"gpu2d_core", "gpu2d_axi",
+				"openvg_axi",
+				"vpu_axi", "vpu_clk";
+			interrupts = <0 12 0x04>, <0 3 0x04>;
+			interrupt-names = "vpu_ipi_irq", "vpu_jpu_irq";
+			reg = <0x02040000 0x4000>;
+			reg-names = "vpu_regs";
+			iram-size = <0x21000>;
+		};
+	};
+
+	regulators {
+		compatible = "simple-bus";
+
+		reg_2p5v: 2p5v {
+			compatible = "regulator-fixed";
+			regulator-name = "2P5V";
+			regulator-min-microvolt = <2500000>;
+			regulator-max-microvolt = <2500000>;
+			regulator-always-on;
+		};
+
+		reg_3p3v: 3p3v {
+			compatible = "regulator-fixed";
+			regulator-name = "3P3V";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+		};
+
+		reg_usb_otg_vbus: usb_otg_vbus {
+			compatible = "regulator-fixed";
+			regulator-name = "usb_otg_vbus";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			//gpio = <&gpio3 22 0>;
+			enable-active-high;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		heartbeat {
+			label = "novena::usr0";
+			gpios = <&gpio3 19 0>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
+        backlight {
+                compatible = "pwm-backlight";
+                pwms = <&pwm1 0 10000>;
+
+                brightness-levels = <0 3 6 12 16 24 32 48 64 96 128 192 255>;
+                default-brightness-level = <12>;
+        };
+
+        imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu2 0>, <&ipu2 1>,
+			<&ipu1 0>, <&ipu1 1>;
+		connectors = <&ldb>, <&hdmi>;
+	};
+
+	sound {
+		compatible = "fsl,imx-audio-novena";
+		model = "imx-audio-novena";
+		clocks = <&clks 169>, <&clks 57>, <&clks 173>, <&clks 203>, <&clks 201>;
+		clock-names = "cko1", "cko1_sel", "pll4_audio", "pll4_post_div", "cko_sel";
+		ssi-controller = <&ssi1>;
+		audio-codec = <&codec>;
+		power-gpio = <&gpio5 17 0>;
+		jack-gpio = <&gpio5 15 0>;
+		audio-routing =
+			"MIC_IN", "Mic Jack",
+			"Mic Jack", "Mic Bias",
+			"Headphone Jack", "HP_OUT",
+			"Ext Spk", "SPK_OUT";
+		mux-int-port = <1>;
+		mux-ext-port = <3>;
+	};
+
+};
+
+&ssi1 {
+	fsl,mode = "i2s-slave";
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart2_1>;
+};
+
+&uart3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart3_1>;
+};
+
+&uart4 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart4_2>;
+};
+
+&sata {
+	status = "okay";
+};
+
+&iomuxc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hog>;
+
+	hog {
+		pinctrl_hog: hoggrp {
+			fsl,pins = <
+				//MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
+				//MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
+
+				/* Here to prevent I2C from leaking */
+				MX6QDL_PAD_GPIO_3__GPIO1_IO03 0x80000000
+				MX6QDL_PAD_GPIO_5__GPIO1_IO05 0x80000000
+				MX6QDL_PAD_GPIO_6__GPIO1_IO06 0x80000000
+
+				/* Audio power switch */
+				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17 0x80000000 /* Write protect */
+
+				/* uSDHC2 */
+				MX6QDL_PAD_GPIO_2__GPIO1_IO02   0x80000000 /* Write protect */
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000 /* Card detect */
+
+				/* Ethernet reset */
+				MX6QDL_PAD_EIM_D23__GPIO3_IO23  0x80000000
+
+				/* Headphone plug */
+				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15 0x80000000
+				MX6QDL_PAD_GPIO_0__CCM_CLKO1       0x80000000
+
+				/* Touchscreen interrupt */
+				MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13 0x80000000
+
+				/* GPIO LED */
+				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+
+				/* PCI express */
+				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000 /* Wakeup */
+				MX6QDL_PAD_EIM_D29__GPIO3_IO29  0x80000000 /* Reset */
+				MX6QDL_PAD_GPIO_17__GPIO7_IO12  0x80000000 /* Power On */
+				MX6QDL_PAD_EIM_A22__GPIO2_IO16  0x80000000 /* Wifi kill */
+
+				/* FPGA power */
+				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x80000000
+
+				/* Taking these pins away from UART4 */
+				MX6QDL_PAD_KEY_COL0__GPIO4_IO06 0x80000000
+				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07 0x80000000
+
+				/* PMB "reprogram" GPIO */
+				/*MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20 0x80000000*/
+
+				/* PMB "reset" GPIO */
+				/*MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21 0x80000000*/
+			>;
+		};
+	};
+
+	enet {
+		pinctrl_enet_novena: enetgrp-novena {
+			fsl,pins = <
+				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
+				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
+				//MX6QDL_PAD_RGMII_TXC__RGMII_TXC_DDR3  0x1b020
+				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b020
+				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b028
+				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b028
+				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b028
+				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b028
+				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b028
+				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
+				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
+				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
+				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
+				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
+				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
+				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
+				MX6QDL_PAD_GPIO_16__ENET_REF_CLK      0x4001b0a8
+			>;
+		};
+	};
+
+	uart4 {
+		pinctrl_uart4_2: uart4grp-2 {
+			fsl,pins = <
+				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
+			>;
+		};
+	};
+
+	hdmi {
+		pinctrl_novena_hdmi: carrier1-hdmi {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+			>;
+	       };
+	};
+
+};
+
+&fec {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet_novena>;
+	phy-mode = "rgmii";
+	phy-reset-gpios = <&gpio3 23 0>;
+	mac-address = [00 22 C6 87 72 03];
+	rxc-skew-ps = <3000>;
+	rxdv-skew-ps = <0>;
+	txc-skew-ps = <3000>;
+	txen-skew-ps = <0>;
+	rxd0-skew-ps = <0>;
+	rxd1-skew-ps = <0>;
+	rxd2-skew-ps = <0>;
+	rxd3-skew-ps = <0>;
+	txd0-skew-ps = <3000>;
+	txd1-skew-ps = <3000>;
+	txd2-skew-ps = <3000>;
+	txd3-skew-ps = <3000>;
+};
+
+&usdhc2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc2_1>;
+	cd-gpios = <&gpio1 4 0>;
+	wp-gpios = <&gpio1 2 0>;
+	status = "okay";
+};
+
+&usdhc3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc3_2>;
+	non-removable;
+	status = "okay";
+};
+
+&usbotg {
+	vbus-supply = <&reg_usb_otg_vbus>;
+	dr_mode = "otg";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usbotg_2>;
+	disable-over-current;
+	status = "okay";
+};
+
+&usbh1 {
+	status = "okay";
+};
+
+&audmux {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_audmux_2>;
+};
+
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c1_1>;
+	status = "okay";
+
+	stmpe610@0 {
+		compatible = "st,stmpe610";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x44>;
+		irq-over-gpio;
+		irq-gpios = <&gpio5 13 0>;
+		id = <0>;
+		blocks = <0x5>;
+		irq-trigger = <0x1>;
+
+		stmpe_adc {
+			compatible = "st,stmpe-adc";
+		};
+		stmpe_touchscreen {
+			compatible = "st,stmpe-ts";
+			ts,sample-time = <4>;
+			ts,mod-12b = <1>;
+			ts,ref-sel = <0>;
+			ts,adc-freq = <1>;
+			ts,ave-ctrl = <1>;
+			ts,touch-det-delay = <2>;
+			ts,settling = <2>;
+			ts,fraction-z = <7>;
+			ts,i-drive = <1>;
+		};
+/*
+		stmpe_gpio {
+			compatible = "st,stmpe-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+*/
+	};
+};
+
+&i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2_1>;
+	status = "okay";
+
+	pmic: pfuze100@08 {
+		compatible = "fsl,pfuze100";
+		reg = <0x08>;
+
+		regulators {
+			sw1a_reg: sw1ab {
+				regulator-min-microvolt = <300000>;
+				regulator-max-microvolt = <1875000>;
+				regulator-boot-on;
+				regulator-always-on;
+				regulator-ramp-delay = <6250>;
+			};
+
+			sw1c_reg: sw1c {
+				regulator-min-microvolt = <300000>;
+				regulator-max-microvolt = <1875000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw2_reg: sw2 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw3a_reg: sw3a {
+				regulator-min-microvolt = <400000>;
+				regulator-max-microvolt = <1975000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw3b_reg: sw3b {
+				regulator-min-microvolt = <400000>;
+				regulator-max-microvolt = <1975000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw4_reg: sw4 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			swbst_reg: swbst {
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5150000>;
+			};
+
+			snvs_reg: vsnvs {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3000000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vref_reg: vrefddr {
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vgen1_reg: vgen1 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1550000>;
+			};
+
+			vgen2_reg: vgen2 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1550000>;
+			};
+
+			vgen3_reg: vgen3 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			vgen4_reg: vgen4 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+
+			vgen5_reg: vgen5 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+
+			vgen6_reg: vgen6 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+
+			coin_reg: coin {
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+		};
+	};
+};
+
+&i2c3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3_1>;
+	status = "okay";
+
+	codec: es8328@11 {
+		compatible = "everest,es8328";
+		reg = <0x11>;
+		status = "disabled";
+	};
+
+	stdp4028@73 {
+		compatible = "st,stdp4028";
+		power-switch = <&gpio5 28 0>;
+		reg = <0x73>;
+		status = "disabled";
+	};
+
+	/* Utility EEPROM */
+};
+
+&ecspi3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ecspi3_1>;
+	fsl,spi-num-chipselects = <3>;
+	status = "okay";
+
+	spidev@0x00 {
+		compatible = "spidev";
+		spi-max-frequency = <30000000>;
+		reg = <0>;
+	};
+};
+
+&pcie {
+	reset-gpio = <&gpio3 29 0>;
+	power-on-gpio = <&gpio7 12 0>;
+	wake-up-gpio = <&gpio3 22 0>;
+	disable-gpio = <&gpio2 16 0>;
+};
+
+&ldb {
+	fsl,dual-channel;
+	status = "disabled";
+        lvds-channel@0 {
+		fsl,data-mapping = "jeida";
+		fsl,data-width = <24>;
+		crtcs = <&ipu2 0>, <&ipu2 1>;
+                display-timings {
+			2560x1700p50 {
+				clock-frequency = <185000000>;
+				hactive = <2560>;
+				vactive = <1700>;
+				hback-porch = <80>;
+				hfront-porch = <48>;
+				hsync-len = <32>;
+				vback-porch = <36>;
+				vfront-porch = <3>;
+				vsync-len = <10>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+                };
+        };
+};
+
+&hdmi {
+	ddc = <&i2c2>;
+	crtcs = <&ipu1 0>;
+	pinctrl-0 = <&pinctrl_novena_hdmi>;
+	display-timings {
+		1280x720p60 {
+			clock-frequency = <74176000>;
+			hactive = <1280>;
+			vactive = <720>;
+			hback-porch = <110>;
+			hfront-porch = <220>;
+			hsync-len = <40>;
+			vback-porch = <20>;
+			vfront-porch = <5>;
+			vsync-len = <5>;
+			hsync-active = <1>;
+			vsync-active = <1>;
+		};
+	};
+};
+
+
+/*
+&caam {
+	compatible = "fsl,sec-v4.0";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	reg = <0x02100000 0x40000>;
+	ranges = <0 0x02100000 0x40000>;
+
+	sec_jr0: jr@1000 {
+		compatible = "fsl,sec-v4.0-job-ring";
+		reg = <0x100000 0x1000>;
+		interrupts = <0 105 0x04>;
+	};
+
+	sec_jr1: jr@2000 {
+		compatible = "fsl,sec-v4.0-job-ring";
+		reg = <0x200000 0x1000>;
+		interrupts = <0 106 0x04>;
+	};
+};
+*/
+
