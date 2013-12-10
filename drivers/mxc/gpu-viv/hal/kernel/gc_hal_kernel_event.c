@@ -1586,10 +1586,6 @@ gckEVENT_Submit(
         /* Release the command queue. */
         gcmkONERROR(gckCOMMAND_ExitCommit(command, FromPower));
         commitEntered = gcvFALSE;
-
-#if !gcdNULL_DRIVER
-        gcmkVERIFY_OK(_TryToIdleGPU(Event));
-#endif
     }
 
     /* Success. */
