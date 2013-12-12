@@ -2301,15 +2301,6 @@ gckEVENT_Destroy(
     IN gckEVENT Event
     );
 
-/* Reserve the next available hardware event. */
-gceSTATUS
-gckEVENT_GetEvent(
-    IN gckEVENT Event,
-    IN gctBOOL Wait,
-    OUT gctUINT8 * EventID,
-    IN gceKERNEL_WHERE Source
-   );
-
 /* Add a new event to the list of events. */
 gceSTATUS
 gckEVENT_AddList(
