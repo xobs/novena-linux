@@ -4144,6 +4144,10 @@ gckHARDWARE_SetPowerManagementState(
     gcmkONERROR(gckOS_GetProcessID(&process));
     gcmkONERROR(gckOS_GetThreadID(&thread));
 
+    /* Before we grab locks see if this is actually a needed change */
+    if (State == Hardware->chipPowerState)
+        return gcvSTATUS_OK;
+
     if (broadcast)
     {
         /* Try to acquire the power mutex. */
@@ -4262,6 +4266,14 @@ gckHARDWARE_SetPowerManagementState(
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
                        "Power Off GPU[%d] at %u [supposed to be at %u]",
                        Hardware->core, currentTime, Hardware->powerOffTime);
+    }
+
+    if (State == gcvPOWER_ON || State == gcvPOWER_OFF)
+    {
+        gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE, "Cancel powerOfftimer");
+
+        /* Cancel running timer when GPU enters ON or OFF. */
+        gcmkVERIFY_OK(gckOS_StopTimer(os, Hardware->powerOffTimer));
     }
 #endif
 
@@ -4702,24 +4714,15 @@ gckHARDWARE_SetPowerManagementState(
 #endif
 
 #if gcdPOWEROFF_TIMEOUT
-    /* Reset power off time */
-    gcmkONERROR(gckOS_GetTicks(&currentTime));
-
-    Hardware->powerOffTime = currentTime + Hardware->powerOffTimeout;
-
     if (State == gcvPOWER_IDLE || State == gcvPOWER_SUSPEND)
     {
+        gcmkONERROR(gckOS_GetTicks(&currentTime));
+
+        Hardware->powerOffTime = currentTime + Hardware->powerOffTimeout;
         /* Start a timer to power off GPU when GPU enters IDLE or SUSPEND. */
         gcmkVERIFY_OK(gckOS_StartTimer(os,
                                        Hardware->powerOffTimer,
                                        Hardware->powerOffTimeout));
-    }
-    else
-    {
-        gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE, "Cancel powerOfftimer");
-
-        /* Cancel running timer when GPU enters ON or OFF. */
-        gcmkVERIFY_OK(gckOS_StopTimer(os, Hardware->powerOffTimer));
     }
 #endif
 
