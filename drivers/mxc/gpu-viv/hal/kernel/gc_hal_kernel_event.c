@@ -2012,6 +2012,12 @@ gckEVENT_Notify(
 
         queue = gcvNULL;
 
+        /* Grab the mutex queue. */
+        gcmkONERROR(gckOS_AcquireMutex(Event->os,
+                                       Event->eventQueueMutex,
+                                       gcvINFINITE));
+        acquired = gcvTRUE;
+
         gcmDEBUG_ONLY(
             if (IDs == 0)
             {
@@ -2057,6 +2063,10 @@ gckEVENT_Notify(
                 "Interrupts 0x%x are not pending.",
                 pending
                 );
+
+            /* Release the mutex queue. */
+            gcmkONERROR(gckOS_ReleaseMutex(Event->os, Event->eventQueueMutex));
+            acquired = gcvFALSE;
 
 #if gcdSMP
             /* Mark pending interrupts as handled. */
@@ -2131,11 +2141,8 @@ gckEVENT_Notify(
         suspended = gcvFALSE;
 #endif
 
-        /* Grab the mutex queue. */
-        gcmkONERROR(gckOS_AcquireMutex(Event->os,
-                                       Event->eventQueueMutex,
-                                       gcvINFINITE));
-        acquired = gcvTRUE;
+        /* We are in the notify loop. */
+        Event->inNotify = gcvTRUE;
 
         /* We are in the notify loop. */
         Event->inNotify = gcvTRUE;
