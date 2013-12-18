@@ -1032,16 +1032,20 @@ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
 	imx_hdmi_phy_gen2_pddq(hdmi, 0);
 
 	/*Wait for PHY PLL lock */
-	msec = 4;
-	val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-	while (!val) {
-		udelay(1000);
-		if (msec-- == 0) {
-			dev_dbg(hdmi->dev, "PHY PLL not locked\n");
+	msec = 5;
+	do {
+		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+		if (!val)
+			break;
+
+		if (msec == 0) {
+			dev_err(hdmi->dev, "PHY PLL not locked\n");
 			return -EINVAL;
 		}
-		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-	}
+
+		udelay(1000);
+		msec--;
+	} while (1);
 
 	return 0;
 }
