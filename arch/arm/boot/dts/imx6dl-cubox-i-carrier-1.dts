@@ -27,6 +27,12 @@
 		pinctrl-0 = <&pinctrl_carrier1_spdif>;
 	};
 
+	imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>;
+		connectors = <&hdmi>;
+	};
+
 	sound-spdif {
 		compatible = "fsl,imx-audio-spdif";
 		model = "imx-spdif";
@@ -34,6 +40,14 @@
 		spdif-controller = <&spdif>;
 		spdif-out;
 	};
+};
+
+&hdmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_carrier1_hdmi>;
+	ddc = <&i2c2>;
+	status = "okay";
+	crtcs = <&ipu1 0>;
 };
 
 &i2c1 {
@@ -51,11 +65,24 @@
 	 */
 };
 
+&i2c2 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2_2>;
+	status = "okay";
+};
+
 &iomuxc {
 	carrier1 {
 		pinctrl_carrier1_gpio1_2: carrier1-gpio1_2 {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+			>;
+		};
+
+		pinctrl_carrier1_hdmi: carrier1-hdmi {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
 			>;
 		};
 
