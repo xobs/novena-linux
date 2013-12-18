@@ -19,7 +19,6 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-
 #include <linux/of_device.h>
 
 #include <drm/drmP.h>
@@ -37,7 +36,7 @@
 #define YCBCR444		1
 #define YCBCR422_16BITS		2
 #define YCBCR422_8BITS		3
-#define	XVYCC444		4
+#define XVYCC444		4
 
 enum hdmi_datamap {
 	RGB444_8B = 0x01,
@@ -1762,8 +1761,8 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *ddc_node;
 	struct imx_hdmi *hdmi;
-	int ret, irq;
 	struct resource *iores;
+	int ret, irq;
 
 	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
 	if (!hdmi)
