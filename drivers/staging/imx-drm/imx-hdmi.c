@@ -130,7 +130,6 @@ struct imx_hdmi {
 	int vic;
 
 	u8 edid[HDMI_EDID_LEN];
-	bool fb_reg;
 	bool cable_plugin;
 
 	bool phy_enabled;
@@ -1451,9 +1450,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 {
 	int ret;
 
-	if (hdmi->fb_reg)
-		return 0;
-
 	ret = clk_prepare_enable(hdmi->iahb_clk);
 	if (ret)
 		return ret;
@@ -1473,8 +1469,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 
 	/* Unmute interrupts */
 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
-
-	hdmi->fb_reg = true;
 
 	clk_disable_unprepare(hdmi->iahb_clk);
 
