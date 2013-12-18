@@ -1275,7 +1275,7 @@ static void hdmi_av_composer(struct imx_hdmi *hdmi,
 	hdmi_writeb(hdmi, hsync_len >> 8, HDMI_FC_HSYNCINWIDTH1);
 	hdmi_writeb(hdmi, hsync_len, HDMI_FC_HSYNCINWIDTH0);
 
-	/* Set up VSYNC active edge delay (in pixel clks) */
+	/* Set up VSYNC active edge delay (in lines) */
 	vsync_len = mode->vsync_end - mode->vsync_start;
 	hdmi_writeb(hdmi, vsync_len, HDMI_FC_VSYNCINWIDTH);
 }
