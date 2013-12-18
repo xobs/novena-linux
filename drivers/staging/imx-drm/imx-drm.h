@@ -5,13 +5,14 @@
 
 #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
 
+struct device_node;
 struct drm_crtc;
 struct drm_connector;
 struct drm_device;
 struct drm_encoder;
-struct imx_drm_crtc;
 struct drm_fbdev_cma;
 struct drm_framebuffer;
+struct imx_drm_crtc;
 struct platform_device;
 
 int imx_drm_crtc_id(struct imx_drm_crtc *crtc);
@@ -46,8 +47,6 @@ int imx_drm_panel_format_pins(struct drm_encoder *encoder,
 		u32 interface_pix_fmt, int hsync_pin, int vsync_pin);
 int imx_drm_panel_format(struct drm_encoder *encoder,
 		u32 interface_pix_fmt);
-
-struct device_node;
 
 int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
 int imx_drm_encoder_parse_of(struct drm_device *drm,
