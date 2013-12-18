@@ -325,6 +325,29 @@ void drm_helper_disable_unused_functions(struct drm_device *dev)
 EXPORT_SYMBOL(drm_helper_disable_unused_functions);
 
 /**
+ * drm_helper_crtc_possible_mask - find the mask of a registered CRTC
+ * @crtc: crtc to find mask for
+ *
+ * Given a registered CRTC, return the mask bit of that CRTC for an
+ * encoder's possible_crtcs field.
+ */
+uint32_t drm_helper_crtc_possible_mask(struct drm_crtc *crtc)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_crtc *tmp;
+	uint32_t crtc_mask = 1;
+
+	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
+		if (tmp == crtc)
+			return crtc_mask;
+		crtc_mask <<= 1;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_helper_crtc_possible_mask);
+
+/**
  * drm_encoder_crtc_ok - can a given crtc drive a given encoder?
  * @encoder: encoder to test
  * @crtc: crtc to test
@@ -334,23 +357,13 @@ EXPORT_SYMBOL(drm_helper_disable_unused_functions);
 static bool drm_encoder_crtc_ok(struct drm_encoder *encoder,
 				struct drm_crtc *crtc)
 {
-	struct drm_device *dev;
-	struct drm_crtc *tmp;
-	int crtc_mask = 1;
+	uint32_t crtc_mask;
 
 	WARN(!crtc, "checking null crtc?\n");
 
-	dev = crtc->dev;
+	crtc_mask = drm_helper_crtc_possible_mask(crtc);
 
-	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
-		if (tmp == crtc)
-			break;
-		crtc_mask <<= 1;
-	}
-
-	if (encoder->possible_crtcs & crtc_mask)
-		return true;
-	return false;
+	return !!(encoder->possible_crtcs & crtc_mask);
 }
 
 /*
