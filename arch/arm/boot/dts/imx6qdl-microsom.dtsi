@@ -78,3 +78,50 @@
 	vbus-supply = <&reg_usb_h1_vbus>;
 	status = "okay";
 };
+
+/* experimental stuff */
+
+/* USDHC1 - Allegedly connected to BRCM Wifi/BT/FM */
+&usdhc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc1_2>;
+};
+
+/* SPDIF out */
+
+/* CAN1 */
+/* CCM */
+
+/* ECSPI2 */
+
+/* I2C1 */
+/* I2C2 - HDMI DDC */
+
+/* I2C3 */
+&i2c3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3_1>;
+	status = "okay";
+};
+
+/* PWM */
+
+/* UART2 */
+
+/* USB OC pin */
+
+/* USDHC2 */
+
+/* USDHC3 */
+&usdhc3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc3_1>;
+	status = "disabled";
+};
+
+/* USDHC4 */
+&usdhc4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc4_1>;
+	status = "disabled";
+};
