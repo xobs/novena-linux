@@ -40,6 +40,7 @@ int ipu_plane_irq(struct ipu_plane *ipu_plane)
 	return ipu_idmac_channel_irq(ipu_plane->ipu, ipu_plane->ipu_ch,
 				     IPU_IRQ_EOF);
 }
+EXPORT_SYMBOL(ipu_plane_irq);
 
 static int calc_vref(struct drm_display_mode *mode)
 {
@@ -81,6 +82,7 @@ int ipu_plane_set_base(struct ipu_plane *ipu_plane, struct drm_framebuffer *fb,
 
 	return 0;
 }
+EXPORT_SYMBOL(ipu_plane_set_base);
 
 int ipu_plane_mode_set(struct ipu_plane *ipu_plane, struct drm_crtc *crtc,
 		       struct drm_display_mode *mode,
@@ -184,6 +186,7 @@ int ipu_plane_mode_set(struct ipu_plane *ipu_plane, struct drm_crtc *crtc,
 
 	return 0;
 }
+EXPORT_SYMBOL(ipu_plane_mode_set);
 
 void ipu_plane_put_resources(struct ipu_plane *ipu_plane)
 {
@@ -194,6 +197,7 @@ void ipu_plane_put_resources(struct ipu_plane *ipu_plane)
 	if (!IS_ERR_OR_NULL(ipu_plane->ipu_ch))
 		ipu_idmac_put(ipu_plane->ipu_ch);
 }
+EXPORT_SYMBOL(ipu_plane_put_resources);
 
 int ipu_plane_get_resources(struct ipu_plane *ipu_plane)
 {
@@ -228,6 +232,7 @@ err_out:
 
 	return ret;
 }
+EXPORT_SYMBOL(ipu_plane_get_resources);
 
 void ipu_plane_enable(struct ipu_plane *ipu_plane)
 {
@@ -238,6 +243,7 @@ void ipu_plane_enable(struct ipu_plane *ipu_plane)
 
 	ipu_plane->enabled = true;
 }
+EXPORT_SYMBOL(ipu_plane_enable);
 
 void ipu_plane_disable(struct ipu_plane *ipu_plane)
 {
@@ -250,6 +256,7 @@ void ipu_plane_disable(struct ipu_plane *ipu_plane)
 	ipu_idmac_disable_channel(ipu_plane->ipu_ch);
 	ipu_dmfc_disable_channel(ipu_plane->dmfc);
 }
+EXPORT_SYMBOL(ipu_plane_disable);
 
 static void ipu_plane_dpms(struct ipu_plane *ipu_plane, int mode)
 {
@@ -373,3 +380,6 @@ struct ipu_plane *ipu_plane_init(struct drm_device *dev, struct ipu_soc *ipu,
 
 	return ipu_plane;
 }
+EXPORT_SYMBOL(ipu_plane_init);
+
+MODULE_LICENSE("GPL");
