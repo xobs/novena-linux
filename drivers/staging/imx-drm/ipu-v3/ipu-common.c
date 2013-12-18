@@ -1003,19 +1003,26 @@ static int ipu_add_client_devices(struct ipu_soc *ipu)
 {
 	struct device *dev = ipu->dev;
 	unsigned i;
-	int id, ret;
+	int ipu_id, id, ret;
 
 	mutex_lock(&ipu_client_id_mutex);
-	id = ipu_client_id;
-	ipu_client_id += ARRAY_SIZE(client_reg);
+	id = ipu_client_id++;
 	mutex_unlock(&ipu_client_id_mutex);
+
+	/* FIXME: this needs a better solution */
+	ipu_id = id;
+
+	id *= ARRAY_SIZE(client_reg);
 
 	for (i = 0; i < ARRAY_SIZE(client_reg); i++) {
 		const struct ipu_platform_reg *reg = &client_reg[i];
+		struct ipu_client_platformdata pdata = reg->pdata;
 		struct platform_device *pdev;
 
+		pdata.ipu = ipu_id;
+
 		pdev = platform_device_register_data(dev, reg->name,
-			id++, &reg->pdata, sizeof(reg->pdata));
+			id++, &pdata, sizeof(pdata));
 
 		if (IS_ERR(pdev))
 			goto err_register;
