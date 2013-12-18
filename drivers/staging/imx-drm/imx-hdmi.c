@@ -375,6 +375,12 @@ void imx_hdmi_set_sample_rate(struct imx_hdmi *hdmi, unsigned int rate)
 }
 EXPORT_SYMBOL(imx_hdmi_set_sample_rate);
 
+uint8_t *imx_hdmi_get_eld(struct imx_hdmi *hdmi)
+{
+	return hdmi->connector.eld;
+}
+EXPORT_SYMBOL(imx_hdmi_get_eld);
+
 /*
  * this submodule is responsible for the video data synchronization.
  * for example, for RGB 4:4:4 input, the data map is defined as
@@ -1406,6 +1412,8 @@ static int imx_hdmi_connector_get_modes(struct drm_connector *connector)
 
 		drm_mode_connector_update_edid_property(connector, edid);
 		ret = drm_add_edid_modes(connector, edid);
+		/* Store the ELD */
+		drm_edid_to_eld(connector, edid);
 		kfree(edid);
 	} else {
 		dev_dbg(hdmi->dev, "failed to get edid\n");
