@@ -1,0 +1,56 @@
+i.MX6 cpufreq driver
+-------------------
+
+i.MX6 SoC cpufreq driver for CPU frequency scaling.
+
+This binding doc defines properties that must be put in the /cpus/cpu@0 node,
+please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+for detail.
+
+Required properties:
+- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
+  for details.
+- clocks: Specify clocks that need to be used when cpu frequency is scaled,
+  refer to Documentation/devicetree/bindings/clock/clock-bindings.txt for
+  details.
+- clock-names: List of clock input name strings sorted in the same order as the
+  clocks property, refer to Documentation/devicetree/bindings/clock/clock-bindings.txt
+  for details.
+- xxx-supply: Input voltage supply regulator, refer to
+  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+  arm-supply: regulator node supplying arm.
+  pu-supply: regulator node supplying pu.
+  soc-supply: regulator node supplying soc.
+
+Optional properties:
+- fsl,soc-operating-points: Specify vddsoc/pu voltage settings that must
+  go with cpu0's operating-points.
+- clock-latency: Specify the possible maximum transition latency for clock,
+  in unit of nanoseconds.
+
+Examples:
+
+	cpu@0 {
+		operating-points = <
+			/* kHz    uV */
+			1200000 1275000
+			996000  1250000
+			792000  1150000
+			396000  975000
+		>;
+		fsl,soc-operating-points = <
+			/* ARM kHz  SOC-PU uV */
+			1200000 1275000
+			996000	1250000
+			792000	1175000
+			396000	1175000
+		>;
+		clock-latency = <61036>; /* two CLK32 periods */
+		clocks = <&clks 104>, <&clks 6>, <&clks 16>,
+			 <&clks 17>, <&clks 170>;
+		clock-names = "arm", "pll2_pfd2_396m", "step",
+			      "pll1_sw", "pll1_sys";
+		arm-supply = <&reg_arm>;
+		pu-supply = <&reg_pu>;
+		soc-supply = <&reg_soc>;
+	};
