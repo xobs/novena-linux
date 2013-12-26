@@ -103,6 +103,13 @@
                 default-brightness-level = <12>;
         };
 
+        imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu2 0>, <&ipu2 1>,
+			<&ipu1 0>, <&ipu1 1>;
+		connectors = <&ldb>, <&hdmi>;
+	};
+
 	sound {
 		compatible = "fsl,imx-audio-novena";
 		model = "imx-audio-novena";
@@ -239,6 +246,15 @@
 			>;
 		};
 	};
+
+	hdmi {
+		pinctrl_novena_hdmi: carrier1-hdmi {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+			>;
+	       };
+	};
+
 };
 
 &fec {
@@ -515,7 +531,8 @@
 
 &hdmi {
 	ddc = <&i2c2>;
-	crtcs = <&ipu1 0>, <&ipu1 1>;
+	crtcs = <&ipu1 0>;
+	pinctrl-0 = <&pinctrl_novena_hdmi>;
 	display-timings {
 		1280x720p60 {
 			clock-frequency = <74176000>;
