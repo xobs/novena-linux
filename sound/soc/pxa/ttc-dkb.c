@@ -87,12 +87,12 @@ static int ttc_pm860x_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Headset jack detection */
 	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE
-			| SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
-			&hs_jack);
+	                 | SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
+	                 0, &hs_jack);
 	snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
 			      hs_jack_pins);
 	snd_soc_jack_new(codec, "Microphone Jack", SND_JACK_MICROPHONE,
-			 &mic_jack);
+	                 0, &mic_jack);
 	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
 			      mic_jack_pins);
 

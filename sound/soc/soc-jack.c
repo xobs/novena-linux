@@ -26,6 +26,7 @@
  * @id:    an identifying string for this jack
  * @type:  a bitmask of enum snd_jack_type values that can be detected by
  *         this jack
+ * @idx:   The index of the ALSA control created to represent the jack.
  * @jack:  structure to use for the jack
  *
  * Creates a new jack object.
@@ -34,7 +35,7 @@
  * On success jack will be initialised.
  */
 int snd_soc_jack_new(struct snd_soc_codec *codec, const char *id, int type,
-		     struct snd_soc_jack *jack)
+                     int idx, struct snd_soc_jack *jack)
 {
 	mutex_init(&jack->mutex);
 	jack->codec = codec;
@@ -42,7 +43,7 @@ int snd_soc_jack_new(struct snd_soc_codec *codec, const char *id, int type,
 	INIT_LIST_HEAD(&jack->jack_zones);
 	BLOCKING_INIT_NOTIFIER_HEAD(&jack->notifier);
 
-	return snd_jack_new(codec->card->snd_card, id, type, &jack->jack);
+	return snd_jack_new(codec->card->snd_card, id, type, idx, &jack->jack);
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_new);
 

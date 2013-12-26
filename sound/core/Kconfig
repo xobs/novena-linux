@@ -23,6 +23,7 @@ config SND_COMPRESS_OFFLOAD
 # to avoid having to force INPUT on.
 config SND_JACK
 	bool
+	select SND_KCTL_JACK
 
 config SND_SEQUENCER
 	tristate "Sequencer support"

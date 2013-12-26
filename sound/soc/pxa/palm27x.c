@@ -98,7 +98,7 @@ static int palm27x_ac97_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Jack detection API stuff */
 	err = snd_soc_jack_new(codec, "Headphone Jack",
-				SND_JACK_HEADPHONE, &hs_jack);
+	                       SND_JACK_HEADPHONE, 0, &hs_jack);
 	if (err)
 		return err;
 

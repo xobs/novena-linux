@@ -254,8 +254,8 @@ static int mfld_init(struct snd_soc_pcm_runtime *runtime)
 
 	/* Headset and button jack detection */
 	ret_val = snd_soc_jack_new(codec, "Intel(R) MID Audio Jack",
-			SND_JACK_HEADSET | SND_JACK_BTN_0 |
-			SND_JACK_BTN_1, &mfld_jack);
+	                           SND_JACK_HEADSET | SND_JACK_BTN_0 |
+	                           SND_JACK_BTN_1, 0, &mfld_jack);
 	if (ret_val) {
 		pr_err("jack creation failed\n");
 		return ret_val;

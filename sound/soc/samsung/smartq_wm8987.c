@@ -167,7 +167,7 @@ static int smartq_wm8987_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Headphone jack detection */
 	err = snd_soc_jack_new(codec, "Headphone Jack",
-			       SND_JACK_HEADPHONE, &smartq_jack);
+	                       SND_JACK_HEADPHONE, 0, &smartq_jack);
 	if (err)
 		return err;
 

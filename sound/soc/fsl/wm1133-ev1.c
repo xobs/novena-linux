@@ -221,14 +221,14 @@ static int wm1133_ev1_init(struct snd_soc_pcm_runtime *rtd)
 				ARRAY_SIZE(wm1133_ev1_map));
 
 	/* Headphone jack detection */
-	snd_soc_jack_new(codec, "Headphone", SND_JACK_HEADPHONE, &hp_jack);
+	snd_soc_jack_new(codec, "Headphone", SND_JACK_HEADPHONE, 0, &hp_jack);
 	snd_soc_jack_add_pins(&hp_jack, ARRAY_SIZE(hp_jack_pins),
 			      hp_jack_pins);
 	wm8350_hp_jack_detect(codec, WM8350_JDR, &hp_jack, SND_JACK_HEADPHONE);
 
 	/* Microphone jack detection */
 	snd_soc_jack_new(codec, "Microphone",
-			 SND_JACK_MICROPHONE | SND_JACK_BTN_0, &mic_jack);
+	                 SND_JACK_MICROPHONE | SND_JACK_BTN_0, 0, &mic_jack);
 	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
 			      mic_jack_pins);
 	wm8350_mic_jack_detect(codec, &mic_jack, SND_JACK_MICROPHONE,

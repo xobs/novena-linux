@@ -113,7 +113,7 @@ static int tegra_rt5640_asoc_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_rt5640 *machine = snd_soc_card_get_drvdata(codec->card);
 
 	snd_soc_jack_new(codec, "Headphones", SND_JACK_HEADPHONE,
-			 &tegra_rt5640_hp_jack);
+	                 0, &tegra_rt5640_hp_jack);
 	snd_soc_jack_add_pins(&tegra_rt5640_hp_jack,
 			ARRAY_SIZE(tegra_rt5640_hp_jack_pins),
 			tegra_rt5640_hp_jack_pins);

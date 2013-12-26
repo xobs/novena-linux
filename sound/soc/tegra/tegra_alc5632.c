@@ -108,7 +108,7 @@ static int tegra_alc5632_asoc_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_alc5632 *machine = snd_soc_card_get_drvdata(codec->card);
 
 	snd_soc_jack_new(codec, "Headset Jack", SND_JACK_HEADSET,
-			 &tegra_alc5632_hs_jack);
+	                 0, &tegra_alc5632_hs_jack);
 	snd_soc_jack_add_pins(&tegra_alc5632_hs_jack,
 			ARRAY_SIZE(tegra_alc5632_hs_jack_pins),
 			tegra_alc5632_hs_jack_pins);

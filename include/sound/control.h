@@ -242,6 +242,6 @@ void snd_ctl_sync_vmaster(struct snd_kcontrol *kctl, bool hook_only);
 struct snd_kcontrol *
 snd_kctl_jack_new(const char *name, int idx, void *private_data);
 void snd_kctl_jack_report(struct snd_card *card,
-			  struct snd_kcontrol *kctl, bool status);
+                          struct snd_kcontrol *kctl, bool status);
 
 #endif	/* __SOUND_CONTROL_H */

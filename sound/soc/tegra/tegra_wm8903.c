@@ -179,7 +179,7 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 	if (gpio_is_valid(machine->gpio_hp_det)) {
 		tegra_wm8903_hp_jack_gpio.gpio = machine->gpio_hp_det;
 		snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-				&tegra_wm8903_hp_jack);
+		                 0, &tegra_wm8903_hp_jack);
 		snd_soc_jack_add_pins(&tegra_wm8903_hp_jack,
 					ARRAY_SIZE(tegra_wm8903_hp_jack_pins),
 					tegra_wm8903_hp_jack_pins);
@@ -189,7 +189,7 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	snd_soc_jack_new(codec, "Mic Jack", SND_JACK_MICROPHONE,
-			 &tegra_wm8903_mic_jack);
+	                 0, &tegra_wm8903_mic_jack);
 	snd_soc_jack_add_pins(&tegra_wm8903_mic_jack,
 			      ARRAY_SIZE(tegra_wm8903_mic_jack_pins),
 			      tegra_wm8903_mic_jack_pins);
