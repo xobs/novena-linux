@@ -26,6 +26,7 @@
 #include <sound/core.h>
 
 struct input_dev;
+struct snd_kcontrol;
 
 /**
  * Jack types which can be reported.  These values are used as a
@@ -58,11 +59,12 @@ enum snd_jack_types {
 
 struct snd_jack {
 	struct input_dev *input_dev;
+	struct snd_kcontrol *kctl[SND_JACK_SWITCH_TYPES]; /* control for each key */
 	int registered;
 	int type;
 	const char *id;
 	char name[100];
-	unsigned int key[6];   /* Keep in sync with definitions above */
+	unsigned int key[SND_JACK_SWITCH_TYPES];   /* Keep in sync with definitions above */
 	void *private_data;
 	void (*private_free)(struct snd_jack *);
 };
@@ -70,7 +72,7 @@ struct snd_jack {
 #ifdef CONFIG_SND_JACK
 
 int snd_jack_new(struct snd_card *card, const char *id, int type,
-		 struct snd_jack **jack);
+                 int idx, struct snd_jack **jack);
 void snd_jack_set_parent(struct snd_jack *jack, struct device *parent);
 int snd_jack_set_key(struct snd_jack *jack, enum snd_jack_types type,
 		     int keytype);
@@ -80,7 +82,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
 #else
 
 static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
-			       struct snd_jack **jack)
+                               int idx, struct snd_jack **jack)
 {
 	return 0;
 }

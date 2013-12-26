@@ -178,8 +178,8 @@ static int tobermory_late_probe(struct snd_soc_card *card)
 		return ret;
 
 	ret = snd_soc_jack_new(codec, "Headset",
-			       SND_JACK_HEADSET | SND_JACK_BTN_0,
-			       &tobermory_headset);
+	                       SND_JACK_HEADSET | SND_JACK_BTN_0,
+	                       0, &tobermory_headset);
 	if (ret)
 		return ret;
 

@@ -184,7 +184,7 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	/* Headset jack detection only if it is supported */
 	if (priv->jack_detection) {
 		ret = snd_soc_jack_new(codec, "Headset Jack",
-					SND_JACK_HEADSET, &hs_jack);
+		                       SND_JACK_HEADSET, 0, &hs_jack);
 		if (ret)
 			return ret;
 

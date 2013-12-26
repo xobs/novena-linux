@@ -57,9 +57,9 @@ static int lowland_wm5100_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	ret = snd_soc_jack_new(codec, "Headset",
-			       SND_JACK_LINEOUT | SND_JACK_HEADSET |
-			       SND_JACK_BTN_0,
-			       &lowland_headset);
+	                       SND_JACK_LINEOUT | SND_JACK_HEADSET |
+	                       SND_JACK_BTN_0,
+	                       0, &lowland_headset);
 	if (ret)
 		return ret;
 

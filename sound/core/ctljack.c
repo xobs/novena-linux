@@ -14,7 +14,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 
-#define jack_detect_kctl_info	snd_ctl_boolean_mono_info
+#define	jack_detect_kctl_info	snd_ctl_boolean_mono_info
 
 static int jack_detect_kctl_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
@@ -38,6 +38,7 @@ snd_kctl_jack_new(const char *name, int idx, void *private_data)
 	kctl = snd_ctl_new1(&jack_detect_kctl, private_data);
 	if (!kctl)
 		return NULL;
+
 	snprintf(kctl->id.name, sizeof(kctl->id.name), "%s Jack", name);
 	kctl->id.index = idx;
 	kctl->private_value = 0;
