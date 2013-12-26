@@ -72,9 +72,9 @@ static int imx_novena_dai_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Headphone jack detection */
 	if (gpio_is_valid(data->jack_gpio)) {
-		ret = snd_soc_jack_new(rtd->codec, "Headset",
-				       SND_JACK_HEADSET | SND_JACK_BTN_0,
-				       &headset_jack);
+		ret = snd_soc_jack_new(rtd->codec, "Headphone",
+				       SND_JACK_HEADSET,
+				       0, &headset_jack);
 		if (ret)
 			return ret;
 
