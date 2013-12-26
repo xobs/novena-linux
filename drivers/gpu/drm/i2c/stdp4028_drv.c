@@ -231,6 +231,9 @@ module_param_named(phase, clk_phase, int, 0444);
 static int res_trim = 0x18;
 module_param_named(trim, res_trim, int, 0444);
 
+static int phase_adj = 0x0fb3;
+module_param_named(phase_adj, phase_adj, int, 0444);
+
 static void
 stdp4028_init(struct stdp4028_priv *priv)
 {
@@ -251,7 +254,7 @@ stdp4028_init(struct stdp4028_priv *priv)
 		STDP4028_LVDS_DIG_CTRL_2_CLKDBL_RANGE_GT_40_MHZ_L3_100_MHZ);
 
 	/* This number removes *most* shimmer from the red channel */
-//	stdp4028_write(priv, STDP4028_LVDS_PLL_PHASE_ADJUST, 0x2690);
+	stdp4028_write(priv, STDP4028_LVDS_PLL_PHASE_ADJUST, phase_adj);
 }
 
 
