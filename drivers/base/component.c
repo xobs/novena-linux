@@ -140,6 +140,7 @@ int component_master_add_child(struct master *master,
 
 	return ret;
 }
+EXPORT_SYMBOL(component_master_add_child);
 
 /* Detach all attached components from this master */
 static void master_remove_components(struct master *master)
