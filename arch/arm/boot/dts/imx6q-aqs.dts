@@ -11,13 +11,15 @@
  */
 
 /dts-v1/;
-#include "imx6q.dtsi"
+/*#include "imx6q.dtsi"*/
+#include "imx6dl.dtsi"
 
 / {
 	model = "Kosagi Novena (i.MX6 Quad)";
-	compatible = "fsl,imx6q-novena", "fsl,imx6q";
+	/*	compatible = "fsl,imx6q-novena", "fsl,imx6q"; */
+	compatible = "fsl,imx6q-novena", "fsl,imx6q", "fsl,imx6dl"; 
         chosen {
-                bootargs = "console=ttymxc1,115200 earlyprintk root=/dev/mmcblk0p2 rootwait rootfstype=ext4";
+                bootargs = "console=ttymxc1,115200 earlyprintk root=/dev/mmcblk0p2 rootwait rootfstype=ext4 ignore_loglevel";
         };
 
 	memory {
@@ -189,10 +191,6 @@
 	pinctrl-0 = <&pinctrl_uart4_2>;
 };
 
-&sata {
-	status = "okay";
-};
-
 &iomuxc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hog>;
@@ -341,19 +339,19 @@
 	txd1-skew-ps = <3000>;
 	txd2-skew-ps = <3000>;
 	txd3-skew-ps = <3000>;
+	status = "okay";
 };
 
 &usdhc2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usdhc2_1>;
-	cd-gpios = <&gpio1 4 0>;
-	wp-gpios = <&gpio1 2 0>;
+	non-removable;
 	status = "okay";
 };
 
 &usdhc3 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usdhc3_2>;
+	pinctrl-0 = <&pinctrl_usdhc3_1>;
 	non-removable;
 	status = "okay";
 };
