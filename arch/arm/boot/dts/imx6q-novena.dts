@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013-2014 Sutajio Ko-usagi PTE LTD
  * Copyright 2012 Freescale Semiconductor, Inc.
  * Copyright 2011 Linaro Ltd.
  *
@@ -15,7 +16,7 @@
 
 / {
 	model = "Kosagi Novena (i.MX6 Quad)";
-	compatible = "fsl,imx6q-novena", "fsl,imx6q";
+	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
         chosen {
                 bootargs = "console=ttymxc1,115200 earlyprintk root=/dev/mmcblk0p2 rootwait rootfstype=ext4";
         };
@@ -34,9 +35,9 @@
 				"gpu2d_clk", "gpu2d_axi_clk",
 				"openvg_axi_clk";
 			interrupts = <0 9 0x04>, <0 10 0x04>, <0 11 0x04>;
-			interrupt-names = "irq-3d", "irq-2d", "irq-vg";
+			interrupt-names = "irq_3d", "irq_2d", "irq_vg";
 			reg = <0 0>, <0x00130000 0x4000>, <0x00134000 0x4000>, <0x02204000 0x4000>;
-			reg-names = "phys-addr", "iobase-3d", "iobase-2d", "iobase-vg";
+			reg-names = "phys-addr", "iobase_3d", "iobase_2d", "iobase_vg";
 		};
 
 		vpu {
@@ -111,7 +112,7 @@
 	};
 
 	sound {
-		compatible = "fsl,imx-audio-novena";
+		compatible = "kosagi,imx-audio-novena";
 		model = "imx-audio-novena";
 		clocks = <&clks 169>, <&clks 57>, <&clks 173>, <&clks 203>, <&clks 201>;
 		clock-names = "cko1", "cko1_sel", "pll4_audio", "pll4_post_div", "cko_sel";
@@ -262,7 +263,7 @@
 	pinctrl-0 = <&pinctrl_enet_novena>;
 	phy-mode = "rgmii";
 	phy-reset-gpios = <&gpio3 23 0>;
-	mac-address = [00 22 C6 87 72 03];
+	local-mac-address = [00 00 00 00 00 00];
 	rxc-skew-ps = <3000>;
 	rxdv-skew-ps = <0>;
 	txc-skew-ps = <3000>;
@@ -317,19 +318,15 @@
 	status = "okay";
 
 	stmpe610@0 {
-		compatible = "st,stmpe610";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x44>;
-		irq-over-gpio;
-		irq-gpios = <&gpio5 13 0>;
-		id = <0>;
-		blocks = <0x5>;
-		irq-trigger = <0x1>;
+                compatible = "st,stmpe610";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x44>;
+                interrupts = <13 0x0>;
+                interrupt-parent = <&gpio5>;
+                id = <0>;
+                irq-trigger = <0x1>;
 
-		stmpe_adc {
-			compatible = "st,stmpe-adc";
-		};
 		stmpe_touchscreen {
 			compatible = "st,stmpe-ts";
 			ts,sample-time = <4>;
@@ -342,13 +339,6 @@
 			ts,fraction-z = <7>;
 			ts,i-drive = <1>;
 		};
-/*
-		stmpe_gpio {
-			compatible = "st,stmpe-gpio";
-			gpio-controller;
-			#gpio-cells = <2>;
-		};
-*/
 	};
 };
 
