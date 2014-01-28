@@ -322,7 +322,7 @@ static int imx_novena_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id imx_novena_dt_ids[] = {
-	{ .compatible = "fsl,imx-audio-novena", },
+	{ .compatible = "kosagi,imx-audio-novena", },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, imx_novena_dt_ids);
