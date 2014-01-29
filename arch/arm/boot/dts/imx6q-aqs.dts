@@ -138,28 +138,31 @@
 		status = "okay";
         };
 
+        imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>;
+		connectors = <&ldb>;
+	};
+
 	rotary@0 {
 		compatible = "rotary-encoder";
-		gpios = <&gpio2 21 0>, <&gpio2 20 0>;
+		gpios = <&gpio2 21 0>, <&gpio1 02 0>;
 		linux,axis = <8>; /* REL_WHEEL */
 		rotary-encoder,relative-axis;
 		rotary-encoder,half-period;
 	};
 
 	sound {
-		compatible = "fsl,imx-audio-novena";
-		model = "imx-audio-novena";
-		clocks = <&clks 169>, <&clks 57>, <&clks 173>, <&clks 203>, <&clks 201>;
-                clock-names = "cko1", "cko1_sel", "pll4_audio", "pll4_post_div", "cko_sel";
+		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+			     "fsl,imx-audio-sgtl5000";
+		model = "imx6q-sabrelite-sgtl5000";
 		ssi-controller = <&ssi1>;
 		audio-codec = <&codec>;
-		power-gpio = <&gpio5 17 0>;
-		jack-gpio = <&gpio5 15 0>;
 		audio-routing =
 			"MIC_IN", "Mic Jack",
 			"Mic Jack", "Mic Bias",
-			"Headphone Jack", "HP_OUT",
-			"Ext Spk", "SPK_OUT";
+/*			"Headphone Jack", "HP_OUT"; */
+			"Line out", "LINE_OUT";
 		mux-int-port = <1>;
 		mux-ext-port = <3>;
 	};
@@ -499,8 +502,9 @@
 			};
 
 			vgen3_reg: vgen3 {
-				regulator-min-microvolt = <1800000>;
-				regulator-max-microvolt = <3300000>;
+				regulator-min-microvolt = <1700000>;
+				regulator-max-microvolt = <1900000>;
+				regulator-always-on;
 			};
 
 			vgen4_reg: vgen4 {
@@ -536,10 +540,12 @@
 	pinctrl-0 = <&pinctrl_i2c3_1>;
 	status = "okay";
 
-	codec: es8328@11 {
-		compatible = "everest,es8328";
-		reg = <0x11>;
-		status = "disabled";
+	codec: sgtl5000@0a {
+		compatible = "fsl,sgtl5000";
+		reg = <0x0a>;
+		clocks = <&clks 201>;
+		VDDA-supply = <&reg_2p5v>;
+		VDDIO-supply = <&reg_3p3v>;
 	};
 
 	/* Utility EEPROM */
@@ -571,6 +577,7 @@
 		status = "okay";
 		fsl,data-mapping = "spwg";
 		fsl,data-width = <24>;
+		crtcs = <&ipu1 0>, <&ipu1 1>;
                 display-timings {
 			800x480p60 {
 				clock-frequency = <29500000>;
