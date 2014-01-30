@@ -1206,8 +1206,7 @@ static void hdmi_av_composer(struct imx_hdmi *hdmi,
 	vmode->mhsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PHSYNC);
 	vmode->mvsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PVSYNC);
 	vmode->minterlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
-	vmode->mpixelclock = mode->htotal * mode->vtotal *
-			     drm_mode_vrefresh(mode);
+	vmode->mpixelclock = mode->clock * 1000;
 
 	dev_dbg(hdmi->dev, "final pixclk = %d\n", vmode->mpixelclock);
 
