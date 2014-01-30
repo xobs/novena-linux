@@ -1448,12 +1448,6 @@ static int imx_hdmi_setup(struct imx_hdmi *hdmi, struct drm_display_mode *mode)
 /* Wait until we are registered to enable interrupts */
 static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 {
-	int ret;
-
-	ret = clk_prepare_enable(hdmi->iahb_clk);
-	if (ret)
-		return ret;
-
 	hdmi_writeb(hdmi, HDMI_PHY_I2CM_INT_ADDR_DONE_POL,
 		    HDMI_PHY_I2CM_INT_ADDR);
 
@@ -1469,8 +1463,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 
 	/* Unmute interrupts */
 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
-
-	clk_disable_unprepare(hdmi->iahb_clk);
 
 	return 0;
 }
