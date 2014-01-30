@@ -27,6 +27,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder_slave.h>
 
+#include "dw-hdmi-audio.h"
 #include "ipu-v3/imx-ipu-v3.h"
 #include "imx-hdmi.h"
 #include "imx-drm.h"
@@ -119,6 +120,7 @@ struct imx_hdmi {
 	struct drm_connector connector;
 	struct drm_encoder encoder;
 
+	struct snd_dw_hdmi *audio;
 	enum imx_hdmi_devtype dev_type;
 	struct device *dev;
 	struct clk *isfr_clk;
@@ -365,6 +367,13 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct imx_hdmi *hdmi)
 {
 	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
 }
+
+void imx_hdmi_set_sample_rate(struct imx_hdmi *hdmi, unsigned int rate)
+{
+	hdmi->sample_rate = rate;
+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
+}
+EXPORT_SYMBOL(imx_hdmi_set_sample_rate);
 
 /*
  * this submodule is responsible for the video data synchronization.
@@ -1705,10 +1714,20 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	/* Unmute interrupts */
 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
 
+	ret = snd_dw_hdmi_probe(&hdmi->audio, dev, hdmi->regs, irq, hdmi);
+	if (ret)
+		goto err_audio;
+
 	dev_set_drvdata(dev, hdmi);
 
 	return 0;
 
+err_audio:
+	/* Disable all interrupts */
+	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
+
+	hdmi->connector.funcs->destroy(&hdmi->connector);
+	hdmi->encoder.funcs->destroy(&hdmi->encoder);
 err_iahb:
 	clk_disable_unprepare(hdmi->iahb_clk);
 err_isfr:
@@ -1721,6 +1740,8 @@ static void imx_hdmi_unbind(struct device *dev, struct device *master,
 	void *data)
 {
 	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
+
+	snd_dw_hdmi_remove(hdmi->audio);
 
 	/* Disable all interrupts */
 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
