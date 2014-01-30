@@ -19,6 +19,7 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+
 #include <linux/of_device.h>
 
 #include <drm/drmP.h>
@@ -36,7 +37,7 @@
 #define YCBCR444		1
 #define YCBCR422_16BITS		2
 #define YCBCR422_8BITS		3
-#define XVYCC444		4
+#define	XVYCC444		4
 
 enum hdmi_datamap {
 	RGB444_8B = 0x01,
@@ -129,6 +130,7 @@ struct imx_hdmi {
 	int vic;
 
 	u8 edid[HDMI_EDID_LEN];
+	bool fb_reg;
 	bool cable_plugin;
 
 	bool phy_enabled;
@@ -1030,20 +1032,16 @@ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
 	imx_hdmi_phy_gen2_pddq(hdmi, 0);
 
 	/*Wait for PHY PLL lock */
-	msec = 5;
-	do {
-		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-		if (!val)
-			break;
-
-		if (msec == 0) {
-			dev_err(hdmi->dev, "PHY PLL not locked\n");
-			return -ETIMEDOUT;
-		}
-
+	msec = 4;
+	val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+	while (!val) {
 		udelay(1000);
-		msec--;
-	} while (1);
+		if (msec-- == 0) {
+			dev_dbg(hdmi->dev, "PHY PLL not locked\n");
+			return -EINVAL;
+		}
+		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+	}
 
 	return 0;
 }
@@ -1204,7 +1202,8 @@ static void hdmi_av_composer(struct imx_hdmi *hdmi,
 	vmode->mhsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PHSYNC);
 	vmode->mvsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PVSYNC);
 	vmode->minterlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
-	vmode->mpixelclock = mode->clock * 1000;
+	vmode->mpixelclock = mode->htotal * mode->vtotal *
+			     drm_mode_vrefresh(mode);
 
 	dev_dbg(hdmi->dev, "final pixclk = %d\n", vmode->mpixelclock);
 
@@ -1273,7 +1272,7 @@ static void hdmi_av_composer(struct imx_hdmi *hdmi,
 	hdmi_writeb(hdmi, hsync_len >> 8, HDMI_FC_HSYNCINWIDTH1);
 	hdmi_writeb(hdmi, hsync_len, HDMI_FC_HSYNCINWIDTH0);
 
-	/* Set up VSYNC active edge delay (in lines) */
+	/* Set up VSYNC active edge delay (in pixel clks) */
 	vsync_len = mode->vsync_end - mode->vsync_start;
 	hdmi_writeb(hdmi, vsync_len, HDMI_FC_VSYNCINWIDTH);
 }
@@ -1343,7 +1342,7 @@ static void imx_hdmi_clear_overflow(struct imx_hdmi *hdmi)
 		return;
 	}
 
-	for (count = 0; count < 4; count++)
+	for (count = 0; count < 5; count++)
 		hdmi_writeb(hdmi, val, HDMI_FC_INVIDCONF);
 }
 
@@ -1447,6 +1446,15 @@ static int imx_hdmi_setup(struct imx_hdmi *hdmi, struct drm_display_mode *mode)
 /* Wait until we are registered to enable interrupts */
 static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 {
+	int ret;
+
+	if (hdmi->fb_reg)
+		return 0;
+
+	ret = clk_prepare_enable(hdmi->iahb_clk);
+	if (ret)
+		return ret;
+
 	hdmi_writeb(hdmi, HDMI_PHY_I2CM_INT_ADDR_DONE_POL,
 		    HDMI_PHY_I2CM_INT_ADDR);
 
@@ -1462,6 +1470,10 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
 
 	/* Unmute interrupts */
 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+
+	hdmi->fb_reg = true;
+
+	clk_disable_unprepare(hdmi->iahb_clk);
 
 	return 0;
 }
@@ -1761,8 +1773,8 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *ddc_node;
 	struct imx_hdmi *hdmi;
-	struct resource *iores;
 	int ret, irq;
+	struct resource *iores;
 
 	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
 	if (!hdmi)

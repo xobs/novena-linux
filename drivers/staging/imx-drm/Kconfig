@@ -55,7 +55,7 @@ config DRM_IMX_IPUV3
 	  Choose this if you have a i.MX5 or i.MX6 processor.
 
 config DRM_IMX_HDMI
-	tristate "Freescale i.MX DRM HDMI"
+	tristate "Freescale i.MX DRM HDMI "
 	depends on DRM_IMX
 	help
 	  Choose this if you want to use HDMI on i.MX6.
