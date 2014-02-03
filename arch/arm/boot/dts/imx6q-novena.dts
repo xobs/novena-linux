@@ -86,6 +86,18 @@
 		};
 	};
 
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		user-button {
+			label = "User Button";
+			gpios = <&gpio4 14 1>;
+			gpio-key,wakeup;
+			/*linux,code = <116>; // KEY_POWER */
+			linux,code = <115>; /* KEY_VOLUMEUP */
+		};
+	};
+
 	leds {
 		compatible = "gpio-leds";
 		heartbeat {
@@ -111,7 +123,7 @@
 	};
 
 	sound {
-		compatible = "fsl,imx-audio-novena";
+		compatible = "kosagi,imx-audio-novena";
 		model = "imx-audio-novena";
 		clocks = <&clks 169>, <&clks 57>, <&clks 173>, <&clks 203>, <&clks 201>;
 		clock-names = "cko1", "cko1_sel", "pll4_audio", "pll4_post_div", "cko_sel";
@@ -164,9 +176,6 @@
 	hog {
 		pinctrl_hog: hoggrp {
 			fsl,pins = <
-				//MX6QDL_PAD_SD3_DAT5__GPIO7_IO00 0x80000000
-				//MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0x1f0b0
-
 				/* Here to prevent I2C from leaking */
 				MX6QDL_PAD_GPIO_3__GPIO1_IO03 0x80000000
 				MX6QDL_PAD_GPIO_5__GPIO1_IO05 0x80000000
@@ -210,6 +219,9 @@
 
 				/* PMB "reset" GPIO */
 				/*MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21 0x80000000*/
+
+				/* Reset button */
+				MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x80000000
 			>;
 		};
 	};
