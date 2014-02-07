@@ -473,6 +473,8 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 
 		isr = gpio_keys_gpio_isr;
 		irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+		if (bdata->button->wakeup)
+			irqflags |= IRQF_NO_SUSPEND;
 
 	} else {
 		if (!button->irq) {

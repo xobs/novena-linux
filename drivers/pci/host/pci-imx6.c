@@ -1,3 +1,4 @@
+#define DEBUG
 /*
  * PCIe host controller driver for Freescale i.MX6 SoCs
  *
@@ -490,6 +491,34 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+static int imx6_pcie_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct imx6_pcie *imx6_pcie = platform_get_drvdata(pdev);
+	/*
+	 * toggle bit18 of GPR1, to fix errata
+	 * "PCIe PCIe does not support L2 Power Down"
+	*/
+	dev_err(&pdev->dev,
+		"disabling PCIE_TEST_PD to workaround bug\n");
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+	return 0;
+}
+
+static int imx6_pcie_resume(struct platform_device *pdev)
+{
+	struct imx6_pcie *imx6_pcie = platform_get_drvdata(pdev);
+	/*
+	 * toggle bit18 of GPR1, to fix errata
+	 * "PCIe PCIe does not support L2 Power Down"
+	*/
+	dev_err(&pdev->dev,
+		"re-enabling PCIE_TEST_PD to workaround bug\n");
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, 0, 1 << 18);
+	return 0;
+}
+
+
 static int __init imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie;
@@ -613,6 +642,8 @@ static const struct of_device_id imx6_pcie_of_match[] = {
 MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
 
 static struct platform_driver imx6_pcie_driver = {
+//	.suspend = imx6_pcie_suspend,
+//	.resume = imx6_pcie_resume,
 	.driver = {
 		.name	= "imx6q-pcie",
 		.owner	= THIS_MODULE,
