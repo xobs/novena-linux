@@ -9,3 +9,6 @@ obj-$(CONFIG_PSTORE_FTRACE)	+= ftrace.o
 
 ramoops-objs += ram.o ram_core.o
 obj-$(CONFIG_PSTORE_RAM)	+= ramoops.o
+
+eepromoops-objs += eeprom.o
+obj-$(CONFIG_PSTORE_EEPROM)	+= eepromoops.o
