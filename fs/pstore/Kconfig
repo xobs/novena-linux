@@ -50,3 +50,11 @@ config PSTORE_RAM
 	  "ramoops.ko".
 
 	  For more information, see Documentation/ramoops.txt.
+
+config PSTORE_EEPROM
+	tristate "Log panic/oops to I2C EEPROM"
+	depends on PSTORE
+	depends on I2C
+	help
+	  When enabled, this allows logging panic and oops messages to
+	  an I2C EEPROM.
