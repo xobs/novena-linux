@@ -36,6 +36,7 @@
 #define MX3_PWMCR_DOZEEN                (1 << 24)
 #define MX3_PWMCR_WAITEN                (1 << 23)
 #define MX3_PWMCR_DBGEN			(1 << 22)
+#define MX3_PWMCR_CLKSRC_IPG_32K  (3 << 16)
 #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
 #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
 #define MX3_PWMCR_EN              (1 << 0)
@@ -107,7 +108,15 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
 	unsigned long period_cycles, duty_cycles, prescale;
 	u32 cr;
 
-	c = clk_get_rate(imx->clk_per);
+	if (duty_ns > 100000) {
+		cr = MX3_PWMCR_CLKSRC_IPG_32K;
+		c = 32768;
+	}
+	else {
+		cr = MX3_PWMCR_CLKSRC_IPG_HIGH;
+		c = clk_get_rate(imx->clk_per);
+		dev_dbg(chip->dev, "Clock rate: %lld\n", c);
+	}
 	c = c * period_ns;
 	do_div(c, 1000000000);
 	period_cycles = c;
@@ -131,9 +140,9 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
 	writel(duty_cycles, imx->mmio_base + MX3_PWMSAR);
 	writel(period_cycles, imx->mmio_base + MX3_PWMPR);
 
-	cr = MX3_PWMCR_PRESCALER(prescale) |
+	cr |= MX3_PWMCR_PRESCALER(prescale) |
 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
-		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
+		MX3_PWMCR_DBGEN;
 
 	if (test_bit(PWMF_ENABLED, &pwm->flags))
 		cr |= MX3_PWMCR_EN;
