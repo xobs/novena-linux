@@ -35,11 +35,17 @@
 
 struct stdp4028_priv {
 	struct i2c_client *client;
-	int power_switch;
 	uint16_t saved_state[0x10];
 };
 
-#define STDP4028_I2C_ADDR_SLAVE			0x73
+static int clk_phase = 0x63;
+module_param_named(phase, clk_phase, int, 0444);
+
+static int res_trim = 0x18;
+module_param_named(trim, res_trim, int, 0444);
+
+static int phase_adj = 0x0fb3;
+module_param_named(phase_adj, phase_adj, int, 0444);
 
 /* HW register definitions */
 
@@ -193,8 +199,8 @@ fail:
 	return -1;
 }
 
-static void
-stdp4028_save_state(struct stdp4028_priv *priv)
+/*
+static void stdp4028_save_state(struct stdp4028_priv *priv)
 {
 	int i;
 
@@ -202,8 +208,7 @@ stdp4028_save_state(struct stdp4028_priv *priv)
 		priv->saved_state[i] = stdp4028_read(priv, i);
 }
 
-static void
-stdp4028_restore_state(struct stdp4028_priv *priv)
+static void stdp4028_restore_state(struct stdp4028_priv *priv)
 {
 	int i;
 
@@ -211,12 +216,10 @@ stdp4028_restore_state(struct stdp4028_priv *priv)
 		stdp4028_write(priv, i, priv->saved_state[i]);
 }
 
-static void
-stdp4028_set_power_state(struct stdp4028_priv *priv, bool on)
+static void stdp4028_set_power_state(struct stdp4028_priv *priv, bool on)
 {
 	uint16_t control = stdp4028_read(priv, STDP4028_SYSTEM_CONTROL);
 
-	/* 0 means powered up, 1 means standby */
 	if (on)
 		control &= ~STDP4028_SYSTEM_CONTROL_POWER_UP;
 	else
@@ -224,18 +227,9 @@ stdp4028_set_power_state(struct stdp4028_priv *priv, bool on)
 
 	stdp4028_write(priv, STDP4028_SYSTEM_CONTROL, control);
 }
+*/
 
-static int clk_phase = 0x63;
-module_param_named(phase, clk_phase, int, 0444);
-
-static int res_trim = 0x18;
-module_param_named(trim, res_trim, int, 0444);
-
-static int phase_adj = 0x0fb3;
-module_param_named(phase_adj, phase_adj, int, 0444);
-
-static void
-stdp4028_init(struct stdp4028_priv *priv)
+static void stdp4028_init(struct stdp4028_priv *priv)
 {
 	stdp4028_write(priv, STDP4028_LVDS_DATA_FORMAT,
 		STDP4028_LVDS_DATA_FORMAT_SELECT_JEIDA |
@@ -258,6 +252,27 @@ stdp4028_init(struct stdp4028_priv *priv)
 }
 
 
+static int stdp4028_suspend(struct i2c_client *client, pm_message_t msg)
+{
+	dev_err(&client->dev, "Suspending STDP driver: %d\n", msg.event);
+	return 0;
+}
+
+static void stdp4028_shutdown(struct i2c_client *client)
+{
+	struct stdp4028_priv *priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Shutting down STDP driver\n");
+	stdp4028_init(priv);
+	return;
+}
+
+static int stdp4028_resume(struct i2c_client *client)
+{
+	struct stdp4028_priv *priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Resuming STDP driver\n");
+	stdp4028_init(priv);
+	return 0;
+}
 
 /* I2C driver functions */
 
@@ -265,7 +280,6 @@ static int
 stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct stdp4028_priv *priv;
-	struct device_node *np = client->dev.of_node;
 	int device, si_version, major, minor, rev;
 	int ret;
 
@@ -275,22 +289,10 @@ stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return -ENOMEM;
 	}
 
+	dev_err(&client->dev, "Probing STDP driver\n");
+
 	priv->client = client;
 	i2c_set_clientdata(client, priv);
-
-	priv->power_switch = of_get_named_gpio(np, "power-switch", 0);
-	if (gpio_is_valid(priv->power_switch)) {
-		ret = devm_gpio_request_one(&client->dev,
-					priv->power_switch,
-					GPIOF_OUT_INIT_HIGH,
-					"STDP4028 power switch");
-		if (ret) {
-			dev_err(&client->dev, "unable to get power switch\n");
-			goto err;
-		}
-
-		usleep_range(900*1000,1000*1000);
-	}
 
 	device = stdp4028_read(priv, STDP4028_PRODUCT_ID) >> 8;
 	if (device == -1) {
@@ -308,7 +310,6 @@ stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	dev_info(&client->dev, "detected device %x:%d.%d.%d v%d\n",
 			device, major, minor, rev, si_version);
 	stdp4028_init(priv);
-	//stdp4028_set_power_state(priv, 1);
 
 	return 0;
 
@@ -322,9 +323,8 @@ stdp4028_remove(struct i2c_client *client)
 {
 	struct stdp4028_priv *priv;
 	priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Removing STDP driver\n");
 
-	gpio_set_value(priv->power_switch, 0);
-	
 	kfree(priv);
 	return 0;
 }
@@ -343,6 +343,9 @@ static struct i2c_driver stdp4028_driver = {
 	},
 	.probe = stdp4028_probe,
 	.remove = stdp4028_remove,
+	.suspend = stdp4028_suspend,
+	.resume = stdp4028_resume,
+	.shutdown = stdp4028_shutdown,
 	.id_table = stdp4028_ids,
 };
 
