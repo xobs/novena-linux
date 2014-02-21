@@ -17,6 +17,7 @@
 #include <linux/clk.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/regulator/consumer.h>
 #include <linux/clk-provider.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
@@ -258,7 +259,6 @@ static int imx_es8328_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail;
 
-
 	data->dai.name = "hifi";
 	data->dai.stream_name = "hifi";
 	data->dai.codec_dai_name = "es8328-hifi-analog";
@@ -300,8 +300,8 @@ static int imx_es8328_remove(struct platform_device *pdev)
 {
 	struct imx_es8328_data *data = platform_get_drvdata(pdev);
 
-	snd_soc_jack_free_gpios(&headset_jack, ARRAY_SIZE(headset_jack_gpios),
-				headset_jack_gpios);
+//	snd_soc_jack_free_gpios(&headset_jack, ARRAY_SIZE(headset_jack_gpios),
+//				headset_jack_gpios);
 
 	if (data->codec_clk)
 		clk_disable_unprepare(data->codec_clk);
