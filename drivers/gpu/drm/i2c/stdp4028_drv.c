@@ -252,9 +252,24 @@ static void stdp4028_init(struct stdp4028_priv *priv)
 }
 
 
+static int stdp4028_suspend(struct i2c_client *client, pm_message_t msg)
+{
+	dev_err(&client->dev, "Suspending STDP driver: %d\n", msg.event);
+	return 0;
+}
+
+static void stdp4028_shutdown(struct i2c_client *client)
+{
+	struct stdp4028_priv *priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Shutting down STDP driver\n");
+	stdp4028_init(priv);
+	return;
+}
+
 static int stdp4028_resume(struct i2c_client *client)
 {
 	struct stdp4028_priv *priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Resuming STDP driver\n");
 	stdp4028_init(priv);
 	return 0;
 }
@@ -265,7 +280,6 @@ static int
 stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct stdp4028_priv *priv;
-	struct device_node *np = client->dev.of_node;
 	int device, si_version, major, minor, rev;
 	int ret;
 
@@ -274,6 +288,8 @@ stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "unable to allocate private data\n");
 		return -ENOMEM;
 	}
+
+	dev_err(&client->dev, "Probing STDP driver\n");
 
 	priv->client = client;
 	i2c_set_clientdata(client, priv);
@@ -307,6 +323,7 @@ stdp4028_remove(struct i2c_client *client)
 {
 	struct stdp4028_priv *priv;
 	priv = i2c_get_clientdata(client);
+	dev_err(&client->dev, "Removing STDP driver\n");
 
 	kfree(priv);
 	return 0;
@@ -326,7 +343,9 @@ static struct i2c_driver stdp4028_driver = {
 	},
 	.probe = stdp4028_probe,
 	.remove = stdp4028_remove,
+	.suspend = stdp4028_suspend,
 	.resume = stdp4028_resume,
+	.shutdown = stdp4028_shutdown,
 	.id_table = stdp4028_ids,
 };
 
