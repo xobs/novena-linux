@@ -57,6 +57,18 @@
 			gpio = <&gpio5 17 0>;
 			enable-active-high;
 		};
+		reg_lvds_lcd: lcd-regulator {
+			compatible = "regulator-fixed";
+
+			regulator-name = "lcd-lvds-power";
+			regulator-boot-on;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			startup-delay-us = <300000>;
+
+			gpio = <&gpio5 28 0>;
+			enable-active-high;
+	      };
 	};
 
 	gpio-keys {
@@ -85,6 +97,7 @@
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_backlight_novena>;
+		power-supply = <&reg_lvds_lcd>;
 
                 brightness-levels = <0 3 6 12 16 24 32 48 64 96 128 192 255>;
                 default-brightness-level = <12>;
@@ -488,18 +501,15 @@
 
 	stdp4028@73 {
 		compatible = "st,stdp4028";
-		power-switch = <&gpio5 28 0>;
 		reg = <0x73>;
 		status = "disabled";
 	};
 
-	/*
 	eepromoops@56 {
 		compatible = "kosagi,eepromoops";
 		reg = <0x56>;
 		status = "okay";
 	};
-	*/
 };
 
 &ecspi3 {
