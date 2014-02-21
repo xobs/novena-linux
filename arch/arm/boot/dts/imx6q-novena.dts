@@ -57,14 +57,22 @@
 			gpio = <&gpio5 17 0>;
 			enable-active-high;
 		};
+		reg_audio_amp: audio-amp-supply {
+			compatible = "regulator-fixed";
+			regulator-name = "audio-amp-supply";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			startup-delay-us = <300000>;
+			gpio = <&gpio4 9 0>;
+			enable-active-high;
+		};
 		reg_lvds_lcd: lcd-regulator {
 			compatible = "regulator-fixed";
 
 			regulator-name = "lcd-lvds-power";
-			regulator-boot-on;
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
-			startup-delay-us = <300000>;
+			startup-delay-us = <600000>;
 
 			gpio = <&gpio5 28 0>;
 			enable-active-high;
@@ -114,8 +122,6 @@
 	sound {
 		compatible = "kosagi,imx-audio-es8328";
 		model = "imx-audio-es8328";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_sound_novena>;
 		clocks = <&clks 169>, <&clks 57>, <&clks 173>, <&clks 203>, <&clks 201>;
 		clock-names = "cko1", "cko1_sel", "pll4_audio", "pll4_post_div", "cko_sel";
 		ssi-controller = <&ssi1>;
@@ -247,6 +253,9 @@
 				/* Headphone plug */
 				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15 0x80000000
 
+				/* Speaker amplifier mute */
+				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09    0x80000000
+
 				MX6QDL_PAD_GPIO_0__CCM_CLKO1       0x80000000
 			>;
 		};
@@ -343,9 +352,9 @@
 
 	bq20z75@b {
 		compatible = "sbs,sbs-battery";
-		reg = < 0xb >;
-		sbs,i2c-retry-count = <2>;
-		sbs,poll-retry-count = <10>;
+		reg = <0xb>;
+		sbs,i2c-retry-count = <20>;
+		sbs,poll-retry-count = <20>;
 	};
 
 	stmpe610@0 {
@@ -496,6 +505,10 @@
 	codec: es8328@11 {
 		compatible = "everest,es8328";
 		reg = <0x11>;
+		codec-supply = <&reg_audio_codec>;
+		audio-amp-supply = <&reg_audio_amp>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sound_novena>;
 		status = "disabled";
 	};
 
