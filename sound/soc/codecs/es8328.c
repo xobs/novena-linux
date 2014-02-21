@@ -22,6 +22,7 @@
 #include <linux/spi/spi.h>
 #include <linux/slab.h>
 #include <linux/of_device.h>
+#include <linux/regulator/consumer.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -54,6 +55,7 @@ uint8_t sample_ratios[] = {
 struct es8328_priv {
 	struct regmap *regmap;
 	int sysclk;
+	struct regulator *amp_regulator;
 };
 
 static const DECLARE_TLV_DB_SCALE(play_tlv, -3000, 100, 0);
@@ -281,9 +283,13 @@ static int es8328_pcm_prepare(struct snd_pcm_substream *substream,
 			      struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
+	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		es8328_dac_enable(codec);
+		if (es8328->amp_regulator)
+			regulator_enable(es8328->amp_regulator);
+	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		es8328_adc_enable(codec);
@@ -295,9 +301,12 @@ static void es8328_pcm_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
+	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
 	u16 reg;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (es8328->amp_regulator)
+			regulator_disable(es8328->amp_regulator);
 		/* Mute DAC */
 		snd_soc_write(codec, ES8328_DACCONTROL3,
 				ES8328_DACCONTROL3_DACZEROCROSS |
@@ -431,6 +440,11 @@ static int es8328_probe(struct snd_soc_codec *codec)
 {
 	int ret;
 	struct device *dev = codec->dev;
+	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
+
+	es8328->amp_regulator = devm_regulator_get(dev, "audio-amp");
+	if (IS_ERR(es8328->amp_regulator))
+		dev_err(dev, "No codec regulator\n");
 
 	ret = snd_soc_codec_set_cache_io(codec, 7, 9, SND_SOC_REGMAP);
 	if (ret < 0) {
