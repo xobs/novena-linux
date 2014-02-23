@@ -7,6 +7,7 @@
  */
 
 #include <linux/bcd.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/rtc.h>
@@ -82,24 +83,96 @@ static int pcf8523_write(struct i2c_client *client, u8 reg, u8 value)
 	return 0;
 }
 
-static int pcf8523_select_capacitance(struct i2c_client *client, bool high)
+static int pcf8523_rtc_check_oscillator(struct i2c_client *client)
+{
+	u8 start = REG_SECONDS, regs[7];
+	struct i2c_msg msgs[2];
+	int err;
+
+	msgs[0].addr = client->addr;
+	msgs[0].flags = 0;
+	msgs[0].len = 1;
+	msgs[0].buf = &start;
+
+	msgs[1].addr = client->addr;
+	msgs[1].flags = I2C_M_RD;
+	msgs[1].len = sizeof(regs);
+	msgs[1].buf = regs;
+
+	err = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
+	if (err < 0)
+		return err;
+
+	if (regs[0] & REG_SECONDS_OS) {
+		/*
+		 * If the oscillator was stopped, try to clear the flag. Upon
+		 * power-up the flag is always set, but if we cannot clear it
+		 * the oscillator isn't running properly for some reason. The
+		 * sensible thing therefore is to return an error, signalling
+		 * that the clock cannot be assumed to be correct.
+		 */
+
+		regs[0] &= ~REG_SECONDS_OS;
+
+		err = pcf8523_write(client, REG_SECONDS, regs[0]);
+		if (err < 0)
+			return err;
+
+		err = pcf8523_read(client, REG_SECONDS, &regs[0]);
+		if (err < 0)
+			return err;
+
+		if (regs[0] & REG_SECONDS_OS)
+			return -EAGAIN;
+	}
+
+	return 0;
+}
+
+static int pcf8523_switch_capacitance(struct i2c_client *client)
 {
 	u8 value;
 	int err;
 
 	err = pcf8523_read(client, REG_CONTROL1, &value);
 	if (err < 0)
-		return err;
+		goto out;
 
-	if (!high)
-		value &= ~REG_CONTROL1_CAP_SEL;
-	else
-		value |= REG_CONTROL1_CAP_SEL;
+	value ^= REG_CONTROL1_CAP_SEL;
 
 	err = pcf8523_write(client, REG_CONTROL1, value);
-	if (err < 0)
-		return err;
 
+out:
+	return err;
+}
+
+static int pcf8523_enable_oscillator(struct i2c_client *client)
+{
+	int err, loop;
+
+	loop = 0;
+	while (loop < 200) {
+		err = pcf8523_rtc_check_oscillator(client);
+		if (!err)
+			return 0;
+		loop++;
+		msleep(10);
+	}
+
+	err = pcf8523_switch_capacitance(client);
+	if (err < 0)
+		goto out;
+
+	loop = 0;
+	while (loop < 200) {
+		err = pcf8523_rtc_check_oscillator(client);
+		if (!err)
+			return 0;
+		loop++;
+		msleep(10);
+	}
+
+out:
 	return err;
 }
 
@@ -299,7 +372,7 @@ static int pcf8523_probe(struct i2c_client *client,
 	if (!pcf)
 		return -ENOMEM;
 
-	err = pcf8523_select_capacitance(client, true);
+	err = pcf8523_enable_oscillator(client);
 	if (err < 0)
 		return err;
 
