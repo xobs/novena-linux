@@ -1815,6 +1815,8 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 
 	trace_regulator_enable_complete(rdev_get_name(rdev));
 
+	_notifier_call_chain(rdev, 0, NULL);
+
 	return 0;
 }
 
