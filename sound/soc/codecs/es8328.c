@@ -283,6 +283,20 @@ static int es8328_pcm_prepare(struct snd_pcm_substream *substream,
 			      struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		es8328_adc_enable(codec);
+
+	return 0;
+}
+
+static int es8328_pcm_startup(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_codec *codec = dai->codec;
 	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -290,10 +304,6 @@ static int es8328_pcm_prepare(struct snd_pcm_substream *substream,
 		if (es8328->amp_regulator)
 			regulator_enable(es8328->amp_regulator);
 	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		es8328_adc_enable(codec);
-
 	return 0;
 }
 
@@ -400,6 +410,7 @@ static int es8328_init(struct snd_soc_codec *codec)
 static const struct snd_soc_dai_ops es8328_dai_ops = {
 	.hw_params	= es8328_hw_params,
 	.prepare	= es8328_pcm_prepare,
+	.startup	= es8328_pcm_startup,
 	.shutdown	= es8328_pcm_shutdown,
 //	.digital_mute	= es8328_mute,
 	.set_fmt	= es8328_set_dai_fmt,
