@@ -29,13 +29,15 @@
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/of_gpio.h>
+#include <linux/of_platform.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
-
-#include <linux/byteorder/generic.h>
 
 struct stdp4028_priv {
 	struct i2c_client *client;
+	struct regulator *regulator;
 	uint16_t saved_state[0x10];
+	struct notifier_block nb;
 };
 
 static int clk_phase = 0x63;
@@ -274,6 +276,22 @@ static int stdp4028_resume(struct i2c_client *client)
 	return 0;
 }
 
+static int stdp4028_power_event(struct notifier_block *nb,
+		unsigned long event,
+		void *var)
+{
+	struct stdp4028_priv *priv = container_of(nb, struct stdp4028_priv, nb);
+	if (!priv)
+		return 0;
+
+	/* Power on event */
+	if (! (event & REGULATOR_EVENT_DISABLE))
+		stdp4028_init(priv);
+
+	return 0;
+}
+
+
 /* I2C driver functions */
 
 static int
@@ -288,7 +306,6 @@ stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "unable to allocate private data\n");
 		return -ENOMEM;
 	}
-
 	dev_err(&client->dev, "Probing STDP driver\n");
 
 	priv->client = client;
@@ -311,6 +328,18 @@ stdp4028_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			device, major, minor, rev, si_version);
 	stdp4028_init(priv);
 
+	priv->regulator = devm_regulator_get(&client->dev, "power");
+	if (IS_ERR(priv->regulator)) {
+		dev_err(&client->dev, "Unable to get regulator\n");
+		return 0;
+	}
+	priv->nb.notifier_call = &stdp4028_power_event;
+	ret = regulator_register_notifier(priv->regulator, &priv->nb);
+	if (ret) {
+		dev_err(&client->dev, "Unable to request regulator notifier\n");
+		return 0;
+	}
+
 	return 0;
 
 err:
@@ -325,6 +354,7 @@ stdp4028_remove(struct i2c_client *client)
 	priv = i2c_get_clientdata(client);
 	dev_err(&client->dev, "Removing STDP driver\n");
 
+	regulator_unregister_notifier(priv->regulator, &priv->nb);
 	kfree(priv);
 	return 0;
 }
