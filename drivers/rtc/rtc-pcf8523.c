@@ -85,25 +85,14 @@ static int pcf8523_write(struct i2c_client *client, u8 reg, u8 value)
 
 static int pcf8523_rtc_check_oscillator(struct i2c_client *client)
 {
-	u8 start = REG_SECONDS, regs[7];
-	struct i2c_msg msgs[2];
+	u8 value;
 	int err;
 
-	msgs[0].addr = client->addr;
-	msgs[0].flags = 0;
-	msgs[0].len = 1;
-	msgs[0].buf = &start;
-
-	msgs[1].addr = client->addr;
-	msgs[1].flags = I2C_M_RD;
-	msgs[1].len = sizeof(regs);
-	msgs[1].buf = regs;
-
-	err = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
+	err = pcf8523_read(client, REG_SECONDS, &value);
 	if (err < 0)
 		return err;
 
-	if (regs[0] & REG_SECONDS_OS) {
+	if (value & REG_SECONDS_OS) {
 		/*
 		 * If the oscillator was stopped, try to clear the flag. Upon
 		 * power-up the flag is always set, but if we cannot clear it
@@ -112,17 +101,17 @@ static int pcf8523_rtc_check_oscillator(struct i2c_client *client)
 		 * that the clock cannot be assumed to be correct.
 		 */
 
-		regs[0] &= ~REG_SECONDS_OS;
+		value &= ~REG_SECONDS_OS;
 
-		err = pcf8523_write(client, REG_SECONDS, regs[0]);
+		err = pcf8523_write(client, REG_SECONDS, value);
 		if (err < 0)
 			return err;
 
-		err = pcf8523_read(client, REG_SECONDS, &regs[0]);
+		err = pcf8523_read(client, REG_SECONDS, &value);
 		if (err < 0)
 			return err;
 
-		if (regs[0] & REG_SECONDS_OS)
+		if (value & REG_SECONDS_OS)
 			return -EAGAIN;
 	}
 
