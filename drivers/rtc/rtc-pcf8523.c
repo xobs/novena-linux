@@ -363,6 +363,7 @@ static int pcf8523_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct pcf8523 *pcf;
+	u8 value;
 	int err;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
@@ -372,9 +373,19 @@ static int pcf8523_probe(struct i2c_client *client,
 	if (!pcf)
 		return -ENOMEM;
 
-	err = pcf8523_enable_oscillator(client);
+	/* Check whether the RTC reports battery low */
+	err = pcf8523_read(client, REG_CONTROL3, &value);
 	if (err < 0)
 		return err;
+
+	if (value & REG_CONTROL3_BLF)
+		dev_warn(&client->dev, "RTC reports battery is low\n");
+
+	err = pcf8523_enable_oscillator(client);
+	if (err < 0) {
+		dev_warn(&client->dev, "RTC reports oscillator is not running\n");
+		return err;
+	}
 
 	err = pcf8523_set_pm(client, 0);
 	if (err < 0)
