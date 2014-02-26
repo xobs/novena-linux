@@ -14,7 +14,17 @@
 #include <sound/core.h>
 #include <sound/control.h>
 
-#define jack_detect_kctl_info	snd_ctl_boolean_mono_info
+#define jack_detect_kctl_info	jack_ctl_integer_info
+
+int jack_ctl_integer_info(struct snd_kcontrol *kcontrol,
+                          struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 0x10000U;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xffff;
+	return 0;
+}
 
 static int jack_detect_kctl_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)

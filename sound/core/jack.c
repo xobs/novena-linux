@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <sound/jack.h>
+#include <sound/control.h>
 #include <sound/core.h>
 
 static int jack_switch_types[SND_JACK_SWITCH_TYPES] = {
@@ -54,16 +55,52 @@ static int snd_jack_dev_disconnect(struct snd_device *device)
 static int snd_jack_dev_free(struct snd_device *device)
 {
 	struct snd_jack *jack = device->device_data;
+	int i;
 
 	if (jack->private_free)
 		jack->private_free(jack);
 
 	snd_jack_dev_disconnect(device);
 
+	/* Free available KControls*/
+	for (i = 0; i < SND_JACK_SWITCH_TYPES; ++i)
+		if (jack->kctl[i])
+			snd_ctl_remove(device->card, jack->kctl[i]);
+
 	kfree(jack->id);
 	kfree(jack);
 
 	return 0;
+}
+
+const char * jack_get_name_by_key(const char *name, int key)
+{
+	char *jack_name;
+	size_t jack_name_size;
+	const char *key_name;
+
+	switch(key) {
+	case SW_HEADPHONE_INSERT: key_name = "Headphone"; break;
+	case SW_MICROPHONE_INSERT: key_name = "Mic"; break;
+	case SW_LINEOUT_INSERT: key_name = "Line Out"; break;
+	case SW_JACK_PHYSICAL_INSERT: key_name = "Mechanical"; break;
+	case SW_VIDEOOUT_INSERT: key_name = "Video Out"; break;
+	case SW_LINEIN_INSERT: key_name = "Line In"; break;
+	default: key_name = "Unknown";
+	}
+
+	/* Avoid duplicate name in KControl */
+	if (strcmp(name, key_name) != 0) {
+		/* allocate necessary memory space only */
+		jack_name_size = strlen(name) + strlen(key_name) + 4;
+		jack_name = kmalloc(jack_name_size, GFP_KERNEL);
+
+		snprintf(jack_name, jack_name_size, "%s (%s)", name, key_name);
+	} else {
+		jack_name = (char *)name;
+	}
+
+	return jack_name;
 }
 
 static int snd_jack_dev_register(struct snd_device *device)
@@ -72,7 +109,7 @@ static int snd_jack_dev_register(struct snd_device *device)
 	struct snd_card *card = device->card;
 	int err, i;
 
-	snprintf(jack->name, sizeof(jack->name), "%s %s",
+	snprintf(jack->name, sizeof(jack->name), "%s %s Jack",
 		 card->shortname, jack->id);
 	jack->input_dev->name = jack->name;
 
@@ -92,6 +129,18 @@ static int snd_jack_dev_register(struct snd_device *device)
 
 		input_set_capability(jack->input_dev, EV_KEY, jack->key[i]);
 	}
+
+	/* We don't need to free the control, it's freed by snd_ctl_add itself
+	   if an error occur */
+	for (i = 0; i < SND_JACK_SWITCH_TYPES; ++i)
+		if (jack->kctl[i]) {
+			err = snd_ctl_add(card, jack->kctl[i]);
+			if (err < 0) {
+				pr_notice("%s: ALSA Jack Control not available for '%s'\n", __func__,
+				          jack_get_name_by_key(jack->id, jack_switch_types[i]));
+				jack->kctl[i] = NULL;
+			}
+		}
 
 	err = input_register_device(jack->input_dev);
 	if (err == 0)
@@ -117,6 +166,7 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
 		 struct snd_jack **jjack)
 {
 	struct snd_jack *jack;
+	struct snd_kcontrol *kctl;
 	int err;
 	int i;
 	static struct snd_device_ops ops = {
@@ -142,9 +192,19 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
 	jack->type = type;
 
 	for (i = 0; i < SND_JACK_SWITCH_TYPES; i++)
-		if (type & (1 << i))
+		if (type & (1 << i)) {
 			input_set_capability(jack->input_dev, EV_SW,
 					     jack_switch_types[i]);
+
+			/* card is the private_data */
+			kctl = snd_kctl_jack_new(jack_get_name_by_key(id, jack_switch_types[i]), 0, card);
+			if (!kctl) {
+				err = -ENOMEM;
+				goto fail_kctl;
+			}
+
+			jack->kctl[i] = kctl;
+		}
 
 	err = snd_device_new(card, SNDRV_DEV_JACK, jack, &ops);
 	if (err < 0)
@@ -153,6 +213,11 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
 	*jjack = jack;
 
 	return 0;
+
+fail_kctl:
+	for (i = 0; i < SND_JACK_SWITCH_TYPES; ++i)
+		if (jack->kctl[i])
+			snd_ctl_remove(card, jack->kctl[i]);
 
 fail_input:
 	input_free_device(jack->input_dev);
@@ -245,10 +310,15 @@ void snd_jack_report(struct snd_jack *jack, int status)
 
 	for (i = 0; i < ARRAY_SIZE(jack_switch_types); i++) {
 		int testbit = 1 << i;
-		if (jack->type & testbit)
+		if (jack->type & testbit) {
 			input_report_switch(jack->input_dev,
 					    jack_switch_types[i],
 					    status & testbit);
+
+			/* Update ALSA KControl interface */
+			snd_kctl_jack_report((struct snd_card *)jack->kctl[i]->private_data,
+			                     jack->kctl[i], status & testbit);
+		}
 	}
 
 	input_sync(jack->input_dev);
