@@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
 config IO_36
 	bool
 
+config ARCH_HIBERNATION_POSSIBLE
+	bool
+	depends on MMU
+	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
+
 comment "Processor Features"
 
 config ARM_LPAE
