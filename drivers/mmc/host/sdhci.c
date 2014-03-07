@@ -2124,15 +2124,6 @@ static const struct mmc_host_ops sdhci_ops = {
  *                                                                           *
 \*****************************************************************************/
 
-static void sdhci_tasklet_card(unsigned long param)
-{
-	struct sdhci_host *host = (struct sdhci_host*)param;
-
-	sdhci_card_event(host->mmc);
-
-	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-}
-
 static void sdhci_tasklet_finish(unsigned long param)
 {
 	struct sdhci_host *host;
@@ -2475,7 +2466,10 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 			sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
 				     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
-			tasklet_schedule(&host->card_tasklet);
+
+			host->thread_isr |= intmask & (SDHCI_INT_CARD_INSERT |
+						       SDHCI_INT_CARD_REMOVE);
+			result = IRQ_WAKE_THREAD;
 		}
 
 		if (intmask & SDHCI_INT_CMD_MASK)
@@ -2531,6 +2525,11 @@ static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
 	isr = host->thread_isr;
 	host->thread_isr = 0;
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	if (isr & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
+		sdhci_card_event(host->mmc);
+		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+	}
 
 	if (isr & SDHCI_INT_CARD_INT) {
 		sdio_run_irqs(host->mmc);
@@ -3221,8 +3220,6 @@ int sdhci_add_host(struct sdhci_host *host)
 	/*
 	 * Init tasklets.
 	 */
-	tasklet_init(&host->card_tasklet,
-		sdhci_tasklet_card, (unsigned long)host);
 	tasklet_init(&host->finish_tasklet,
 		sdhci_tasklet_finish, (unsigned long)host);
 
@@ -3287,7 +3284,6 @@ reset:
 	free_irq(host->irq, host);
 #endif
 untasklet:
-	tasklet_kill(&host->card_tasklet);
 	tasklet_kill(&host->finish_tasklet);
 
 	return ret;
@@ -3331,7 +3327,6 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 
 	del_timer_sync(&host->timer);
 
-	tasklet_kill(&host->card_tasklet);
 	tasklet_kill(&host->finish_tasklet);
 
 	if (host->vmmc) {
