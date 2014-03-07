@@ -44,6 +44,7 @@ static int dummy_regulator_probe(struct platform_device *pdev)
 
 	config.dev = &pdev->dev;
 	config.init_data = &dummy_initdata;
+	config.ena_gpio = -EINVAL;
 
 	dummy_regulator_rdev = regulator_register(&dummy_desc, &config);
 	if (IS_ERR(dummy_regulator_rdev)) {
