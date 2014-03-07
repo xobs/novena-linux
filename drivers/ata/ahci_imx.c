@@ -264,6 +264,10 @@ static int imx_ahci_probe(struct platform_device *pdev)
 	struct platform_device *ahci_pdev;
 	int ret;
 
+	/* Prevent our child ahci device coming back to us */
+	if (!strcmp(dev_name(&pdev->dev), "ahci"))
+		return -ENODEV;
+
 	of_id = of_match_device(imx_ahci_of_match, dev);
 	if (!of_id)
 		return -EINVAL;
