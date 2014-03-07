@@ -1709,8 +1709,7 @@ static int sdhci_get_ro(struct mmc_host *mmc)
 
 static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
 {
-	/* SDIO IRQ will be enabled as appropriate in runtime resume */
-	if (!(host->flags & SDHCI_DEVICE_DEAD) || host->runtime_suspended) {
+	if (!(host->flags & SDHCI_DEVICE_DEAD)) {
 		if (enable)
 			sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
 		else
@@ -2422,7 +2421,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	spin_lock(&host->lock);
 
-	if (host->runtime_suspended) {
+	if (host->runtime_suspended && !sdhci_sdio_irq_enabled(host)) {
 		spin_unlock(&host->lock);
 		pr_warning("%s: got irq while runtime suspended\n",
 		       mmc_hostname(host->mmc));
@@ -2690,7 +2689,7 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
 	}
 
 	spin_lock_irqsave(&host->lock, flags);
-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
+	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK & ~SDHCI_INT_CARD_INT);
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	synchronize_hardirq(host->irq);
