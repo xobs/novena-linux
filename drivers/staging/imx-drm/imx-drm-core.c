@@ -42,8 +42,8 @@ struct imx_drm_crtc {
 	int					pipe;
 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
 	void					*cookie;
-	int					id;
-	int					mux_id;
+	int					di_id;
+	int					ipu_id;
 };
 
 static int legacyfb_depth = 16;
@@ -348,7 +348,7 @@ err_kms:
 int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
 		struct imx_drm_crtc **new_crtc,
 		const struct imx_drm_crtc_helper_funcs *imx_drm_helper_funcs,
-		void *cookie, int id)
+		void *cookie, int ipu_id, int di_id)
 {
 	struct imx_drm_device *imxdrm = drm->dev_private;
 	struct imx_drm_crtc *imx_drm_crtc;
@@ -371,8 +371,8 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
 	imx_drm_crtc->imx_drm_helper_funcs = *imx_drm_helper_funcs;
 	imx_drm_crtc->pipe = imxdrm->pipes++;
 	imx_drm_crtc->cookie = cookie;
-	imx_drm_crtc->id = id;
-	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
+	imx_drm_crtc->di_id = di_id;
+	imx_drm_crtc->ipu_id = ipu_id;
 	imx_drm_crtc->crtc = crtc;
 
 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
@@ -429,7 +429,7 @@ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
 
 	for (i = 0; i < MAX_CRTC; i++) {
 		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
-		if (imx_drm_crtc && imx_drm_crtc->id == id &&
+		if (imx_drm_crtc && imx_drm_crtc->di_id == id &&
 		    imx_drm_crtc->cookie == cookie)
 			return drm_crtc_mask(imx_drm_crtc->crtc);
 	}
@@ -485,7 +485,7 @@ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
 {
 	struct imx_drm_crtc *imx_crtc = imx_drm_find_crtc(encoder->crtc);
 
-	return imx_crtc ? imx_crtc->mux_id : -EINVAL;
+	return imx_crtc ? imx_crtc->ipu_id * 2 + imx_crtc->di_id : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(imx_drm_encoder_get_mux_id);
 
