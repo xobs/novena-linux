@@ -138,6 +138,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
 	writel(reg_val | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
 	imx_sata_clock_disable(ap->dev);
 	imxpriv->no_device = true;
+
+	dev_info(ap->dev, "no device found, disabling link.\n");
+	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
+		 ".hotplug=1 to enable hotplug\n");
 }
 
 static int ahci_imx_softreset(struct ata_link *link, unsigned int *class,
