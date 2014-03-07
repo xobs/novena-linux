@@ -131,7 +131,7 @@ static int sdhci_probe(struct platform_device *pdev)
 	}
 
 	/* clk enable */
-	sdhci->clk = clk_get(&pdev->dev, NULL);
+	sdhci->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(sdhci->clk)) {
 		ret = PTR_ERR(sdhci->clk);
 		dev_dbg(&pdev->dev, "Error getting clock\n");
@@ -141,7 +141,7 @@ static int sdhci_probe(struct platform_device *pdev)
 	ret = clk_prepare_enable(sdhci->clk);
 	if (ret) {
 		dev_dbg(&pdev->dev, "Error enabling clock\n");
-		goto put_clk;
+		goto err;
 	}
 
 	ret = clk_set_rate(sdhci->clk, 50000000);
@@ -153,7 +153,7 @@ static int sdhci_probe(struct platform_device *pdev)
 		sdhci->data = sdhci_probe_config_dt(pdev);
 		if (IS_ERR(sdhci->data)) {
 			dev_err(&pdev->dev, "DT: Failed to get pdata\n");
-			return -ENODEV;
+			goto disable_clk;
 		}
 	} else {
 		sdhci->data = dev_get_platdata(&pdev->dev);
@@ -263,8 +263,6 @@ free_host:
 	sdhci_free_host(host);
 disable_clk:
 	clk_disable_unprepare(sdhci->clk);
-put_clk:
-	clk_put(sdhci->clk);
 err:
 	dev_err(&pdev->dev, "spear-sdhci probe failed: %d\n", ret);
 	return ret;
@@ -284,7 +282,6 @@ static int sdhci_remove(struct platform_device *pdev)
 	sdhci_remove_host(host, dead);
 	sdhci_free_host(host);
 	clk_disable_unprepare(sdhci->clk);
-	clk_put(sdhci->clk);
 
 	return 0;
 }
