@@ -28,6 +28,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder_slave.h>
 
+#include "dw-hdmi-audio.h"
 #include "ipu-v3/imx-ipu-v3.h"
 #include "imx-hdmi.h"
 #include "imx-drm.h"
@@ -115,6 +116,7 @@ struct imx_hdmi {
 	struct drm_connector connector;
 	struct drm_encoder encoder;
 
+	struct platform_device *audio;
 	enum imx_hdmi_devtype dev_type;
 	struct device *dev;
 	struct clk *isfr_clk;
@@ -361,6 +363,13 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct imx_hdmi *hdmi)
 {
 	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
 }
+
+void imx_hdmi_set_sample_rate(struct imx_hdmi *hdmi, unsigned int rate)
+{
+	hdmi->sample_rate = rate;
+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
+}
+EXPORT_SYMBOL(imx_hdmi_set_sample_rate);
 
 /*
  * this submodule is responsible for the video data synchronization.
@@ -1582,11 +1591,13 @@ MODULE_DEVICE_TABLE(of, imx_hdmi_dt_ids);
 static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 {
 	struct platform_device *pdev = to_platform_device(dev);
+	struct platform_device_info pdevinfo;
 	const struct of_device_id *of_id =
 				of_match_device(imx_hdmi_dt_ids, dev);
 	struct drm_device *drm = data;
 	struct device_node *np = dev->of_node;
 	struct device_node *ddc_node;
+	struct dw_hdmi_audio_data audio;
 	struct imx_hdmi *hdmi;
 	struct resource *iores;
 	int ret, irq;
@@ -1701,6 +1712,19 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	/* Unmute interrupts */
 	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
 
+	memset(&pdevinfo, 0, sizeof(pdevinfo));
+	pdevinfo.parent = dev;
+	pdevinfo.id = PLATFORM_DEVID_AUTO;
+
+	audio.base = hdmi->regs;
+	audio.irq = irq;
+	audio.hdmi = hdmi;
+
+	pdevinfo.name = "dw-hdmi-audio";
+	pdevinfo.data = &audio;
+	pdevinfo.size_data = sizeof(audio);
+	hdmi->audio = platform_device_register_full(&pdevinfo);
+
 	dev_set_drvdata(dev, hdmi);
 
 	return 0;
@@ -1717,6 +1741,9 @@ static void imx_hdmi_unbind(struct device *dev, struct device *master,
 	void *data)
 {
 	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
+
+	if (!IS_ERR(hdmi->audio))
+		platform_device_unregister(hdmi->audio);
 
 	/* Disable all interrupts */
 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
