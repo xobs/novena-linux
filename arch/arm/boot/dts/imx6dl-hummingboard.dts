@@ -52,6 +52,12 @@
 		};
 	};
 
+	imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>;
+		connectors = <&hdmi>;
+	};
+
 	sound-spdif {
 		compatible = "fsl,imx-audio-spdif";
 		model = "imx-spdif";
@@ -65,6 +71,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hummingboard_flexcan1>;
 	status = "okay";
+};
+
+&hdmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
+	ddc = <&i2c2>;
+	status = "okay";
+	crtcs = <&ipu1 0>;
 };
 
 &i2c1 {
@@ -82,6 +96,13 @@
 	 */
 };
 
+&i2c2 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
+	status = "okay";
+};
+
 &iomuxc {
 	hummingboard {
 		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
@@ -97,10 +118,23 @@
 			>;
 		};
 
+		pinctrl_hummingboard_hdmi: hummingboard-hdmi {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+			>;
+		};
+
 		pinctrl_hummingboard_i2c1: hummingboard-i2c1 {
 			fsl,pins = <
 				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
 				MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
+			>;
+		};
+
+		pinctrl_hummingboard_i2c2: hummingboard-i2c2 {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
 			>;
 		};
 
