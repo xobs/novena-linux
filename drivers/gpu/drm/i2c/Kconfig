@@ -32,4 +32,10 @@ config DRM_I2C_STDP4028
 	  Support for STMicroelectronics STDP4028 LVDS to DisplayPort
 	  encoder.
 
+config DRM_I2C_IT6251
+	tristate "IT6251 LVDS to DisplayPort encoder"
+	default m if DRM_NOVENA
+	help
+	  Support for IT6251 LVDS to DisplayPort encoder.
+
 endmenu

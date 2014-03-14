@@ -11,3 +11,6 @@ obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
 
 stdp4028-y := stdp4028_drv.o
 obj-$(CONFIG_DRM_I2C_STDP4028) += stdp4028.o
+
+it6251-y := it6251_drv.o
+obj-$(CONFIG_DRM_I2C_IT6251) += it6251.o
