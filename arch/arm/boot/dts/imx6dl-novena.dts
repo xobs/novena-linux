@@ -1,0 +1,12 @@
+/*
+ * Copyright (C) 2014 Sean Cross
+ */
+/dts-v1/;
+
+#include "imx6dl.dtsi"
+#include "imx6qdl-novena.dtsi"
+
+/ {
+	model = "Kosagi Novena Solo/DualLite";
+	compatible = "kosagi,novena-dl", "fsl,imx6dl";
+};

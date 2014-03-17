@@ -1,0 +1,88 @@
+/*
+ * Copyright (C) 2014 Russell King
+ */
+/dts-v1/;
+
+#include "imx6q.dtsi"
+#include "imx6qdl-novena.dtsi"
+
+/ {
+	model = "Kosagi Novena Dual/Quad";
+	compatible = "kosagi,novena-q", "fsl,imx6q";
+
+	soc {
+		gpu: gpu@00130000 {
+			compatible = "fsl,imx6q-gpu";
+			reg = <0x00130000 0x4000>, <0x00134000 0x4000>,
+			      <0x02204000 0x4000>, <0x0 0x0>;
+			reg-names = "iobase_3d", "iobase_2d",
+				    "iobase_vg", "phys_baseaddr";
+			interrupts = <0 9 0x04>, <0 10 0x04>,<0 11 0x04>;
+			interrupt-names = "irq_3d", "irq_2d", "irq_vg";
+			clocks = <&clks 26>, <&clks 143>,
+				 <&clks 27>, <&clks 121>,
+				 <&clks 122>, <&clks 74>;
+			clock-names = "gpu2d_axi_clk", "openvg_axi_clk",
+				      "gpu3d_axi_clk", "gpu2d_clk",
+				      "gpu3d_clk", "gpu3d_shader_clk";
+			resets = <&src 0>, <&src 3>, <&src 3>;
+			reset-names = "gpu3d", "gpu2d", "gpuvg";
+			pu-supply = <&reg_pu>;
+		};
+	};
+
+	imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>,
+			<&ipu2 0>, <&ipu2 1>;
+		connectors = <&ldb>, <&hdmi>;
+	};
+};
+
+&sata {
+	status = "okay";
+	fsl,transmit-level-mV = <1104>;
+	fsl,transmit-boost-mdB = <0>;
+	fsl,transmit-atten-16ths = <9>;
+};
+
+&ldb {
+	fsl,dual-channel;
+	status = "okay";
+	lvds-channel@0 {
+		status = "okay";
+		fsl,data-mapping = "jeida";
+		fsl,data-width = <24>;
+		crtcs = <&ipu2 0>, <&ipu2 1>;
+		display-timings {
+			1920x1080p60 {
+				clock-frequency = <148500000>;
+				hactive = <1920>;
+				vactive = <1080>;
+				hback-porch = <148>;
+				hfront-porch = <88>;
+				hsync-len = <44>;
+				vback-porch = <36>;
+				vfront-porch = <4>;
+				vsync-len = <5>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+/*
+			2560x1700p50 {
+				clock-frequency = <185000000>;
+				hactive = <2560>;
+				vactive = <1700>;
+				hback-porch = <80>;
+				hfront-porch = <48>;
+				hsync-len = <32>;
+				vback-porch = <36>;
+				vfront-porch = <3>;
+				vsync-len = <10>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+*/
+		};
+	};
+};

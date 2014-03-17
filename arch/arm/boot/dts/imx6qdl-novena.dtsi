@@ -10,15 +10,9 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
-/dts-v1/;
-#include "imx6q.dtsi"
-
 / {
-	model = "Kosagi Novena (i.MX6 Quad)";
-	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
-
 	memory {
-		reg = <0x10000000 0x40000000>;
+		reg = <0x10000000 0xefffffff>;
 	};
 
 	regulators {
@@ -72,11 +66,21 @@
 			regulator-name = "lcd-lvds-power";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
-			startup-delay-us = <600000>;
+
+			gpio = <&gpio4 15 0>;
+			enable-active-high;
+		};
+		reg_display: display-regulator {
+			compatible = "regulator-fixed";
+
+			regulator-name = "lcd-lvds-power";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-boot-on;
 
 			gpio = <&gpio5 28 0>;
 			enable-active-high;
-	      };
+		};
 	};
 
 	gpio-keys {
@@ -88,6 +92,12 @@
 			gpio-key,wakeup;
 			linux,code = <116>; /* KEY_POWER */
 		};
+	};
+
+	imx-drm {
+		compatible = "fsl,imx-drm";
+		crtcs = <&ipu1 0>, <&ipu1 1>;
+		connectors = <&hdmi>;
 	};
 
 	leds {
@@ -110,14 +120,6 @@
                 brightness-levels = <0 3 6 12 16 24 32 48 64 96 128 192 255>;
                 default-brightness-level = <12>;
         };
-
-	imx-drm {
-		compatible = "fsl,imx-drm";
-		crtcs = <&ipu2 0>, <&ipu2 1>,
-			<&ipu1 0>, <&ipu1 1>;
-		connectors = <&ldb>, <&hdmi>;
-	};
-
 
 	sound {
 		compatible = "kosagi,imx-audio-es8328";
@@ -160,17 +162,17 @@
 	pinctrl-0 = <&pinctrl_uart4_novena>;
 };
 
-&sata {
-	status = "okay";
-};
-
 &iomuxc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hog>;
 
 	backlight {
 		pinctrl_backlight_novena: backlight-pwm {
-			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b0>;
+			fsl,pins = <
+				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT   0x1b0b0
+				MX6QDL_PAD_CSI0_DAT10__GPIO5_IO28 0x80000000
+				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15   0x80000000
+			>;
 		};
 	};
 
@@ -204,6 +206,7 @@
 		pinctrl_hdmi_novena: hdmi_novena {
 			fsl,pins = <
 				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+				MX6QDL_PAD_EIM_A24__GPIO5_IO04        0x80000000
 			>;
 		};
 	};
@@ -222,6 +225,25 @@
 
 				/* User button */
 				MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x80000000
+
+				/* FPGA GPIOs */
+				MX6QDL_PAD_EIM_A16__GPIO2_IO22	0x80000000
+				MX6QDL_PAD_EIM_A17__GPIO2_IO21	0x80000000
+				MX6QDL_PAD_EIM_CS0__GPIO2_IO23	0x80000000
+				MX6QDL_PAD_EIM_CS1__GPIO2_IO24	0x80000000
+				MX6QDL_PAD_EIM_DA0__GPIO3_IO00	0x80000000
+				MX6QDL_PAD_EIM_DA10__GPIO3_IO10	0x80000000
+				MX6QDL_PAD_EIM_DA11__GPIO3_IO11	0x80000000
+				MX6QDL_PAD_EIM_DA12__GPIO3_IO12	0x80000000
+				MX6QDL_PAD_EIM_DA13__GPIO3_IO13	0x80000000
+				MX6QDL_PAD_EIM_DA14__GPIO3_IO14	0x80000000
+				MX6QDL_PAD_EIM_DA15__GPIO3_IO15	0x80000000
+				MX6QDL_PAD_EIM_DA1__GPIO3_IO01	0x80000000
+				MX6QDL_PAD_EIM_DA2__GPIO3_IO02	0x80000000
+				MX6QDL_PAD_EIM_DA3__GPIO3_IO03	0x80000000
+				MX6QDL_PAD_EIM_DA4__GPIO3_IO04	0x80000000
+				MX6QDL_PAD_EIM_LBA__GPIO2_IO27	0x80000000
+
 			>;
 		};
 	};
@@ -291,6 +313,7 @@
 };
 
 &fec {
+	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_enet_novena>;
 	phy-mode = "rgmii";
@@ -352,12 +375,14 @@
 
 	bq20z75@b {
 		compatible = "sbs,sbs-battery";
+		status = "disabled";
 		reg = <0xb>;
 		sbs,i2c-retry-count = <20>;
 		sbs,poll-retry-count = <20>;
 	};
 
 	stmpe610@0 {
+		status = "okay";
 		compatible = "st,stmpe610";
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -394,6 +419,7 @@
 	pmic: pfuze100@08 {
 		compatible = "fsl,pfuze100";
 		reg = <0x08>;
+		status = "okay";
 
 		regulators {
 			sw1a_reg: sw1ab {
@@ -509,14 +535,14 @@
 		audio-amp-supply = <&reg_audio_amp>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_sound_novena>;
-		status = "disabled";
+		status = "okay";
 	};
 
-	stdp4028@73 {
-		compatible = "st,stdp4028";
-		reg = <0x73>;
-		power-supply = <&reg_lvds_lcd>;
-		status = "disabled";
+	it6251@73 {
+		compatible = "it,it6251";
+		reg = <0x5c>;
+		power-supply = <&reg_display>;
+		status = "okay";
 	};
 
 	eepromoops@56 {
@@ -546,37 +572,14 @@
 	power-on-gpio = <&gpio7 12 0>;
 	wake-up-gpio = <&gpio3 22 0>;
 	disable-gpio = <&gpio2 16 0>;
+	status = "okay";
 };
 
 &hdmi {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hdmi_novena>;
 	ddc = <&i2c2>;
-	status = "okay";
 	crtcs = <&ipu1 0>;
+	status = "okay";
 };
 
-&ldb {
-	fsl,dual-channel;
-	status = "disabled";
-        lvds-channel@0 {
-		fsl,data-mapping = "jeida";
-		fsl,data-width = <24>;
-		crtcs = <&ipu2 0>, <&ipu2 1>;
-                display-timings {
-			2560x1700p50 {
-				clock-frequency = <185000000>;
-				hactive = <2560>;
-				vactive = <1700>;
-				hback-porch = <80>;
-				hfront-porch = <48>;
-				hsync-len = <32>;
-				vback-porch = <36>;
-				vfront-porch = <3>;
-				vsync-len = <10>;
-				hsync-active = <1>;
-				vsync-active = <1>;
-			};
-                };
-        };
-};
