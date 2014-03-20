@@ -76,7 +76,7 @@
 			regulator-name = "lcd-lvds-power";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
-			regulator-boot-on;
+			startup-delay-us = <100000>;
 
 			gpio = <&gpio5 28 0>;
 			enable-active-high;
@@ -224,7 +224,7 @@
 				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x80000000
 
 				/* User button */
-				MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x80000000
+				MX6QDL_PAD_KEY_COL4__GPIO4_IO14 0x80000000
 
 				/* FPGA GPIOs */
 				MX6QDL_PAD_EIM_A16__GPIO2_IO22	0x80000000
