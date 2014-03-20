@@ -58,7 +58,7 @@ it6251_write(struct it6251_priv *priv, uint8_t addr, uint8_t val)
 
 	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
 	if (ret < 0) {
-		dev_err(&client->dev, "Error %d writing to subaddress 0x%x\n",
+		dev_err(&client->dev, "error %d writing to edp addr 0x%x\n",
 			   ret, addr);
 		return -1;
 	}
@@ -74,7 +74,7 @@ it6251_lvds_write(struct it6251_priv *priv, uint8_t addr, uint8_t val)
 
 	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
 	if (ret < 0) {
-		dev_err(&client->dev, "Error %d writing to subaddress 0x%x\n",
+		dev_err(&client->dev, "error %d writing to lvds addr 0x%x\n",
 			   ret, addr);
 		return -1;
 	}
@@ -106,8 +106,7 @@ fail:
 
 static int it6251_init(struct it6251_priv *priv)
 {
-	it6251_write(priv, 0x5, 0xff);  // reset DPTX
-	it6251_write(priv, 0x5, 0x00);
+	it6251_write(priv, 0x05, 0x00);
 
 	it6251_write(priv, 0xfd, 0xbc); // set LVDSRX address, and enable
 	it6251_write(priv, 0xfe, 0x01);
@@ -117,8 +116,8 @@ static int it6251_init(struct it6251_priv *priv)
 		return -1;
 
 	// LVDSRX
-	it6251_lvds_write(priv, 0x5, 0xff);   // reset LVDSRX
-	it6251_lvds_write(priv, 0x5, 0x00);
+	it6251_lvds_write(priv, 0x05, 0xff);   // reset LVDSRX
+	it6251_lvds_write(priv, 0x05, 0x00);
 
 	it6251_lvds_write(priv, 0x3b, 0x42);  // reset LVDSRX PLL
 	it6251_lvds_write(priv, 0x3b, 0x43);
@@ -133,7 +132,6 @@ static int it6251_init(struct it6251_priv *priv)
 
 	it6251_lvds_write(priv, 0x05, 0x02);  // reset LVDSRX pix clock
 	it6251_lvds_write(priv, 0x05, 0x00);
-
 
 	// DPTX
 	it6251_write(priv, 0x16, 0x02); // set for two lane mode, normal op, no swapping, no downspread
@@ -222,6 +220,10 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "Unable to get regulator\n");
 		return 0;
 	}
+
+	ret = regulator_enable(priv->regulator);
+	if (ret)
+		dev_err(&client->dev, "Unable to enable regulator\n");
 
 	priv->client = client;
 	i2c_set_clientdata(client, priv);
