@@ -1,3 +1,4 @@
+#define DEBUG
 /*
  * Copyright (C) 2011-2013 Freescale Semiconductor, Inc.
  *
@@ -1623,16 +1624,16 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	if (irq < 0)
 		return -EINVAL;
 
+	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	hdmi->regs = devm_ioremap_resource(dev, iores);
+	if (IS_ERR(hdmi->regs))
+		return PTR_ERR(hdmi->regs);
+
 	ret = devm_request_threaded_irq(dev, irq, imx_hdmi_hardirq,
 					imx_hdmi_irq, IRQF_SHARED,
 					dev_name(dev), hdmi);
 	if (ret)
 		return ret;
-
-	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	hdmi->regs = devm_ioremap_resource(dev, iores);
-	if (IS_ERR(hdmi->regs))
-		return PTR_ERR(hdmi->regs);
 
 	hdmi->regmap = syscon_regmap_lookup_by_phandle(np, "gpr");
 	if (IS_ERR(hdmi->regmap))
