@@ -433,7 +433,7 @@
 
 	bq20z75@b {
 		compatible = "sbs,sbs-battery";
-		status = "disabled";
+		status = "okay";
 		reg = <0xb>;
 		sbs,i2c-retry-count = <20>;
 		sbs,poll-retry-count = <20>;
@@ -616,11 +616,17 @@
 	fsl,spi-num-chipselects = <3>;
 	status = "okay";
 
-	fpga@0 {
+	spidev@0 {
+		compatible = "spidev";
+		spi-max-frequency = <30000000>;
+		reg = <0>;
+	};
+
+	fpga@1 {
 		compatible = "kosagi,novena-fpga";
 
 		spi-max-frequency = <30000000>;
-		reg = <0>;
+		reg = <1>;
 
 		pinctrl-names = "default", "state-eim", "state-gpio";
 		pinctrl-0 = <&pinctrl_fpga_gpio>;
