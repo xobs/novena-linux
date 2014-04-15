@@ -33,8 +33,8 @@
 
 	imx-drm {
 		compatible = "fsl,imx-drm";
-		crtcs = <&ipu1 0>, <&ipu1 1>,
-			<&ipu2 0>, <&ipu2 1>;
+		crtcs = <&ipu2 0>, <&ipu2 1>,
+			<&ipu1 0>, <&ipu1 1>;
 		connectors = <&ldb>, <&hdmi>;
 	};
 };
@@ -47,13 +47,13 @@
 };
 
 &hdmi {
-        crtcs = <&ipu2 0>;
+        crtcs = <&ipu1 0>;
 };
 
 &ldb {
 	status = "okay";
 	lvds-channel@0 {
 		status = "okay";
-		crtcs = <&ipu1 0>, <&ipu1 1>;
+		crtcs = <&ipu2 0>, <&ipu2 1>;
 	};
 };
