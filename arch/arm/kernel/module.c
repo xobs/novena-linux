@@ -353,3 +353,8 @@ module_arch_cleanup(struct module *mod)
 			unwind_table_del(mod->arch.unwind[i]);
 #endif
 }
+
+void v7_dma_flush_range(int start, int end);
+EXPORT_SYMBOL(v7_dma_flush_range);
+void v7_dma_map_area(int start, int size, int dir);
+EXPORT_SYMBOL(v7_dma_map_area);
