@@ -335,6 +335,16 @@ config HID_LENOVO_TPKBD
 	sensitivity of the trackpoint, using the microphone mute button or
 	controlling the mute and microphone mute LEDs.
 
+config HID_LENOVO_CBTKBD
+	tristate "Lenovo ThinkPad Compact Bluetooth Keyboard with TrackPoint"
+	depends on HID
+	---help---
+	Support for the Lenovo ThinkPad Compact Bluetooth Keyboard with TrackPoint.
+
+	Say Y here if you have a Lenovo ThinkPad Compact Bluetooth Keyboard with
+	TrackPoint and would like to use the function keys as function keys, as
+	well as letting linux recognise the special functions such as brightness.
+
 config HID_LOGITECH
 	tristate "Logitech devices" if EXPERT
 	depends on HID
