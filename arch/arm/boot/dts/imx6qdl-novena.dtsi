@@ -634,8 +634,8 @@
 		pinctrl-2 = <&pinctrl_fpga_gpio>;
 		clocks = <&clks 205>, <&clks 207>, <&clks 190>, <&clks 196>;
 		clock-names = "lvds", "lvds-switch", "lvds-parent", "eim-slow";
-		power-switch = <&gpio1 17 0>;
-		reset-switch = <&gpio5 7 0>;
+		reset-switch = <&gpio1 17 0>;
+		power-switch = <&gpio5 7 0>;
 
 		kosagi,weim-cs0-timing = <0x31910BBF 0x00001000 0x09014000
 					  0x00000000 0x09080800 0x00000000>;
