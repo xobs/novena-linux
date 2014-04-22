@@ -113,12 +113,15 @@ fi
 case $ARCH in
 um)
 	installed_image_path="usr/bin/linux-$version"
+	installed_dtb_path="usr/bin/linux-$version.dtb"
 	;;
 parisc|mips|powerpc)
 	installed_image_path="boot/vmlinux-$version"
+	installed_dtb_path="boot/vmlinuz-$version.dtb"
 	;;
 *)
 	installed_image_path="boot/vmlinuz-$version"
+	installed_dtb_path="boot/vmlinuz-$version.dtb"
 esac
 
 BUILD_DEBUG="$(grep -s '^CONFIG_DEBUG_INFO=y' $KCONFIG_CONFIG || true)"
@@ -152,6 +155,14 @@ if grep -q "^CONFIG_OF=y" $KCONFIG_CONFIG ; then
 	# Only some architectures with OF support have this target
 	if grep -q dtbs_install "${srctree}/arch/$SRCARCH/Makefile"; then
 		$MAKE KBUILD_SRC= INSTALL_DTBS_PATH="$tmpdir/usr/lib/$packagename" dtbs_install
+	fi
+fi
+
+if [ ! -z $KBUILD_DTB ]; then
+	if [ -e $KBUILD_DTB ]; then
+		cp $KBUILD_DTB "$tmpdir/$installed_dtb_path"
+	else
+		cp arch/$ARCH/boot/dts/$KBUILD_DTB "$tmpdir/$installed_dtb_path"
 	fi
 fi
 
