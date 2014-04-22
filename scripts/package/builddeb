@@ -97,12 +97,15 @@ fi
 case $ARCH in
 um)
 	installed_image_path="usr/bin/linux-$version"
+	installed_dtb_path="usr/bin/linux-$version.dtb"
 	;;
 parisc|mips|powerpc)
 	installed_image_path="boot/vmlinux-$version"
+	installed_dtb_path="boot/vmlinuz-$version.dtb"
 	;;
 *)
 	installed_image_path="boot/vmlinuz-$version"
+	installed_dtb_path="boot/vmlinuz-$version.dtb"
 esac
 
 BUILD_DEBUG="$(grep -s '^CONFIG_DEBUG_INFO=y' $KCONFIG_CONFIG || true)"
@@ -141,6 +144,14 @@ if [ -e $KBUILD_IMAGE ]; then
 	cp $KBUILD_IMAGE "$tmpdir/$installed_image_path"
 else
 	cp arch/$ARCH/boot/$KBUILD_IMAGE "$tmpdir/$installed_image_path"
+fi
+
+if [ ! -z $KBUILD_DTB ]; then
+	if [ -e $KBUILD_DTB ]; then
+		cp $KBUILD_DTB "$tmpdir/$installed_dtb_path"
+	else
+		cp arch/$ARCH/boot/dts/$KBUILD_DTB "$tmpdir/$installed_dtb_path"
+	fi
 fi
 
 if grep -q '^CONFIG_MODULES=y' $KCONFIG_CONFIG ; then
