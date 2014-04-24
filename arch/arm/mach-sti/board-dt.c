@@ -16,15 +16,9 @@
 
 void __init stih41x_l2x0_init(void)
 {
-	u32 way_size = 0x4;
-	u32 aux_ctrl;
-	/* may be this can be encoded in macros like BIT*() */
-	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
-		   L310_AUX_CTRL_DATA_PREFETCH |
-		   L310_AUX_CTRL_INSTR_PREFETCH |
-		   L2C_AUX_CTRL_WAY_SIZE(way_size);
-
-	l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
+		     L310_AUX_CTRL_DATA_PREFETCH |
+		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
 }
 
 static void __init stih41x_machine_init(void)
