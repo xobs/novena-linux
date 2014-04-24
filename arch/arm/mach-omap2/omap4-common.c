@@ -220,8 +220,7 @@ static int __init omap_l2_cache_init(void)
 		   L2C_AUX_CTRL_WAY_SIZE(3) |
 		   L2C_AUX_CTRL_SHARED_OVERRIDE |
 		   L310_AUX_CTRL_DATA_PREFETCH |
-		   L310_AUX_CTRL_INSTR_PREFETCH |
-		   L310_AUX_CTRL_EARLY_BRESP;
+		   L310_AUX_CTRL_INSTR_PREFETCH;
 
 	outer_cache.write_sec = omap4_l2c310_write_sec;
 	if (of_have_populated_dt())
