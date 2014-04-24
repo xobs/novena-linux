@@ -125,6 +125,8 @@
 			cache-level = <2>;
 			arm,tag-latency = <4 2 3>;
 			arm,data-latency = <4 2 3>;
+			arm,dynamic-clk-gating;
+			arm,standby-mode;
 		};
 
 		pcie: pcie@0x01000000 {
