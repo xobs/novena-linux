@@ -59,10 +59,10 @@ static int __init ux500_l2x0_init(void)
 	/* DBx540's L2 has 128KB way size */
 	if (cpu_is_ux540_family())
 		/* 128KB way size */
-		aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+		aux_val |= L2C_AUX_CTRL_WAY_SIZE(4);
 	else
 		/* 64KB way size */
-		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+		aux_val |= L2C_AUX_CTRL_WAY_SIZE(3);
 
 	outer_cache.write_sec = ux500_l2c310_write_sec;
 
