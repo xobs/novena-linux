@@ -21,6 +21,7 @@
 #ifndef __ASM_OUTERCACHE_H
 #define __ASM_OUTERCACHE_H
 
+#include <linux/bug.h>
 #include <linux/types.h>
 
 struct outer_cache_fns {
@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
  * cache is pushed out to lower levels of system memory.  The note and
  * conditions above concerning outer_flush_all() applies here.
  */
-static inline void outer_disable(void)
-{
-	if (outer_cache.disable)
-		outer_cache.disable();
-}
+extern void outer_disable(void);
 
 /**
  * outer_resume - restore the cache configuration and re-enable outer cache
