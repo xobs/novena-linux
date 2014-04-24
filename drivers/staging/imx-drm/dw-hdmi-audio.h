@@ -8,6 +8,7 @@ struct dw_hdmi_audio_data {
 	void __iomem *base;
 	int irq;
 	struct imx_hdmi *hdmi;
+	u8 *eld;
 	void (*set_sample_rate)(struct imx_hdmi *, unsigned);
 };
 
