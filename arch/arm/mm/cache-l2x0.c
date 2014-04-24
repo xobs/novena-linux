@@ -695,6 +695,18 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
 			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
 	}
 
+	/* r3p0 or later has power control register */
+	if (rev >= L310_CACHE_ID_RTL_R3P0) {
+		u32 power_ctrl;
+
+		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+			      base, L310_POWER_CTRL);
+		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
+		pr_info("L2C-310 dynamic clock gating %sabled, standby mode %sabled\n",
+			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
+			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+	}
+
 	l2c_enable(base, aux, num_lock);
 
 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
@@ -990,7 +1002,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
 	u32 data[3] = { 0, 0, 0 };
 	u32 tag[3] = { 0, 0, 0 };
 	u32 filter[2] = { 0, 0 };
-	u32 val;
 
 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
 	if (tag[0] && tag[1] && tag[2])
@@ -1017,15 +1028,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
 			       l2x0_base + L310_ADDR_FILTER_START);
 	}
-
-	val = 0;
-	if (of_property_read_bool(np, "arm,dynamic-clk-gating"))
-		val |= L310_DYNAMIC_CLK_GATING_EN;
-	if (of_property_read_bool(np, "arm,standby-mode"))
-		val |= L310_STNDBY_MODE_EN;
-
-	if (val)
-		l2c_write_sec(val, l2x0_base, L310_POWER_CTRL);
 }
 
 static const struct l2c_init_data of_l2c310_data __initconst = {

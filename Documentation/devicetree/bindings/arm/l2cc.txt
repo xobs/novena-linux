@@ -40,8 +40,6 @@ Optional properties:
 - arm,filter-ranges : <start length> Starting address and length of window to
   filter. Addresses in the filter window are directed to the M1 port. Other
   addresses will go to the M0 port.
-- arm,dynamic-clk-gating : Enables dynamic clock gating (PL310)
-- arm,standby-mode : Enables standby mode (PL310)
 - interrupts : 1 combined interrupt.
 - cache-id-part: cache id part number to be used if it is not present
   on hardware
