@@ -30,13 +30,6 @@
 			pu-supply = <&reg_pu>;
 		};
 	};
-
-	imx-drm {
-		compatible = "fsl,imx-drm";
-		crtcs = <&ipu2 0>, <&ipu2 1>,
-			<&ipu1 0>, <&ipu1 1>;
-		connectors = <&ldb>, <&hdmi>;
-	};
 };
 
 &sata {
@@ -44,10 +37,6 @@
 	fsl,transmit-level-mV = <1104>;
 	fsl,transmit-boost-mdB = <0>;
 	fsl,transmit-atten-16ths = <9>;
-};
-
-&hdmi {
-        crtcs = <&ipu1 0>;
 };
 
 &ldb {

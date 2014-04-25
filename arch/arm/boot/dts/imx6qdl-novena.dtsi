@@ -96,12 +96,6 @@
 		};
 	};
 
-	imx-drm {
-		compatible = "fsl,imx-drm";
-		crtcs = <&ipu1 0>, <&ipu1 1>;
-		connectors = <&hdmi>;
-	};
-
 	leds {
 		compatible = "gpio-leds";
 		heartbeat {

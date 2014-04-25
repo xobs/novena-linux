@@ -42,6 +42,7 @@ struct imx_es8328_data {
 	unsigned int clk_frequency;
 	int power_gpio;
 	int jack_gpio;
+	struct regulator *power_regulator;
 };
 
 static struct snd_soc_jack_gpio headset_jack_gpios[] = {
@@ -218,6 +219,14 @@ static int imx_es8328_probe(struct platform_device *pdev)
 		devm_gpio_request_one(&pdev->dev, data->power_gpio,
 				    GPIOF_OUT_INIT_HIGH,
 				    "audio codec power switch");
+
+	data->power_regulator = devm_regulator_get(dev, "power");
+	if (IS_ERR(data->power_regulator)) {
+		dev_err(dev, "No codec regulator\n");
+		data->power_regulator = NULL;
+	}
+	else
+		power_regulator_enable(data->power_regulator);
 
 	/* Setup clocks */
 	data->codec_clk = devm_clk_get(dev, "cko1");
