@@ -108,14 +108,13 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
 	unsigned long period_cycles, duty_cycles, prescale;
 	u32 cr;
 
-	if (duty_ns > 100000) {
+	if (period_ns > 100000) {
 		cr = MX3_PWMCR_CLKSRC_IPG_32K;
 		c = 32768;
 	}
 	else {
 		cr = MX3_PWMCR_CLKSRC_IPG_HIGH;
 		c = clk_get_rate(imx->clk_per);
-		dev_dbg(chip->dev, "Clock rate: %lld\n", c);
 	}
 	c = c * period_ns;
 	do_div(c, 1000000000);
