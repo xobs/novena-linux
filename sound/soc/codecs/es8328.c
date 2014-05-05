@@ -10,7 +10,6 @@
  * published by the Free Software Foundation.
  */
 
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -59,14 +58,17 @@ struct es8328_priv {
 };
 
 static const DECLARE_TLV_DB_SCALE(play_tlv, -3000, 100, 0);
+static const DECLARE_TLV_DB_SCALE(dac_tlv, -9600, 50, 0);
 static const DECLARE_TLV_DB_SCALE(cap_tlv, -9600, 50, 0);
 static const DECLARE_TLV_DB_SCALE(pga_tlv, 0, 300, 0);
 
 static const struct snd_kcontrol_new es8328_snd_controls[] = {
-SOC_DOUBLE_R_TLV("Speaker Playback Volume",
+SOC_DOUBLE_R_TLV("OUT2 Playback Volume",
 		ES8328_DACCONTROL26, ES8328_DACCONTROL27, 0, 0x24, 0, play_tlv),
-SOC_DOUBLE_R_TLV("Headphone Playback Volume",
+SOC_DOUBLE_R_TLV("OUT1 Playback Volume",
 		ES8328_DACCONTROL24, ES8328_DACCONTROL25, 0, 0x24, 0, play_tlv),
+SOC_DOUBLE_R_TLV("PCM Playback Volume",
+		ES8328_DACCONTROL4, ES8328_DACCONTROL5, 0, 0xc0, 1, dac_tlv),
 
 SOC_DOUBLE_R_TLV("Mic Capture Volume",
 		ES8328_ADCCONTROL8, ES8328_ADCCONTROL9, 0, 0xc0, 1, cap_tlv),
@@ -74,19 +76,35 @@ SOC_DOUBLE_TLV("Mic PGA Volume",
 		ES8328_ADCCONTROL1, 4, 0, 0x08, 0, pga_tlv),
 };
 
-/*
- * DAPM controls.
- */
+static const char *dac_mux_text[] = {
+	"IN1",
+	"IN2",
+	"IN3",
+	"ADC Input",
+};
+
+static const struct soc_enum dacl_enum =
+        SOC_ENUM_SINGLE(ES8328_DACCONTROL16, ES8328_DACCONTROL16_LMIXSEL_SHIFT,
+			3, dac_mux_text);
+static const struct snd_kcontrol_new adc1l_mux =
+        SOC_DAPM_ENUM("DAC Route", dacl_enum);
+
+static const struct soc_enum dacr_enum =
+        SOC_ENUM_SINGLE(ES8328_DACCONTROL16, ES8328_DACCONTROL16_RMIXSEL_SHIFT,
+			3, dac_mux_text);
+static const struct snd_kcontrol_new adc1l_mux =
+        SOC_DAPM_ENUM("DAC Route", dacr_enum);
+
 static const struct snd_soc_dapm_widget es8328_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC("Speaker Volume", "HiFi Playback", SND_SOC_NOPM, 0, 0),
 	SND_SOC_DAPM_OUTPUT("VOUTL"),
 	SND_SOC_DAPM_OUTPUT("VOUTR"),
-        SND_SOC_DAPM_INPUT("LINE_IN"),
-        SND_SOC_DAPM_INPUT("MIC_IN"),
-        SND_SOC_DAPM_OUTPUT("HP_OUT"),
-        SND_SOC_DAPM_OUTPUT("SPK_OUT"),
+	SND_SOC_DAPM_INPUT("LINE_IN"),
+	SND_SOC_DAPM_INPUT("MIC_IN"),
+	SND_SOC_DAPM_OUTPUT("OUT1"),
+	SND_SOC_DAPM_OUTPUT("OUT2"),
+	SND_SOC_DAPM_MIXER(
 };
-
 
 static const struct snd_soc_dapm_route es8328_intercon[] = {
 	{"VOUTL", NULL, "DAC"},
@@ -95,14 +113,10 @@ static const struct snd_soc_dapm_route es8328_intercon[] = {
 
 static int es8328_mute(struct snd_soc_dai *dai, int mute)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	u16 mute_reg = snd_soc_read(codec, ES8328_DACCONTROL3);
-
-	if (mute)
-		mute_reg |= ES8328_DACCONTROL3_DACMUTE;
-	else
-		mute_reg &= ~ES8328_DACCONTROL3_DACMUTE;
-	return snd_soc_write(codec, ES8328_DACCONTROL3, mute_reg);
+	return snd_soc_update_bits(dai->codec,
+				   ES8328_DACCONTROL3,
+				   ES8328_DACCONTROL3_DACMUTE,
+				   mute);
 }
 
 static int es8328_hw_params(struct snd_pcm_substream *substream,
@@ -167,14 +181,37 @@ static int es8328_hw_params(struct snd_pcm_substream *substream,
 static int es8328_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		unsigned int fmt)
 {
-	if ((fmt & SND_SOC_DAIFMT_FORMAT_MASK) != SND_SOC_DAIFMT_I2S)
-		return -EINVAL;
+	/* Default to 16-bit words */
+	u8 reg = ES8328_DACCONTROL1_DACWL_16;
 
+	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+	case SND_SOC_DAIFMT_CBS_CFS:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_I2S:
+		reg |= ES8328_DACCONTROL1_DACFORMAT_I2S;
+		break;
+	case SND_SOC_DAIFMT_RIGHT_J:
+		reg |= ES8328_DACCONTROL1_DACFORMAT_RJUST;
+		break;
+	case SND_SOC_DAIFMT_LEFT_J:
+		reg |= ES8328_DACCONTROL1_DACFORMAT_LJUST;
+		break;
+	default:
+		return -EINVAL;
+	}
+	
 	if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBM_CFM)
 		return -EINVAL;
 
 	if ((fmt & SND_SOC_DAIFMT_INV_MASK) != SND_SOC_DAIFMT_NB_NF)
 		return -EINVAL;
+
+	snd_soc_write(codec, ES8328_DACCONTROL1, reg);
 
 	return 0;
 }
@@ -222,35 +259,17 @@ static int es8328_adc_enable(struct snd_soc_codec *codec)
 
 static int es8328_dac_enable(struct snd_soc_codec *codec)
 {
-	u16 old_volumes[4];
 	u16 reg;
-	int i;
-
-	for (i = 0; i < 4; i++) {
-		old_volumes[i] = snd_soc_read(codec, i + ES8328_DACCONTROL24);
-		snd_soc_write(codec, i + ES8328_DACCONTROL24, 0);
-	}
 
 	/* Power up LOUT2 ROUT2, and power down xOUT1 */
 	snd_soc_write(codec, ES8328_DACPOWER,
 			ES8328_DACPOWER_ROUT2_ON |
-			ES8328_DACPOWER_LOUT2_ON);
+			ES8328_DACPOWER_LOUT2_ON |
+			ES8328_DACPOWER_ROUT1_ON |
+			ES8328_DACPOWER_LOUT1_ON);
 
 	/* Enable click-free power up */
 	snd_soc_write(codec, ES8328_DACCONTROL6, ES8328_DACCONTROL6_CLICKFREE);
-	snd_soc_write(codec, ES8328_DACCONTROL3, 0x36);
-
-	/* Set I2S to 16-bit mode */
-	snd_soc_write(codec, ES8328_DACCONTROL1, ES8328_DACCONTROL1_DACWL_16);
-
-	/* No attenuation */
-	snd_soc_write(codec, ES8328_DACCONTROL4, 0x00);
-	snd_soc_write(codec, ES8328_DACCONTROL5, 0x00);
-
-	/* Set LIN2 for the output mixer */
-	snd_soc_write(codec, ES8328_DACCONTROL16,
-			ES8328_DACCONTROL16_RMIXSEL_RIN2 |
-			ES8328_DACCONTROL16_LMIXSEL_LIN2);
 
 	/* Point the left DAC at the left mixer */
 	snd_soc_write(codec, ES8328_DACCONTROL17, ES8328_DACCONTROL17_LD2LO);
@@ -261,12 +280,8 @@ static int es8328_dac_enable(struct snd_soc_codec *codec)
 	snd_soc_write(codec, ES8328_DACCONTROL18, 0x00);
 	snd_soc_write(codec, ES8328_DACCONTROL19, 0x00);
 
-
 	/* Disable mono mode for DACL, and mute DACR */
 	snd_soc_write(codec, ES8328_DACCONTROL7, 0x00);
-
-	for (i = 0; i < 4; i++)
-		snd_soc_write(codec, i + ES8328_DACCONTROL24, old_volumes[i]);
 
 	reg = snd_soc_read(codec, ES8328_CHIPPOWER);
 	reg &= ~(ES8328_CHIPPOWER_DACVREF_OFF |
@@ -274,7 +289,6 @@ static int es8328_dac_enable(struct snd_soc_codec *codec)
 		 ES8328_CHIPPOWER_DACSTM_RESET |
 		 ES8328_CHIPPOWER_DACDIG_OFF);
 	snd_soc_write(codec, ES8328_CHIPPOWER, reg);
-	snd_soc_write(codec, ES8328_DACCONTROL3, 0x32);
 
 	return 0;
 }
@@ -301,8 +315,14 @@ static int es8328_pcm_startup(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		es8328_dac_enable(codec);
-		if (es8328->amp_regulator)
-			regulator_enable(es8328->amp_regulator);
+		if (es8328->amp_regulator) {
+			int ret;
+			ret = regulator_enable(es8328->amp_regulator);
+			if (ret) {
+				dev_err(codec->dev,
+					"unable to enable speaker regulator\n");
+			}
+		}
 	}
 	return 0;
 }
@@ -317,11 +337,6 @@ static void es8328_pcm_shutdown(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		if (es8328->amp_regulator)
 			regulator_disable(es8328->amp_regulator);
-		/* Mute DAC */
-		snd_soc_write(codec, ES8328_DACCONTROL3,
-				ES8328_DACCONTROL3_DACZEROCROSS |
-				ES8328_DACCONTROL3_DACSOFTRAMP |
-				ES8328_DACCONTROL3_DACMUTE);
 
 		/* Power down DAC and disable LOUT/ROUT */
 		snd_soc_write(codec, ES8328_DACPOWER,
@@ -389,7 +404,6 @@ static int es8328_init(struct snd_soc_codec *codec)
 			ES8328_CONTROL2_OVERCURRENT_ON |
 			ES8328_CONTROL2_THERMAL_SHUTDOWN_ON);
 
-
 	/* Power on the chip (but leave VRET off) */
 	/*
 	snd_soc_write(codec, ES8328_CHIPPOWER,
@@ -397,12 +411,13 @@ static int es8328_init(struct snd_soc_codec *codec)
 			ES8328_CHIPPOWER_ADCVREF_OFF);
 	*/
 
-
 	/* Enable muting, and turn on zerocross */
 	snd_soc_write(codec, ES8328_DACCONTROL3,
-			ES8328_DACCONTROL3_DACZEROCROSS |
-			ES8328_DACCONTROL3_DACSOFTRAMP |
-			ES8328_DACCONTROL3_DACMUTE);
+			  ES8328_DACCONTROL3_AUTOMUTE
+			| ES8328_DACCONTROL3_DACMUTE
+			| ES8328_DACCONTROL3_DACZEROCROSS
+			| ES8328_DACCONTROL3_DACSOFTRAMP
+			| ES8328_DACCONTROL3_DACRAMPRATE_32LRCLK);
 
 	return 0;
 }
@@ -412,7 +427,7 @@ static const struct snd_soc_dai_ops es8328_dai_ops = {
 	.prepare	= es8328_pcm_prepare,
 	.startup	= es8328_pcm_startup,
 	.shutdown	= es8328_pcm_shutdown,
-//	.digital_mute	= es8328_mute,
+	.digital_mute	= es8328_mute,
 	.set_fmt	= es8328_set_dai_fmt,
 	.set_sysclk	= es8328_set_dai_sysclk,
 };
@@ -571,7 +586,7 @@ static int es8328_i2c_probe(struct i2c_client *i2c,
 
 	i2c_set_clientdata(i2c, es8328);
 
-	ret =  snd_soc_register_codec(&i2c->dev,
+	ret = snd_soc_register_codec(&i2c->dev,
 			&soc_codec_dev_es8328, &es8328_dai, 1);
 
 	return ret;
@@ -595,9 +610,9 @@ static struct i2c_driver es8328_i2c_driver = {
 		.owner = THIS_MODULE,
 		.of_match_table = es8328_of_match,
 	},
-	.probe =    es8328_i2c_probe,
-	.remove =   es8328_i2c_remove,
-	.id_table = es8328_i2c_id,
+	.probe =	es8328_i2c_probe,
+	.remove =	es8328_i2c_remove,
+	.id_table =	es8328_i2c_id,
 };
 #endif
 
