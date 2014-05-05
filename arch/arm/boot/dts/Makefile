@@ -156,6 +156,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6dl-cubox-i.dtb \
 	imx6dl-hummingboard.dtb \
 	imx6dl-novena.dtb \
+	imx6dl-novena-aqs.dtb \
 	imx6dl-sabreauto.dtb \
 	imx6dl-sabresd.dtb \
 	imx6dl-wandboard.dtb \
