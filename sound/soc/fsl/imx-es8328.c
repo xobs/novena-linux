@@ -20,7 +20,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/clk-provider.h>
 #include <sound/soc.h>
+#ifdef ENABLE_JACK
 #include <sound/jack.h>
+#endif
 
 #include "imx-audmux.h"
 
@@ -41,8 +43,20 @@ struct imx_es8328_data {
 	unsigned int clk_freq_src;
 	unsigned int clk_frequency;
 	int power_gpio;
+#ifdef ENABLE_JACK
 	int jack_gpio;
+#endif
 };
+
+#ifdef ENABLE_JACK
+/* Headset jack detection DAPM pins */
+static struct snd_soc_jack_pin headset_jack_pins[] = {
+	{
+		.pin = "Headset Stereophone",
+		.mask = SND_JACK_HEADPHONE,
+	},
+};
+
 
 static struct snd_soc_jack_gpio headset_jack_gpios[] = {
 	{
@@ -55,6 +69,7 @@ static struct snd_soc_jack_gpio headset_jack_gpios[] = {
 };
 
 static struct snd_soc_jack headset_jack;
+#endif
 
 static int imx_es8328_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -71,19 +86,28 @@ static int imx_es8328_dai_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
+#ifdef ENABLE_JACK
 	/* Headphone jack detection */
 	if (gpio_is_valid(data->jack_gpio)) {
+		headset_jack_gpios[0].gpio = data->jack_gpio;
+
 		ret = snd_soc_jack_new(rtd->codec, "Headphone",
 				       SND_JACK_HEADPHONE | SND_JACK_BTN_0,
 				       &headset_jack);
 		if (ret)
 			return ret;
 
-		headset_jack_gpios[0].gpio = data->jack_gpio;
+		ret = snd_soc_jack_add_pins(&headset_jack,
+				ARRAY_SIZE(headset_jack_pins),
+				headset_jack_pins);
+		if (ret)
+			return ret;
+
 		ret = snd_soc_jack_add_gpios(&headset_jack,
 					     ARRAY_SIZE(headset_jack_gpios),
 					     headset_jack_gpios);
 	}
+#endif
 
 	return ret;
 }
@@ -209,8 +233,10 @@ static int imx_es8328_probe(struct platform_device *pdev)
 
 	data->dev = dev;
 
+#ifdef ENABLE_JACK
 	data->jack_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"jack-gpio", 0);
+#endif
 
 	data->power_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"power-gpio", 0);
@@ -265,7 +291,7 @@ static int imx_es8328_probe(struct platform_device *pdev)
 	data->dai.codec_of_node = codec_np;
 	data->dai.cpu_of_node = ssi_np;
 	data->dai.platform_of_node = ssi_np;
-	data->dai.init = &imx_es8328_dai_init;
+	data->dai.init = imx_es8328_dai_init;
 	data->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			    SND_SOC_DAIFMT_CBM_CFM;
 
@@ -300,8 +326,11 @@ static int imx_es8328_remove(struct platform_device *pdev)
 {
 	struct imx_es8328_data *data = platform_get_drvdata(pdev);
 
-//	snd_soc_jack_free_gpios(&headset_jack, ARRAY_SIZE(headset_jack_gpios),
-//				headset_jack_gpios);
+#ifdef ENABLE_JACK
+	snd_soc_jack_free_gpios(&headset_jack,
+				ARRAY_SIZE(headset_jack_gpios),
+				headset_jack_gpios);
+#endif
 
 	if (data->codec_clk)
 		clk_disable_unprepare(data->codec_clk);
