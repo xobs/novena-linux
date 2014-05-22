@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  */
 
+/* Check wm8350.c for good reference */
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -58,20 +59,40 @@ struct es8328_priv {
 	struct regulator *amp_regulator;
 };
 
+static const char *es8328_deemp[] = { "None", "32kHz", "44.1kHz", "48kHz" };
+static const char *es8328_pol[] = { "Normal", "Inv R", "Inv L", "Inv L & R" };
+//static const char *es8328_vpp[] = { "3.5v", "4.0v", "3.0v", "2.5v" };
+
+static const struct soc_enum wm8350_enum[] = {
+	SOC_ENUM_SINGLE(ES8328_DACCONTROL6, 6, 4, es8328_deemp),
+	SOC_ENUM_SINGLE(WM8350_DACCONTROL6, 4, 4, es8328_pol),
+};
+
+
 static const DECLARE_TLV_DB_SCALE(play_tlv, -3000, 100, 0);
-static const DECLARE_TLV_DB_SCALE(cap_tlv, -9600, 50, 0);
+static const DECLARE_TLV_DB_SCALE(dac_adc_tlv, -9600, 50, 0);
 static const DECLARE_TLV_DB_SCALE(pga_tlv, 0, 300, 0);
 
 static const struct snd_kcontrol_new es8328_snd_controls[] = {
-SOC_DOUBLE_R_TLV("Speaker Playback Volume",
-		ES8328_DACCONTROL26, ES8328_DACCONTROL27, 0, 0x24, 0, play_tlv),
-SOC_DOUBLE_R_TLV("Headphone Playback Volume",
-		ES8328_DACCONTROL24, ES8328_DACCONTROL25, 0, 0x24, 0, play_tlv),
+	SOC_ENUM("Playback Deemphasis", es8328_enum[0]),
+	SOC_ENUM("Playback DAC Inversion", es8328_enum[1]),
+	SOC_DOUBLE_R_TLV("Playback PCM Volume",
+			ES8328_LDACVOL,
+			ES8328_RDACVOL,
+			0, ES8328_DACVOL_MAX, 1, dac_adc_tlv),
+	SOC_DOUBLE_R_TLV("Out1 Playback Volume",
+			ES8328_LOUT1VOL,
+			ES8328_ROUT1VOL,
+			0, ES8328_OUT1VOL_MAX, 0, play_tlv),
+	SOC_DOUBLE_R_TLV("Out2 Playback Volume",
+			ES8328_LOUT2VOL, ES8328_ROUT2VOL,
+			0, ES8328_OUT2VOL_MAX, 0, play_tlv),
 
-SOC_DOUBLE_R_TLV("Mic Capture Volume",
-		ES8328_ADCCONTROL8, ES8328_ADCCONTROL9, 0, 0xc0, 1, cap_tlv),
-SOC_DOUBLE_TLV("Mic PGA Volume",
-		ES8328_ADCCONTROL1, 4, 0, 0x08, 0, pga_tlv),
+	SOC_DOUBLE_R_TLV("Mic Capture Volume",
+			ES8328_ADCCONTROL8, ES8328_ADCCONTROL9,
+			0, 0xc0, 1, dac_adc_tlv),
+	SOC_DOUBLE_TLV("Mic PGA Volume",
+			ES8328_ADCCONTROL1, 4, 0, 0x08, 0, pga_tlv),
 };
 
 /*
