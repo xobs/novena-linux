@@ -155,7 +155,7 @@
 &uart3 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart3_1>;
+	pinctrl-0 = <&pinctrl_uart3_2>;
 };
 
 &uart4 {
