@@ -131,13 +131,20 @@
 		ssi-controller = <&ssi1>;
 		audio-codec = <&codec>;
 		jack-gpio = <&gpio5 15 0>;
-		audio-routing =
-			"MIC_IN", "Mic Jack",
-			"Mic Jack", "Mic Bias",
-			"Headphone Jack", "HP_OUT",
-			"Ext Spk", "SPK_OUT";
+                audio-routing =
+			/* Format: [Sink], [Source], */
+			"Speaker", "LOUT2",
+			"Speaker", "ROUT2",
+			"Speaker", "audio-amp",
+			"Headphone", "ROUT1",
+			"Headphone", "LOUT1",
+			"LIN1", "Mic Bias",
+			"Mic Bias", "Mic Bias Gen",
+			"Mic bias Gen", "Mic Jack";
 		mux-int-port = <1>;
 		mux-ext-port = <3>;
+		codec-supply = <&reg_audio_codec>;
+		audio-amp-supply = <&reg_audio_amp>;
 	};
 };
 
