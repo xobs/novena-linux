@@ -31,6 +31,7 @@ struct imx_es8328_data {
 	struct device *dev;
 	struct snd_soc_dai_link dai;
 	struct snd_soc_card card;
+	struct regulator *codec_regulator;
 	char codec_dai_name[DAI_NAME_SIZE];
 	char platform_name[DAI_NAME_SIZE];
 	struct clk *codec_clk;
@@ -72,6 +73,7 @@ static int imx_es8328_dai_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	/* Headphone jack detection */
+	/*
 	if (gpio_is_valid(data->jack_gpio)) {
 		ret = snd_soc_jack_new(rtd->codec, "Headphone",
 				       SND_JACK_HEADPHONE | SND_JACK_BTN_0,
@@ -84,14 +86,16 @@ static int imx_es8328_dai_init(struct snd_soc_pcm_runtime *rtd)
 					     ARRAY_SIZE(headset_jack_gpios),
 					     headset_jack_gpios);
 	}
+	*/
 
 	return ret;
 }
 
 static const struct snd_soc_dapm_widget imx_es8328_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
-	SND_SOC_DAPM_HP("Headphone Jack", NULL),
-	SND_SOC_DAPM_SPK("Ext Spk", NULL),
+	SND_SOC_DAPM_HP("Headphone", NULL),
+	SND_SOC_DAPM_SPK("Speaker", NULL),
+	SND_SOC_DAPM_REGULATOR_SUPPLY("audio-amp", 1, 0),
 };
 
 static int imx_set_frequency(struct imx_es8328_data *data, int freq) {
@@ -109,7 +113,7 @@ static int imx_set_frequency(struct imx_es8328_data *data, int freq) {
 		return ret;
 	}
 
-	data->clk_freq_src = clk_round_rate(data->codec_clk_src, freq*32);
+	data->clk_freq_src = clk_round_rate(data->codec_clk_src, freq * 32);
 	data->clk_frequency = clk_round_rate(data->codec_clk, freq);
 	dev_dbg(data->dev, "clock source frequency: %d\n", data->clk_freq_src);
 	dev_dbg(data->dev, "clock frequency: %d\n", data->clk_frequency);
@@ -259,6 +263,18 @@ static int imx_es8328_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail;
 
+	data->codec_regulator = devm_regulator_get(dev, "codec");
+	if (IS_ERR(data->codec_regulator)) {
+		dev_err(dev, "No codec regulator\n");
+		data->codec_regulator = NULL;
+	}
+	else {
+		ret = regulator_enable(data->codec_regulator);
+		if (ret)
+			dev_err(dev,
+				"Unable to enable codec regulator: %d\n", ret);
+	}
+
 	data->dai.name = "hifi";
 	data->dai.stream_name = "hifi";
 	data->dai.codec_dai_name = "es8328-hifi-analog";
@@ -270,6 +286,8 @@ static int imx_es8328_probe(struct platform_device *pdev)
 			    SND_SOC_DAIFMT_CBM_CFM;
 
 	data->card.dev = &pdev->dev;
+	data->card.dapm_widgets = imx_es8328_dapm_widgets;
+	data->card.num_dapm_widgets = ARRAY_SIZE(imx_es8328_dapm_widgets);
 	ret = snd_soc_of_parse_card_name(&data->card, "model");
 	if (ret)
 		goto fail;
@@ -279,8 +297,6 @@ static int imx_es8328_probe(struct platform_device *pdev)
 	data->card.num_links = 1;
 	data->card.owner = THIS_MODULE;
 	data->card.dai_link = &data->dai;
-	data->card.dapm_widgets = imx_es8328_dapm_widgets;
-	data->card.num_dapm_widgets = ARRAY_SIZE(imx_es8328_dapm_widgets);
 
 	ret = snd_soc_register_card(&data->card);
 	if (ret)
@@ -302,6 +318,13 @@ static int imx_es8328_remove(struct platform_device *pdev)
 
 //	snd_soc_jack_free_gpios(&headset_jack, ARRAY_SIZE(headset_jack_gpios),
 //				headset_jack_gpios);
+	if (data->codec_regulator) {
+		int ret;
+		ret = regulator_disable(data->codec_regulator);
+		if (ret)
+			dev_err(&pdev->dev,
+				"Unable to disable codec regulator: %d\n", ret);
+	}
 
 	if (data->codec_clk)
 		clk_disable_unprepare(data->codec_clk);
