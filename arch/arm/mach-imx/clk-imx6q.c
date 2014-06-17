@@ -448,8 +448,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 
 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
 	    cpu_is_imx6dl()) {
-		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
-		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+		clk_set_parent(clk[ldb_di0_sel], clk[pll3_usb_otg]);
+		clk_set_parent(clk[ldb_di1_sel], clk[pll3_usb_otg]);
 	}
 
 	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
