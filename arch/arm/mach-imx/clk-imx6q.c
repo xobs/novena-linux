@@ -461,6 +461,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
 	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
 
+	if (cpu_is_imx6dl())
+		clk_set_parent(clk[ipu1_sel], clk[pll3_pfd1_540m]);
+
 	/*
 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
 	 * We can not get the 100MHz from the pll2_pfd0_352m.
