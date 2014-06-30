@@ -22,3 +22,10 @@ config DRM_PS8622
 	select BACKLIGHT_CLASS_DEVICE
 	---help---
 	  parade eDP-LVDS bridge chip driver.
+
+config DRM_IT6251
+	tristate "IT6251 LVDS to DisplayPort bridge"
+	depends on DRM
+	select DRM_KMS_HELPER
+	---help---
+	  Support for IT6251 LVDS to DisplayPort encoder.
