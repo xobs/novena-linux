@@ -25,4 +25,10 @@ config DRM_I2C_NXP_TDA998X
 	help
 	  Support for NXP Semiconductors TDA998X HDMI encoders.
 
+config DRM_I2C_IT6251
+	tristate "IT6251 LVDS to DisplayPort encoder"
+	default m if DRM_NOVENA
+	help
+	  Support for IT6251 LVDS to DisplayPort encoder.
+
 endmenu
