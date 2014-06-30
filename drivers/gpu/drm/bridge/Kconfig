@@ -3,3 +3,11 @@ config DRM_PTN3460
 	depends on DRM
 	select DRM_KMS_HELPER
 	---help---
+
+
+config DRM_IT6251
+	tristate "IT6251 LVDS to DisplayPort bridge"
+	depends on DRM
+	select DRM_KMS_HELPER
+	help
+	  Support for IT6251 LVDS to DisplayPort encoder.
