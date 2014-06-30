@@ -252,6 +252,7 @@ static void dw_hdmi_stop_dma(struct snd_dw_hdmi *dw)
 	/* Disable interrupts before disabling DMA */
 	writeb_relaxed(~0, dw->data.base + HDMI_AHB_DMA_MASK);
 	writeb_relaxed(HDMI_AHB_DMA_STOP_STOP, dw->data.base + HDMI_AHB_DMA_STOP);
+	synchronize_irq(dw->data.irq);
 }
 
 static irqreturn_t snd_dw_hdmi_irq(int irq, void *data)
