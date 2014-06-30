@@ -61,6 +61,7 @@ enum {
 	HDMI_REVISION_ID = 0x0001,
 	HDMI_IH_AHBDMAAUD_STAT0 = 0x0109,
 	HDMI_IH_MUTE_AHBDMAAUD_STAT0 = 0x0189,
+	HDMI_AUD_N1 = 0x3200,
 	HDMI_AHB_DMA_CONF0 = 0x3600,
 	HDMI_AHB_DMA_START = 0x3601,
 	HDMI_AHB_DMA_STOP = 0x3602,
@@ -480,6 +481,13 @@ static int dw_hdmi_trigger(struct snd_pcm_substream *substream, int cmd)
 		dw->buf_offset = 0;
 		dw->substream = substream;
 		dw_hdmi_start_dma(dw);
+		if (dw->revision == 0x0a) {
+			void __iomem *base = dw->data.base;
+			unsigned val;
+
+			val = readb_relaxed(base + HDMI_AUD_N1);
+			writeb_relaxed(val, base + HDMI_AUD_N1);
+		}
 		substream->runtime->delay = substream->runtime->period_size;
 		break;
 
