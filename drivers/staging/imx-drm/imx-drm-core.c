@@ -579,6 +579,10 @@ static int imx_drm_add_components(struct device *master, struct master *m)
 	list_for_each_entry(component, &imx_drm_components, list) {
 		ret = component_master_add_child(m, compare_of,
 						 component->of_node);
+		/* Ignore failures of lvds-channel@1 since we have dual-lane */
+		if (ret && !strcmp(component->of_node->full_name,
+			"/soc/aips-bus@02000000/ldb@020e0008/lvds-channel@1"))
+			ret = 0;
 		if (ret)
 			return ret;
 	}
