@@ -336,6 +336,8 @@ static int imx6q_suspend_finish(unsigned long val)
 
 static int imx6q_pm_enter(suspend_state_t state)
 {
+	struct regmap *g;
+
 	switch (state) {
 	case PM_SUSPEND_STANDBY:
 		imx6q_set_lpm(STOP_POWER_ON);
@@ -362,11 +364,40 @@ static int imx6q_pm_enter(suspend_state_t state)
 			imx6q_enable_rbc(true);
 		imx_gpc_pre_suspend(true);
 		imx_anatop_pre_suspend();
+
+		/*
+		 * L2 can exit by 'reset' or Inband beacon (from remote EP)
+		 * toggling phy_powerdown has same effect as 'inband beacon'
+		 * So, toggle bit18 of GPR1, used as a workaround of errata
+		 * "PCIe PCIe does not support L2 Power Down"
+		 */
+		if (IS_ENABLED(CONFIG_PCI_IMX6)) {
+			g = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+			if (IS_ERR(g)) {
+				pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+				return PTR_ERR(g);
+			}
+			regmap_update_bits(g, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
+					IMX6Q_GPR1_PCIE_TEST_PD);
+		}
+
 		imx_set_cpu_jump(0, v7_cpu_resume);
 		/* Zzz ... */
 		cpu_suspend(0, imx6q_suspend_finish);
 		if (cpu_is_imx6q() || cpu_is_imx6dl())
 			imx_smp_prepare();
+
+		/*
+		 * L2 can exit by 'reset' or Inband beacon (from remote EP)
+		 * toggling phy_powerdown has same effect as 'inband beacon'
+		 * So, toggle bit18 of GPR1, used as a workaround of errata
+		 * "PCIe PCIe does not support L2 Power Down"
+		 */
+		if (IS_ENABLED(CONFIG_PCI_IMX6)) {
+			regmap_update_bits(g, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
+					!IMX6Q_GPR1_PCIE_TEST_PD);
+		}
+
 		imx_anatop_post_resume();
 		imx_gpc_post_resume();
 		imx6q_enable_rbc(false);
