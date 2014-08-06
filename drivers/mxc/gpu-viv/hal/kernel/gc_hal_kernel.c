@@ -287,6 +287,8 @@ gckKERNEL_Construct(
 #endif
     }
 
+    spin_lock_init(&kernel->irq_lock);
+
 #if VIVANTE_PROFILER
     /* Initialize profile setting */
     kernel->profileEnable = gcvFALSE;

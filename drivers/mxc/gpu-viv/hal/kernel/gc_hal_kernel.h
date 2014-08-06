@@ -22,6 +22,8 @@
 #ifndef __gc_hal_kernel_h_
 #define __gc_hal_kernel_h_
 
+#include <linux/spinlock.h>
+
 #include "gc_hal.h"
 #include "gc_hal_kernel_hardware.h"
 #include "gc_hal_driver.h"
@@ -453,6 +455,8 @@ struct _gckKERNEL
 #if gcdANDROID_NATIVE_FENCE_SYNC
     gctHANDLE                   timeline;
 #endif
+
+    spinlock_t                 irq_lock;
 };
 
 struct _FrequencyHistory

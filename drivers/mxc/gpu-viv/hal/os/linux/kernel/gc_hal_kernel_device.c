@@ -1278,12 +1278,14 @@ gckGALDEVICE_Enable_ISR(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
+    spin_lock(&Device->kernels[Core]->irq_lock);
     if (Device->isrEnabled[Core] == gcvFALSE)
     {
         enable_irq(Device->irqLines[Core]);
         /* Mark ISR as initialized. */
         Device->isrEnabled[Core] = gcvTRUE;
     }
+    spin_unlock(&Device->kernels[Core]->irq_lock);
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1349,12 +1351,14 @@ gckGALDEVICE_Disable_ISR(
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
     /* disable the irq */
+    spin_lock(&Device->kernels[Core]->irq_lock);
     if (Device->isrEnabled[Core])
     {
         disable_irq(Device->irqLines[Core]);
 
         Device->isrEnabled[Core] = gcvFALSE;
     }
+    spin_unlock(&Device->kernels[Core]->irq_lock);
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
