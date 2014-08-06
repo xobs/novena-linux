@@ -72,6 +72,7 @@ typedef struct _gckGALDEVICE
     /* IRQ management. */
     gctINT              irqLines[gcdMAX_GPU_COUNT];
     gctBOOL             isrInitializeds[gcdMAX_GPU_COUNT];
+    gctINT              isrEnabled[gcdMAX_GPU_COUNT];
     gctBOOL             dataReadys[gcdMAX_GPU_COUNT];
 
     /* Thread management. */
@@ -123,28 +124,24 @@ typedef struct _gcsHAL_PRIVATE_DATA
 }
 gcsHAL_PRIVATE_DATA, * gcsHAL_PRIVATE_DATA_PTR;
 
+gceSTATUS gckGALDEVICE_Enable_ISR(
+    IN gckGALDEVICE Device,
+    IN gceCORE Core
+    );
+
+gceSTATUS gckGALDEVICE_Disable_ISR(
+    IN gckGALDEVICE Device,
+    IN gceCORE Core
+    );
+
 gceSTATUS gckGALDEVICE_Setup_ISR(
-    IN gckGALDEVICE Device
-    );
-
-gceSTATUS gckGALDEVICE_Setup_ISR_2D(
-    IN gckGALDEVICE Device
-    );
-
-gceSTATUS gckGALDEVICE_Setup_ISR_VG(
-    IN gckGALDEVICE Device
+    IN gckGALDEVICE Device,
+    IN gceCORE Core
     );
 
 gceSTATUS gckGALDEVICE_Release_ISR(
-    IN gckGALDEVICE Device
-    );
-
-gceSTATUS gckGALDEVICE_Release_ISR_2D(
-    IN gckGALDEVICE Device
-    );
-
-gceSTATUS gckGALDEVICE_Release_ISR_VG(
-    IN gckGALDEVICE Device
+    IN gckGALDEVICE Device,
+    IN gceCORE Core
     );
 
 gceSTATUS gckGALDEVICE_Start_Threads(
