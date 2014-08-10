@@ -7064,24 +7064,17 @@ gckOS_SetGPUPower(
         if (oldClockState == gcvFALSE) {
             switch (Core) {
             case gcvCORE_MAJOR:
-                clk_prepare(clk_3dcore);
-                clk_enable(clk_3dcore);
-                clk_prepare(clk_3dshader);
-                clk_enable(clk_3dshader);
-                clk_prepare(clk_3d_axi);
-                clk_enable(clk_3d_axi);
+                clk_prepare_enable(clk_3dcore);
+                clk_prepare_enable(clk_3dshader);
+                clk_prepare_enable(clk_3d_axi);
                 break;
             case gcvCORE_2D:
-                clk_prepare(clk_2dcore);
-                clk_enable(clk_2dcore);
-                clk_prepare(clk_2d_axi);
-                clk_enable(clk_2d_axi);
+                clk_prepare_enable(clk_2dcore);
+                clk_prepare_enable(clk_2d_axi);
                 break;
             case gcvCORE_VG:
-                clk_prepare(clk_2dcore);
-                clk_enable(clk_2dcore);
-                clk_prepare(clk_vg_axi);
-                clk_enable(clk_vg_axi);
+                clk_prepare_enable(clk_2dcore);
+                clk_prepare_enable(clk_vg_axi);
                 break;
             default:
                 break;
@@ -7091,24 +7084,17 @@ gckOS_SetGPUPower(
         if (oldClockState == gcvTRUE) {
             switch (Core) {
             case gcvCORE_MAJOR:
-                clk_disable(clk_3dshader);
-                clk_unprepare(clk_3dshader);
-                clk_disable(clk_3dcore);
-                clk_unprepare(clk_3dcore);
-                clk_disable(clk_3d_axi);
-                clk_unprepare(clk_3d_axi);
+                clk_disable_unprepare(clk_3d_axi);
+                clk_disable_unprepare(clk_3dshader);
+                clk_disable_unprepare(clk_3dcore);
                 break;
            case gcvCORE_2D:
-                clk_disable(clk_2dcore);
-                clk_unprepare(clk_2dcore);
-                clk_disable(clk_2d_axi);
-                clk_unprepare(clk_2d_axi);
+                clk_disable_unprepare(clk_2d_axi);
+                clk_disable_unprepare(clk_2dcore);
                 break;
             case gcvCORE_VG:
-                clk_disable(clk_2dcore);
-                clk_unprepare(clk_2dcore);
-                clk_disable(clk_vg_axi);
-                clk_unprepare(clk_vg_axi);
+                clk_disable_unprepare(clk_vg_axi);
+                clk_disable_unprepare(clk_2dcore);
                 break;
             default:
                 break;
