@@ -310,8 +310,8 @@ gckVGHARDWARE_Construct(
         hardware->clockState            = gcvTRUE;
         hardware->powerState            = gcvTRUE;
 
-        hardware->powerOffTime          = 0;
 #if gcdPOWEROFF_TIMEOUT
+        hardware->powerOffTime          = 0;
         hardware->powerOffTimeout = gcdPOWEROFF_TIMEOUT;
 
         gcmkVERIFY_OK(gckOS_CreateTimer(Os,
@@ -2031,7 +2031,9 @@ gckVGHARDWARE_SetPowerOffTimeout(
 {
     gcmkHEADER_ARG("Hardware=0x%x Timeout=%d", Hardware, Timeout);
 
+#if gcdPOWEROFF_TIMEOUT
     Hardware->powerOffTimeout = Timeout;
+#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2046,7 +2048,9 @@ gckVGHARDWARE_QueryPowerOffTimeout(
 {
     gcmkHEADER_ARG("Hardware=0x%x", Hardware);
 
+#if gcdPOWEROFF_TIMEOUT
     *Timeout = Hardware->powerOffTimeout;
+#endif
 
     gcmkFOOTER_ARG("*Timeout=%d", *Timeout);
     return gcvSTATUS_OK;
