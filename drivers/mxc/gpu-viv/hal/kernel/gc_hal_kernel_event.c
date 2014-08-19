@@ -1981,15 +1981,9 @@ gckEVENT_Notify(
 #endif
         spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
 
-        if (pending == 0)
-        {
-            /* No more pending interrupts - done. */
-            break;
-        }
-
         if (pending & 0x80000000)
         {
-            gckOS_Print("!!!!!!!!!!!!! AXI BUS ERROR !!!!!!!!!!!!!\n");
+            //gckOS_Print("!!!!!!!!!!!!! AXI BUS ERROR !!!!!!!!!!!!!\n");
             gcmkTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_EVENT, "AXI BUS ERROR");
             pending &= 0x7FFFFFFF;
         }
@@ -1998,7 +1992,7 @@ gckEVENT_Notify(
         {
             gckHARDWARE_DumpMMUException(Event->kernel->hardware);
 
-            pending &= 0xBFFFFFFF;
+            pending &= 0x3FFFFFFF;
         }
 
         gcmkTRACE_ZONE_N(
@@ -2007,6 +2001,12 @@ gckEVENT_Notify(
             "Pending interrupts 0x%x",
             pending
             );
+
+        if (pending == 0)
+        {
+            /* No more pending interrupts - done. */
+            break;
+        }
 
         queue = gcvNULL;
 
