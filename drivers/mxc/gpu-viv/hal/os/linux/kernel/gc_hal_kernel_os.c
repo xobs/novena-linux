@@ -26,7 +26,9 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
+#include <linux/scatterlist.h>
 #include <asm/atomic.h>
+#include <linux/dma-buf.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
@@ -258,7 +260,11 @@ typedef struct _gcsPageInfo * gcsPageInfo_PTR;
 typedef struct _gcsPageInfo
 {
     struct page **pages;
+    size_t nr_pages;
+    size_t mmu_pages;
     gctUINT32_PTR pageTable;
+    struct dma_buf_attachment *attach;
+    struct sg_table *sgt;
 }
 gcsPageInfo;
 
@@ -5342,6 +5348,79 @@ OnError:
     return status;
 }
 
+gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
+	OUT gctPOINTER *Info, OUT gctUINT32_PTR Address)
+{
+	gcsPageInfo_PTR info;
+	gctUINT32_PTR table;
+	gctUINT32 address;
+	gceSTATUS status;
+	struct sg_table *sgt;
+	struct scatterlist *sg;
+	unsigned num_mmu_pages;
+	int i, j;
+
+	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return gcvSTATUS_OUT_OF_MEMORY;
+
+	sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+	if (!sgt || IS_ERR(sgt)) {
+		kfree(info);
+		return gcvSTATUS_INVALID_OBJECT;
+	}
+
+	/*
+	 * Record information about this attachment so we can re-use
+	 * gckOS_UnmapUserMemory (and the scheduled unmap in libgalcore)
+	 */
+	info->attach = attach;
+	info->sgt = sgt;
+
+	/* If it's a single scatterlist entry, it's contiguous */
+	if (sgt->nents == 1) {
+		*Address = sg_dma_address(sgt->sgl) - Os->baseAddress;
+		*Info = info;
+		return gcvSTATUS_OK;
+	}
+
+	/* Count the number of MMU pages */
+	num_mmu_pages = 0;
+	for_each_sg(sgt->sgl, sg, sgt->nents, i)
+		num_mmu_pages = (sg_dma_len(sg)  4095) / 4096;
+
+	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernel->mmu,
+					 num_mmu_pages, (gctPOINTER *)&table,
+					 &address));
+
+	j = 0;
+	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
+		dma_addr_t addr = sg_dma_address(sg);
+		unsigned len = (sg_dma_len(sg)  4095) / 4096;
+
+		do {
+			table[j] = addr;
+			addr = 4096;
+			len -= 1;
+		} while (len);
+	}
+
+	WARN_ON(j != num_mmu_pages);
+
+	info->pageTable = table;
+	info->mmu_pages = num_mmu_pages;
+
+	*Address = address;
+	*Info = info;
+
+	return gcvSTATUS_OK;
+
+ OnError:
+	dma_buf_unmap_attachment(attach, sgt, DMA_BIDIRECTIONAL);
+	kfree(info);
+	return status;
+}
+
 /*******************************************************************************
 **
 **  gckOS_MapUserMemory
@@ -5436,7 +5515,7 @@ OnError:
         MEMORY_MAP_LOCK(Os);
 
         /* Allocate the Info struct. */
-        info = (gcsPageInfo_PTR)kmalloc(sizeof(gcsPageInfo), GFP_KERNEL | gcdNOWARN);
+        info = (gcsPageInfo_PTR)kzalloc(sizeof(gcsPageInfo), GFP_KERNEL | gcdNOWARN);
 
         if (info == gcvNULL)
         {
@@ -5670,6 +5749,8 @@ OnError:
         /* Save pointer to page table. */
         info->pageTable = pageTable;
         info->pages = pages;
+        info->nr_pages = pageCount;
+        info->mmu_pages = pageCount * (PAGE_SIZE / 4096);
 
         *Info = (gctPOINTER) info;
 
@@ -5838,9 +5919,17 @@ OnError:
     gcmkVERIFY_ARGUMENT(Size > 0);
     gcmkVERIFY_ARGUMENT(Info != gcvNULL);
 
-    do
-    {
-        info = (gcsPageInfo_PTR) Info;
+    info = (gcsPageInfo_PTR) Info;
+    if (!info)
+        return gcvSTATUS_OK;
+
+    if (info->nr_pages) {
+       /*
+        * This is a mapping created by gckOS_MapUserMemory.
+        * Do all the checks against that; these are redundant
+        * when used with the dmabuf API, and the Memory and
+        * Size args are unused.
+       */ 
 
         pages = info->pages;
 
@@ -5896,10 +5985,11 @@ OnError:
 #endif
         {
             /* Free the pages from the MMU. */
-            gcmkERR_BREAK(gckMMU_FreePages(Os->device->kernels[Core]->mmu,
-                                          info->pageTable,
-                                          pageCount * (PAGE_SIZE/4096)
-                                          ));
+            gckMMU_FreePages(Os->device->kernels[Core]->mmu, info->pageTable,
+                             info->mmu_pages);
+            gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
+                   "[gckOS_UnmapUserMemory] memory: 0x%x, pageCount: %ld, pageTable: 0x%p.",
+                   memory, pageCount, info->pageTable);
         }
 
         /* Release the page cache. */
@@ -5925,19 +6015,25 @@ OnError:
 
         /* Success. */
         status = gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
 
-    if (info != gcvNULL)
-    {
         /* Free the page array. */
         if (info->pages != gcvNULL)
         {
             kfree(info->pages);
         }
-
-        kfree(info);
+    } else if (info->pageTable) {
+        /* Free the pages from the MMU. */
+        gckMMU_FreePages(Os->device->kernel->mmu, info->pageTable,
+                         info->mmu_pages);
     }
+    if (info->attach) {
+        struct dma_buf *buf = info->attach->dmabuf;
+        dma_buf_unmap_attachment(info->attach, info->sgt,
+                                 DMA_BIDIRECTIONAL);
+        dma_buf_detach(buf, info->attach);
+        dma_buf_put(buf);
+    }
+    kfree(info);
 
     MEMORY_MAP_UNLOCK(Os);
 

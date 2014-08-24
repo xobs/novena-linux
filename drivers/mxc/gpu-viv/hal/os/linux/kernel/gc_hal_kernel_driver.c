@@ -416,6 +416,88 @@ OnError:
     return -ENOTTY;
 }
 
+#include <linux/dma-buf.h>
+gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
+	OUT gctPOINTER *Info, OUT gctUINT32_PTR Address);
+
+struct map_dma_buf {
+	unsigned zero;
+	unsigned status;
+	int fd;
+	gctPOINTER Info;
+	gctUINT32 Address;
+};
+
+static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
+{
+	struct map_dma_buf map;
+	struct dma_buf_attachment *attach;
+	struct dma_buf *buf;
+	gceSTATUS status;
+	int ret;
+
+	if (args->InputBufferSize != sizeof(map) ||
+	    args->OutputBufferSize != sizeof(map))
+		return -EINVAL;
+
+	if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
+		return -EFAULT;
+
+	buf = dma_buf_get(map.fd);
+	if (IS_ERR(buf))
+		return PTR_ERR(buf);
+
+	attach = dma_buf_attach(buf, device->dev);
+	if (IS_ERR(attach)) {
+		ret = PTR_ERR(buf);
+		goto err_put;
+	}
+
+	status = gckOS_MapDmaBuf(device->os, attach, &map.Info,
+				 &map.Address);
+	if (gcmIS_ERROR(status)) {
+		ret = -EINVAL;
+		goto err_detach;
+	}
+
+	map.status = gcvSTATUS_OK;
+
+	if (!copy_to_user(args->OutputBuffer, &map, sizeof(map)))
+		return 0;
+
+	gckOS_UnmapUserMemory(device->os, (gctPOINTER)1, 1, map.Info,
+			      map.Address);
+
+ err_detach:
+	dma_buf_detach(buf, attach);
+ err_put:
+	dma_buf_put(buf);
+	return ret;
+}
+
+static long drv_ioctl2(gckGALDEVICE device, unsigned cmd, unsigned long arg)
+{
+	DRIVER_ARGS args;
+
+	if (_IOC_TYPE(cmd) != '_')
+		return -ENOTTY;
+
+	if (copy_from_user(&args, (void *)arg, sizeof(args)))
+		return -EFAULT;
+
+	if ((_IOC_DIR(cmd) & _IOC_WRITE && _IOC_SIZE(cmd) != args.InputBufferSize) ||
+	    (_IOC_DIR(cmd) & _IOC_READ  && _IOC_SIZE(cmd) != args.OutputBufferSize))
+		return -ENOTTY;
+
+	switch (_IOC_NR(cmd)) {
+	case 0:
+		return drv_ioctl_dmabuf_map(device, &args);
+
+	default:
+		return -ENOTTY;
+	}
+}
+
 long drv_ioctl(
     struct file* filp,
     unsigned int ioctlCode,
@@ -476,14 +558,7 @@ long drv_ioctl(
     &&  (ioctlCode != IOCTL_GCHAL_KERNEL_INTERFACE)
     )
     {
-        gcmkTRACE_ZONE(
-            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-            "%s(%d): unknown command %d\n",
-            __FUNCTION__, __LINE__,
-            ioctlCode
-            );
-
-        gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        return drv_ioctl2(device, ioctlCode, arg);
     }
 
     /* Get the drvArgs. */
