@@ -417,8 +417,9 @@ OnError:
 }
 
 #include <linux/dma-buf.h>
-gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
-	OUT gctPOINTER *Info, OUT gctUINT32_PTR Address);
+gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
+	struct dma_buf_attachment *attach, OUT gctPOINTER *Info,
+	OUT gctUINT32_PTR Address);
 
 struct map_dma_buf {
 	unsigned zero;
@@ -447,14 +448,13 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 	if (IS_ERR(buf))
 		return PTR_ERR(buf);
 
-	attach = dma_buf_attach(buf, device->dev);
+	attach = dma_buf_attach(buf, device->pmdev);
 	if (IS_ERR(attach)) {
 		ret = PTR_ERR(buf);
 		goto err_put;
 	}
 
-	status = gckOS_MapDmaBuf(device->os, attach, &map.Info,
-				 &map.Address);
+	status = gckOS_MapDmaBuf(device->os, gcvCORE_2D, attach, &map.Info, &map.Address);
 	if (gcmIS_ERROR(status)) {
 		ret = -EINVAL;
 		goto err_detach;
@@ -465,7 +465,7 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 	if (!copy_to_user(args->OutputBuffer, &map, sizeof(map)))
 		return 0;
 
-	gckOS_UnmapUserMemory(device->os, (gctPOINTER)1, 1, map.Info,
+	gckOS_UnmapUserMemory(device->os, gcvCORE_2D, (gctPOINTER)1, 1, map.Info,
 			      map.Address);
 
  err_detach:

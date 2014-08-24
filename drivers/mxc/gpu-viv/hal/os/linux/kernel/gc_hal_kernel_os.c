@@ -5348,8 +5348,9 @@ OnError:
     return status;
 }
 
-gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
-	OUT gctPOINTER *Info, OUT gctUINT32_PTR Address)
+gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
+	struct dma_buf_attachment *attach, OUT gctPOINTER *Info,
+	OUT gctUINT32_PTR Address)
 {
 	gcsPageInfo_PTR info;
 	gctUINT32_PTR table;
@@ -5379,7 +5380,7 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
 
 	/* If it's a single scatterlist entry, it's contiguous */
 	if (sgt->nents == 1) {
-		*Address = sg_dma_address(sgt->sgl) - Os->baseAddress;
+		*Address = sg_dma_address(sgt->sgl) - Os->device->baseAddress;
 		*Info = info;
 		return gcvSTATUS_OK;
 	}
@@ -5387,16 +5388,16 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, struct dma_buf_attachment *attach,
 	/* Count the number of MMU pages */
 	num_mmu_pages = 0;
 	for_each_sg(sgt->sgl, sg, sgt->nents, i)
-		num_mmu_pages = (sg_dma_len(sg)  4095) / 4096;
+		num_mmu_pages = (sg_dma_len(sg) + 4095) / 4096;
 
-	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernel->mmu,
+	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernels[gcvCORE_2D]->mmu,
 					 num_mmu_pages, (gctPOINTER *)&table,
 					 &address));
 
 	j = 0;
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
 		dma_addr_t addr = sg_dma_address(sg);
-		unsigned len = (sg_dma_len(sg)  4095) / 4096;
+		unsigned len = (sg_dma_len(sg) + 4095) / 4096;
 
 		do {
 			table[j] = addr;
@@ -5976,10 +5977,8 @@ OnError:
         if (Core == gcvCORE_VG)
         {
             /* Free the pages from the MMU. */
-            gcmkERR_BREAK(gckVGMMU_FreePages(Os->device->kernels[Core]->vg->mmu,
-                                          info->pageTable,
-                                          pageCount * (PAGE_SIZE/4096)
-                                          ));
+            gckVGMMU_FreePages(Os->device->kernels[Core]->vg->mmu,
+                               info->pageTable, pageCount * (PAGE_SIZE/4096));
         }
         else
 #endif
@@ -5987,10 +5986,10 @@ OnError:
             /* Free the pages from the MMU. */
             gckMMU_FreePages(Os->device->kernels[Core]->mmu, info->pageTable,
                              info->mmu_pages);
-            gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
-                   "[gckOS_UnmapUserMemory] memory: 0x%x, pageCount: %ld, pageTable: 0x%p.",
-                   memory, pageCount, info->pageTable);
         }
+        gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
+               "[gckOS_UnmapUserMemory] memory: 0x%x, pageCount: %ld, pageTable: 0x%p.",
+               memory, pageCount, info->pageTable);
 
         /* Release the page cache. */
         if (pages)
@@ -6023,7 +6022,7 @@ OnError:
         }
     } else if (info->pageTable) {
         /* Free the pages from the MMU. */
-        gckMMU_FreePages(Os->device->kernel->mmu, info->pageTable,
+        gckMMU_FreePages(Os->device->kernels[Core]->mmu, info->pageTable,
                          info->mmu_pages);
     }
     if (info->attach) {
