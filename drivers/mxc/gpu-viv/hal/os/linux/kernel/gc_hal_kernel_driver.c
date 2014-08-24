@@ -475,6 +475,40 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 	return ret;
 }
 
+gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
+	size_t size, unsigned prot, OUT gctPOINTER *Info,
+	OUT gctUINT32_PTR Address);
+
+struct map_buf {
+       unsigned zero;
+       unsigned status;
+       void *addr;
+       unsigned size;
+       unsigned prot;
+       gctPOINTER Info;
+       gctUINT32 Address;
+};
+
+static long drv_ioctl_map(gckGALDEVICE device, DRIVER_ARGS *args)
+{
+       struct map_buf map;
+
+       if (args->InputBufferSize != sizeof(map) ||
+           args->OutputBufferSize != sizeof(map))
+               return -EINVAL;
+
+       if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
+               return -EFAULT;
+
+       map.status = gckOS_MapBuf(device->os, gcvCORE_2D, map.addr, map.size, map.prot,
+                               &map.Info, &map.Address);
+
+       if (copy_to_user(args->OutputBuffer, &map, sizeof(map)))
+               return -EFAULT;
+
+       return 0;
+}
+
 static long drv_ioctl2(gckGALDEVICE device, unsigned cmd, unsigned long arg)
 {
 	DRIVER_ARGS args;
@@ -492,6 +526,9 @@ static long drv_ioctl2(gckGALDEVICE device, unsigned cmd, unsigned long arg)
 	switch (_IOC_NR(cmd)) {
 	case 0:
 		return drv_ioctl_dmabuf_map(device, &args);
+
+	case 1:
+		return drv_ioctl_map(device, &args);
 
 	default:
 		return -ENOTTY;

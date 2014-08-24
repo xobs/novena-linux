@@ -5422,6 +5422,109 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
 	return status;
 }
 
+gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
+	size_t size, unsigned prot, OUT gctPOINTER *Info,
+	OUT gctUINT32_PTR Address)
+{
+	unsigned long start, end, offset;
+	gcsPageInfo_PTR info;
+	gctUINT32_PTR table;
+	gctUINT32 address;
+	gceSTATUS status;
+	unsigned num_pages, num_mmu_pages, i, j;
+	int res, write;
+
+	if (size == 0 || !access_ok(VERIFY_WRITE, addr, size))
+	        return gcvSTATUS_INVALID_ARGUMENT;
+
+	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+	        return gcvSTATUS_OUT_OF_MEMORY;
+
+	offset = (unsigned long)addr & ~PAGE_MASK;
+	start = (unsigned long)addr & PAGE_MASK;
+	end = PAGE_ALIGN((unsigned long)addr + size);
+	num_pages = (end - start) >> PAGE_SHIFT;
+
+	info->pages = kmalloc(sizeof(struct page *) * num_pages, GFP_KERNEL);
+	if (!info->pages) {
+	        kfree(info);
+	        return gcvSTATUS_OUT_OF_MEMORY;
+	}
+
+	write = !!(prot & PROT_WRITE);
+
+	/* Get the user pages. */
+	down_read(&current->mm->mmap_sem);
+	res = get_user_pages(current, current->mm, start, num_pages, write,
+	                     0, info->pages, NULL);
+	up_read(&current->mm->mmap_sem);
+
+	if (res != num_pages) {
+	        struct vm_area_struct *vma;
+	        unsigned long pfn;
+
+	        if (res > 0) {
+	                for (i = 0; i < res; i++)
+	                        page_cache_release(info->pages[i]);
+	        }
+
+	        kfree(info->pages);
+	        kfree(info);
+
+	        res = -EINVAL;
+	        down_read(&current->mm->mmap_sem);
+	        vma = find_vma(current->mm, start);
+	        if (vma && vma->vm_flags & VM_PFNMAP)
+	                res = follow_pfn(vma, start, &pfn);
+	        up_read(&current->mm->mmap_sem);
+
+	        if (res == 0) {
+	                *Address = (pfn << PAGE_SHIFT) + offset -
+	                           Os->device->baseAddress;
+	                *Info = gcvNULL;
+	                return gcvSTATUS_OK;
+	        }
+
+	        return gcvSTATUS_OUT_OF_RESOURCES;
+	}
+
+	num_mmu_pages = num_pages * (PAGE_SIZE / 4096);
+
+	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernels[Core]->mmu,
+	                                 num_mmu_pages, (gctPOINTER *)&table,
+	                                 &address));
+
+	info->pageTable = table;
+	info->mmu_pages = num_mmu_pages;
+
+	j = 0;
+	for (i = 0; i < num_pages; i++) {
+	        phys_addr_t addr = page_to_phys(info->pages[i]);
+	        unsigned len = PAGE_SIZE / 4096;
+
+	        do {
+	                table[j++] = addr;
+	                addr += 4096;
+	                len -= 1;
+	        } while (len);
+	}
+
+	*Info = info;
+	*Address = address + offset;
+
+	return gcvSTATUS_OK;
+
+ OnError:
+	for (i = 0; i < num_pages; i++)
+	        page_cache_release(info->pages[i]);
+
+	kfree(info->pages);
+	kfree(info);
+
+	return status;
+}
+
 /*******************************************************************************
 **
 **  gckOS_MapUserMemory
