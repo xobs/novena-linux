@@ -421,30 +421,57 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
 	struct dma_buf_attachment *attach, OUT gctPOINTER *Info,
 	OUT gctUINT32_PTR Address);
 
-struct map_dma_buf {
-	unsigned zero;
-	unsigned status;
+struct map_dmabuf_args {
 	int fd;
 	gctPOINTER Info;
 	gctUINT32 Address;
 };
 
+struct map_dma_buf_v2 {
+	unsigned zero;
+	unsigned status;
+	struct map_dmabuf_args args;
+};
+
+struct map_dma_buf_v4 {
+	unsigned zero;
+	unsigned hardwareType;
+	unsigned status;
+	struct map_dmabuf_args args;
+};
+
+union map_dma_buf {
+	struct map_dma_buf_v2 v2;
+	struct map_dma_buf_v4 v4;
+};
+
 static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 {
-	struct map_dma_buf map;
+	union map_dma_buf map;
+	struct map_dmabuf_args *ma;
 	struct dma_buf_attachment *attach;
 	struct dma_buf *buf;
 	gceSTATUS status;
+	gceCORE core;
 	int ret;
 
-	if (args->InputBufferSize != sizeof(map) ||
-	    args->OutputBufferSize != sizeof(map))
+	if (args->InputBufferSize != args->OutputBufferSize ||
+	    (args->InputBufferSize != sizeof(map.v2) &&
+	     args->OutputBufferSize != sizeof(map.v4)))
 		return -EINVAL;
 
-	if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
+	if (copy_from_user(&map, args->InputBuffer, args->InputBufferSize))
 		return -EFAULT;
 
-	buf = dma_buf_get(map.fd);
+	if (args->InputBufferSize == sizeof(map.v2)) {
+		ma = &map.v2.args;
+		core = gcvCORE_2D;
+	} else {
+		ma = &map.v4.args;
+		core = device->coreMapping[(int) &map.v4.hardwareType];
+	}
+
+	buf = dma_buf_get(ma->fd);
 	if (IS_ERR(buf))
 		return PTR_ERR(buf);
 
@@ -454,19 +481,19 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 		goto err_put;
 	}
 
-	status = gckOS_MapDmaBuf(device->os, gcvCORE_2D, attach, &map.Info, &map.Address);
+	status = gckOS_MapDmaBuf(device->os, core, attach, &ma->Info, &ma->Address);
 	if (gcmIS_ERROR(status)) {
 		ret = -EINVAL;
 		goto err_detach;
 	}
 
-	map.status = gcvSTATUS_OK;
+	status = gcvSTATUS_OK;
 
-	if (!copy_to_user(args->OutputBuffer, &map, sizeof(map)))
+	if (!copy_to_user(args->OutputBuffer, &map, args->OutputBufferSize))
 		return 0;
 
-	gckOS_UnmapUserMemory(device->os, gcvCORE_2D, (gctPOINTER)1, 1, map.Info,
-			      map.Address);
+	gckOS_UnmapUserMemory(device->os, core, (gctPOINTER)1, 1, ma->Info,
+			      ma->Address);
 
  err_detach:
 	dma_buf_detach(buf, attach);
@@ -479,7 +506,7 @@ gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
 	size_t size, unsigned prot, OUT gctPOINTER *Info,
 	OUT gctUINT32_PTR Address);
 
-struct map_buf {
+struct map_buf_args {
        unsigned zero;
        unsigned status;
        void *addr;
@@ -489,22 +516,57 @@ struct map_buf {
        gctUINT32 Address;
 };
 
+struct map_buf_v2 {
+	unsigned zero;
+	unsigned status;
+	struct map_buf_args args;
+};
+
+struct map_buf_v4 {
+	unsigned zero;
+	unsigned hardwareType;
+	unsigned status;
+	struct map_buf_args args;
+};
+
+union map_buf {
+	struct map_buf_v2 v2;
+	struct map_buf_v4 v4;
+};
+
 static long drv_ioctl_map(gckGALDEVICE device, DRIVER_ARGS *args)
 {
-       struct map_buf map;
+	union map_buf map;
+	struct map_buf_args *ma;
+	gceSTATUS status;
+	gceCORE core;
 
-       if (args->InputBufferSize != sizeof(map) ||
-           args->OutputBufferSize != sizeof(map))
+	if (args->InputBufferSize != args->OutputBufferSize ||
+	    (args->InputBufferSize != sizeof(map.v2) &&
+	     args->OutputBufferSize != sizeof(map.v4)))
                return -EINVAL;
 
-       if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
-               return -EFAULT;
+	if (copy_from_user(&map, args->InputBuffer, args->InputBufferSize))
+		return -EFAULT;
 
-       map.status = gckOS_MapBuf(device->os, gcvCORE_2D, map.addr, map.size, map.prot,
-                               &map.Info, &map.Address);
+	if (args->InputBufferSize == sizeof(map.v2)) {
+		ma = &map.v2.args;
+		core = gcvCORE_2D;
+	} else {
+		ma = &map.v4.args;
+		core = device->coreMapping[(int)&map.v4.hardwareType];
+	}
 
-       if (copy_to_user(args->OutputBuffer, &map, sizeof(map)))
-               return -EFAULT;
+	status = gckOS_MapBuf(device->os, core, ma->addr, ma->size, ma->prot,
+			      &ma->Info, &ma->Address);
+	if (gcmIS_ERROR(status))
+		return -EINVAL;
+
+	if (!copy_to_user(args->OutputBuffer, &map, args->OutputBufferSize))
+		return 0;
+
+	gckOS_UnmapUserMemory(device->os, core, (gctPOINTER)1, 1, ma->Info,
+			      ma->Address);
 
        return 0;
 }
