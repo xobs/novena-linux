@@ -3916,6 +3916,7 @@ _PowerEnum(gceCHIPPOWERSTATE State)
         gcmSTRING(gcvPOWER_SUSPEND_BROADCAST),
         gcmSTRING(gcvPOWER_OFF_BROADCAST),
         gcmSTRING(gcvPOWER_OFF_RECOVERY),
+        gcmSTRING(gcvPOWER_OFF_TIMEOUT),
         gcmSTRING(gcvPOWER_ON_AUTO)
     };
 
