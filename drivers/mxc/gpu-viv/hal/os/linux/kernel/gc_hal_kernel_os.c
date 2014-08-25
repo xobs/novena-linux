@@ -160,7 +160,6 @@ typedef struct _gcsINTEGER_DB * gcsINTEGER_DB_PTR;
 typedef struct _gcsINTEGER_DB
 {
     struct idr                  idr;
-    spinlock_t                  lock;
     gctINT                      curr;
 }
 gcsINTEGER_DB;
@@ -259,9 +258,11 @@ gcsSYNC_POINT;
 typedef struct _gcsPageInfo * gcsPageInfo_PTR;
 typedef struct _gcsPageInfo
 {
+    enum { M_USER, M_OTHER } type;
     struct page **pages;
     size_t nr_pages;
     size_t mmu_pages;
+    unsigned prot;
     gctUINT32_PTR pageTable;
     struct dma_buf_attachment *attach;
     struct sg_table *sgt;
@@ -813,24 +814,20 @@ _AllocateIntegerId(
     )
 {
     int result;
-    gctINT next;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
-    idr_preload(GFP_KERNEL | gcdNOWARN);
+    result = idr_alloc(&Database->idr, KernelPointer, 1, 0, GFP_ATOMIC);
 
-    spin_lock(&Database->lock);
-
-    next = (Database->curr + 1 <= 0) ? 1 : Database->curr + 1;
-    result = idr_alloc(&Database->idr, KernelPointer, next, 0, GFP_ATOMIC);
+        gcmkTRACE_ZONE(
+                gcvLEVEL_ERROR, gcvZONE_OS,
+                "%s(%d) Id = %d is being allocated",
+                __FUNCTION__, __LINE__, result);
 
     if (!result)
     {
+	pr_info("idr_alloc Setting DB curr\n");
         Database->curr = *Id;
     }
-
-    spin_unlock(&Database->lock);
-
-    idr_preload_end();
 
     if (result < 0)
     {
@@ -882,11 +879,12 @@ _QueryIntegerId(
 {
     gctPOINTER pointer;
 
-    spin_lock(&Database->lock);
+        gcmkTRACE_ZONE(
+                gcvLEVEL_ERROR, gcvZONE_OS,
+                "%s(%d) Id = %d is being queried",
+                __FUNCTION__, __LINE__, Id);
 
     pointer = idr_find(&Database->idr, Id);
-
-    spin_unlock(&Database->lock);
 
     if(pointer)
     {
@@ -910,11 +908,12 @@ _DestroyIntegerId(
     IN gctUINT32 Id
     )
 {
-    spin_lock(&Database->lock);
+        gcmkTRACE_ZONE(
+                gcvLEVEL_ERROR, gcvZONE_OS,
+                "%s(%d) Id = %d is being destroyed",
+                __FUNCTION__, __LINE__, Id);
 
     idr_remove(&Database->idr, Id);
-
-    spin_unlock(&Database->lock);
 
     return gcvSTATUS_OK;
 }
@@ -1080,9 +1079,6 @@ gckOS_Construct(
 
     /* Initialize mutex. */
     gcmkONERROR(gckOS_CreateMutex(os, &os->signalMutex));
-
-    /* Initialize signal id database lock. */
-    spin_lock_init(&os->signalDB.lock);
 
     /* Initialize signal id database. */
     idr_init(&os->signalDB.idr);
@@ -5377,6 +5373,8 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
 	 */
 	info->attach = attach;
 	info->sgt = sgt;
+	info->prot = PROT_READ | PROT_WRITE;
+	info->type = M_OTHER;
 
 	/* If it's a single scatterlist entry, it's contiguous */
 	if (sgt->nents == 1) {
@@ -5452,6 +5450,8 @@ gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
 	        return gcvSTATUS_OUT_OF_MEMORY;
 	}
 
+	info->prot = prot;
+	info->type = M_OTHER;
 	write = !!(prot & PROT_WRITE);
 
 	/* Get the user pages. */
@@ -5855,6 +5855,8 @@ OnError:
         info->pages = pages;
         info->nr_pages = pageCount;
         info->mmu_pages = pageCount * (PAGE_SIZE / 4096);
+	info->prot = PROT_READ | PROT_WRITE;
+	info->type = M_USER;
 
         *Info = (gctPOINTER) info;
 
@@ -6027,7 +6029,7 @@ OnError:
     if (!info)
         return gcvSTATUS_OK;
 
-    if (info->nr_pages) {
+    if (info->type == M_USER) {
        /*
         * This is a mapping created by gckOS_MapUserMemory.
         * Do all the checks against that; these are redundant
@@ -6123,17 +6125,34 @@ OnError:
         {
             kfree(info->pages);
         }
-    } else if (info->pageTable) {
-        /* Free the pages from the MMU. */
-        gckMMU_FreePages(Os->device->kernels[Core]->mmu, info->pageTable,
-                         info->mmu_pages);
-    }
-    if (info->attach) {
-        struct dma_buf *buf = info->attach->dmabuf;
-        dma_buf_unmap_attachment(info->attach, info->sgt,
-                                 DMA_BIDIRECTIONAL);
-        dma_buf_detach(buf, info->attach);
-        dma_buf_put(buf);
+    } else {
+        /* If we have a page table mapping, tear that down. */
+        if (info->pageTable) {
+            /* Free the pages from the MMU. */
+            gckMMU_FreePages(Os->device->kernels[Core]->mmu, info->pageTable,
+                             info->mmu_pages);
+        }
+        /* If we have an array of pages, free them. */
+        if (info->pages) {
+            pages = info->pages;
+                pageCount = info->nr_pages;
+
+                for (i = 0; i < pageCount; i++) {
+                     if (info->prot & PROT_WRITE &&
+                         !PageReserved(pages[i]))
+                             SetPageDirty(pages[i]);
+                     page_cache_release(pages[i]);
+                }
+                kfree(info->pages);
+        }
+
+        if (info->attach) {
+            struct dma_buf *buf = info->attach->dmabuf;
+            dma_buf_unmap_attachment(info->attach, info->sgt,
+                                     DMA_BIDIRECTIONAL);
+            dma_buf_detach(buf, info->attach);
+            dma_buf_put(buf);
+        }
     }
     kfree(info);
 
