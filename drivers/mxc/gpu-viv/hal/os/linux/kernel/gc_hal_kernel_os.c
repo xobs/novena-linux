@@ -819,7 +819,7 @@ _AllocateIntegerId(
     result = idr_alloc(&Database->idr, KernelPointer, 1, 0, GFP_ATOMIC);
 
         gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_OS,
+                gcvLEVEL_INFO, gcvZONE_OS,
                 "%s(%d) Id = %d is being allocated",
                 __FUNCTION__, __LINE__, result);
 
@@ -880,7 +880,7 @@ _QueryIntegerId(
     gctPOINTER pointer;
 
         gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_OS,
+                gcvLEVEL_INFO, gcvZONE_OS,
                 "%s(%d) Id = %d is being queried",
                 __FUNCTION__, __LINE__, Id);
 
