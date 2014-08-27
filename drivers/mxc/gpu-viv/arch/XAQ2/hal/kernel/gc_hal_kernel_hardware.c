@@ -4161,10 +4161,6 @@ gckHARDWARE_SetPowerManagementState(
     gcmkONERROR(gckOS_GetProcessID(&process));
     gcmkONERROR(gckOS_GetThreadID(&thread));
 
-    /* Before we grab locks see if this is actually a needed change */
-    if (State == Hardware->chipPowerState)
-        return gcvSTATUS_OK;
-
     if (broadcast)
     {
         /* Try to acquire the power mutex. */
@@ -4220,7 +4216,14 @@ gckHARDWARE_SetPowerManagementState(
         gcmkONERROR(gckOS_AcquireMutex(os, Hardware->powerMutex, gcvINFINITE));
     }
 
-    /* Get time until mtuex acquired. */
+    /* Before we grab locks see if this is actually a needed change */
+    if (State == Hardware->chipPowerState)
+    {
+        gcmkONERROR(gckOS_ReleaseMutex(os, Hardware->powerMutex));
+        return gcvSTATUS_OK;
+    }
+
+    /* Get time until mutex acquired. */
     gcmkPROFILE_QUERY(time, mutexTime);
 
     Hardware->powerProcess = process;
