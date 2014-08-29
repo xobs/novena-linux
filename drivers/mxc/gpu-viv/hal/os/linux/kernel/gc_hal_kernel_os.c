@@ -5489,6 +5489,14 @@ gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
 	        return gcvSTATUS_OUT_OF_RESOURCES;
 	}
 
+	for (i = 0; i < num_pages; i++) {
+		phys_addr_t addr = page_to_phys(info->pages[i]);
+		gcmkONERROR(gckOS_CacheFlush(Os, _GetProcessID(), gcvNULL,
+				(gctPOINTER)(gctUINTPTR_T)addr,
+				(gctPOINTER)(start + i*PAGE_SIZE),
+				PAGE_SIZE));
+	}
+
 	num_mmu_pages = num_pages * (PAGE_SIZE / 4096);
 
 	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernels[Core]->mmu,
@@ -5638,9 +5646,18 @@ OnError:
 
         if (Physical != ~0U)
         {
+            unsigned long pfn = Physical >> PAGE_SHIFT;
             for (i = 0; i < pageCount; i++)
             {
-                pages[i] = pfn_to_page((Physical >> PAGE_SHIFT) + i);
+                if (!pfn_valid(pfn + i))
+                {
+                    gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+            }
+
+            for (i = 0; i < pageCount; i++)
+            {
+                pages[i] = pfn_to_page(pfn + i);
                 get_page(pages[i]);
             }
         }
@@ -5694,6 +5711,7 @@ OnError:
                     {
                         pgd_t * pgd = pgd_offset(current->mm, logical);
                         pud_t * pud = pud_offset(pgd, logical);
+			unsigned long pfn;
 
                         if (pud)
                         {
@@ -5709,8 +5727,16 @@ OnError:
                             gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
                         }
 
-                        pages[i] = pte_page(*pte);
+                        if (pte_present(*pte))
+                            pfn = pte_pfn(*pte);
+                        else
+                            pfn = ~0UL;
                         pte_unmap_unlock(pte, ptl);
+
+                        if (pfn == ~0UL || !pfn_valid(pfn))
+                            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
+
+                        pages[i] = pfn_to_page(pfn);
 
                         /* Advance to next. */
                         logical += PAGE_SIZE;
@@ -5851,6 +5877,7 @@ OnError:
         }
 
         /* Save pointer to page table. */
+	info->type = M_USER;
         info->pageTable = pageTable;
         info->pages = pages;
         info->nr_pages = pageCount;
