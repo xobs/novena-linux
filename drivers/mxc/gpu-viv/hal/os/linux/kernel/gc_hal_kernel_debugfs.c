@@ -351,6 +351,8 @@ _DebugFSPrint (
 {
     char buffer[MAX_LINE_SIZE] ;
     int len ;
+    if (!gc_dbgfs.currentNode)
+        return;
     down ( gcmkNODE_SEM ( gc_dbgfs.currentNode ) ) ;
     len = vsnprintf ( buffer , sizeof (buffer ) , Message , *( va_list * ) & Arguments ) ;
     buffer[len] = '\0' ;
