@@ -45,6 +45,7 @@
 /******************************************************************************\
 *************************** Memory Allocation Wrappers *************************
 \******************************************************************************/
+int pm_enabled = 0;
 
 static gceSTATUS
 _AllocateMemory(
@@ -1286,6 +1287,14 @@ gckGALDEVICE_Enable_ISR(
         Device->isrEnabled[Core] = gcvTRUE;
     }
     Device->isrEnabled[Core]++;
+
+    if (!pm_enabled) {
+        pm_qos_add_request(&Device->pm_qos,
+                           PM_QOS_CPU_DMA_LATENCY,
+                           0);
+        pm_enabled = 1;
+    }
+
     spin_unlock(&Device->kernels[Core]->irq_lock);
 
     gcmkFOOTER_NO();
@@ -1358,6 +1367,10 @@ gckGALDEVICE_Disable_ISR(
         Device->isrEnabled[Core]--;
         if (Device->isrEnabled[Core] == 0)
             disable_irq(Device->irqLines[Core]);
+    }
+    if (pm_enabled) {
+        pm_qos_remove_request(&Device->pm_qos);
+        pm_enabled = 0;
     }
     spin_unlock(&Device->kernels[Core]->irq_lock);
 

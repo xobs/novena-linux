@@ -22,6 +22,8 @@
 #ifndef __gc_hal_kernel_device_h_
 #define __gc_hal_kernel_device_h_
 
+#include <linux/pm_qos.h>
+
 /******************************************************************************\
 ******************************* gckGALDEVICE Structure *******************************
 \******************************************************************************/
@@ -107,6 +109,7 @@ typedef struct _gckGALDEVICE
 #endif
 	/*Run time pm*/
 	struct device		*pmdev;
+	struct pm_qos_request	pm_qos;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
 	struct contiguous_mem_pool *pool;
 	struct reset_control *rstc[gcdMAX_GPU_COUNT];
