@@ -663,7 +663,9 @@ _IsGPUPresent(
     )
 {
     gceSTATUS status;
+#if 0
     gcsHAL_QUERY_CHIP_IDENTITY identity;
+#endif
     gctUINT32 control;
 
     gcmkHEADER_ARG("Hardware=0x%x", Hardware);
@@ -684,6 +686,7 @@ _IsGPUPresent(
                                       0x00000,
                                       control));
 
+#if 0
     /* Identify the hardware. */
     gcmkONERROR(_IdentifyHardware(Hardware->os,
                                   Hardware->core,
@@ -701,6 +704,7 @@ _IsGPUPresent(
         gcmkPRINT("[galcore]: GPU is not present.");
         gcmkONERROR(gcvSTATUS_GPU_NOT_RESPONDING);
     }
+#endif
 
     /* Success. */
     gcmkFOOTER_NO();
