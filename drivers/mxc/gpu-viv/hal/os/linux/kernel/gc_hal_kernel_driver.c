@@ -421,12 +421,21 @@ gceSTATUS gckOS_MapDmaBuf(IN gckOS Os, IN gceCORE Core,
 	struct dma_buf_attachment *attach, OUT gctPOINTER *Info,
 	OUT gctUINT32_PTR Address);
 
+union gcabi_header {
+	uint32_t padding[16];
+	struct {
+		uint32_t zero;
+		uint32_t hwtype;
+		uint32_t status;
+	} v4;
+};
+
 struct map_dma_buf {
-	unsigned zero;
-	unsigned status;
-	int fd;
-	gctPOINTER Info;
-	gctUINT32 Address;
+	union gcabi_header hdr;
+	uint64_t info;
+	uint64_t address;
+	int32_t fd;
+	uint32_t prot;
 };
 
 static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
@@ -434,15 +443,25 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 	struct map_dma_buf map;
 	struct dma_buf_attachment *attach;
 	struct dma_buf *buf;
+	gckKERNEL kernel;
 	gceSTATUS status;
+	gctPOINTER info;
+	gctUINT32 addr;
+	uint32_t core;
 	int ret;
 
 	if (args->InputBufferSize != sizeof(map) ||
 	    args->OutputBufferSize != sizeof(map))
 		return -EINVAL;
 
-	if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
+	if (copy_from_user(&map, gcmUINT64_TO_PTR(args->InputBuffer), sizeof(map)))
 		return -EFAULT;
+
+	if (map.hdr.v4.hwtype > 7)
+		return -EINVAL;
+
+	core = device->coreMapping[map.hdr.v4.hwtype];
+	kernel = device->kernels[core];
 
 	buf = dma_buf_get(map.fd);
 	if (IS_ERR(buf))
@@ -454,19 +473,24 @@ static long drv_ioctl_dmabuf_map(gckGALDEVICE device, DRIVER_ARGS *args)
 		goto err_put;
 	}
 
-	status = gckOS_MapDmaBuf(device->os, gcvCORE_2D, attach, &map.Info, &map.Address);
+	status = gckOS_MapDmaBuf(device->os, core, attach, &info, &addr);
 	if (gcmIS_ERROR(status)) {
 		ret = -EINVAL;
 		goto err_detach;
 	}
 
-	map.status = gcvSTATUS_OK;
+	map.hdr.v4.status = gcvSTATUS_OK;
+	map.info = gcmPTR_TO_NAME(info);
+	map.address = addr;
 
-	if (!copy_to_user(args->OutputBuffer, &map, sizeof(map)))
+	if (!copy_to_user(gcmUINT64_TO_PTR(args->OutputBuffer), &map, sizeof(map))) {
+		gcmkVERIFY_OK(gckKERNEL_AddProcessDB(kernel,
+					task_tgid_vnr(current), gcvDB_MAP_USER_MEMORY,
+					gcmUINT64_TO_PTR(map.info), (void *)1, 1));
 		return 0;
+	}
 
-	gckOS_UnmapUserMemory(device->os, gcvCORE_2D, (gctPOINTER)1, 1, map.Info,
-			      map.Address);
+	gckOS_UnmapUserMemory(device->os, core, (gctPOINTER)1, 1, info, addr);
 
  err_detach:
 	dma_buf_detach(buf, attach);
@@ -480,33 +504,56 @@ gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
 	OUT gctUINT32_PTR Address);
 
 struct map_buf {
-       unsigned zero;
-       unsigned status;
-       void *addr;
-       unsigned size;
-       unsigned prot;
-       gctPOINTER Info;
-       gctUINT32 Address;
+	union gcabi_header hdr;
+	uint64_t info;
+	uint64_t address;
+	uint64_t virt;
+	uint32_t size;
+	uint32_t prot;
 };
 
 static long drv_ioctl_map(gckGALDEVICE device, DRIVER_ARGS *args)
 {
-       struct map_buf map;
+	struct map_buf map;
+	uint32_t core;
+	gckKERNEL kernel;
+	gceSTATUS status;
+	gctPOINTER info;
+	gctUINT32 addr;
+	void *virt;
 
-       if (args->InputBufferSize != sizeof(map) ||
-           args->OutputBufferSize != sizeof(map))
-               return -EINVAL;
+	if (args->InputBufferSize != sizeof(map) ||
+	    args->OutputBufferSize != sizeof(map))
+		return -EINVAL;
 
-       if (copy_from_user(&map, args->InputBuffer, sizeof(map)))
-               return -EFAULT;
+	if (copy_from_user(&map, gcmUINT64_TO_PTR(args->InputBuffer), sizeof(map)))
+		return -EFAULT;
 
-       map.status = gckOS_MapBuf(device->os, gcvCORE_2D, map.addr, map.size, map.prot,
-                               &map.Info, &map.Address);
+	if (map.hdr.v4.hwtype > 7)
+		return -EINVAL;
 
-       if (copy_to_user(args->OutputBuffer, &map, sizeof(map)))
-               return -EFAULT;
+	core = device->coreMapping[map.hdr.v4.hwtype];
+	kernel = device->kernels[core];
+	virt = (void *)(uintptr_t)map.virt;
 
-       return 0;
+	status = gckOS_MapBuf(device->os, core, virt, map.size, map.prot,
+			      &info, &addr);
+	if (gcmIS_ERROR(status))
+		return -EINVAL;
+
+	map.hdr.v4.status = gcvSTATUS_OK;
+	map.info = gcmPTR_TO_NAME(info);
+	map.address = addr;
+
+	if (!copy_to_user(gcmUINT64_TO_PTR(args->OutputBuffer), &map, sizeof(map))) {
+		gcmkVERIFY_OK(gckKERNEL_AddProcessDB(kernel,
+					task_tgid_vnr(current), gcvDB_MAP_USER_MEMORY,
+					gcmUINT64_TO_PTR(map.info), (void *)1, 1));
+		return 0;
+	}
+
+	gckOS_UnmapUserMemory(device->os, core, (gctPOINTER)1, 1, info, addr);
+	return -EFAULT;
 }
 
 static long drv_ioctl2(gckGALDEVICE device, unsigned cmd, unsigned long arg)
