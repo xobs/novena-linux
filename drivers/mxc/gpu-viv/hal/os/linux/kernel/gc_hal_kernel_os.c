@@ -5497,6 +5497,14 @@ gceSTATUS gckOS_MapBuf(IN gckOS Os, IN gceCORE Core, void *addr,
 				PAGE_SIZE));
 	}
 
+	for (i = 0; i < num_pages; i++) {
+		phys_addr_t addr = page_to_phys(info->pages[i]);
+		gcmkONERROR(gckOS_CacheFlush(Os, _GetProcessID(), gcvNULL,
+				(gctPOINTER)(gctUINTPTR_T)addr,
+				(gctPOINTER)(start + i*PAGE_SIZE),
+				PAGE_SIZE));
+	}
+
 	num_mmu_pages = num_pages * (PAGE_SIZE / 4096);
 
 	gcmkONERROR(gckMMU_AllocatePages(Os->device->kernels[Core]->mmu,
