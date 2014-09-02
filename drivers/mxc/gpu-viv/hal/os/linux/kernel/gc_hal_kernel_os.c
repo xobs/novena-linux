@@ -8107,14 +8107,16 @@ gckOS_WaitSignal(
 
         while (gcvTRUE)
         {
+#if 0
             if (signal_pending(current))
             {
                 /* Interrupt received. */
                 status = gcvSTATUS_INTERRUPTED;
                 break;
             }
+#endif
 
-            __set_current_state(TASK_INTERRUPTIBLE);
+            __set_current_state(TASK_KILLABLE);
             spin_unlock_irq(&signal->obj.wait.lock);
             timeout = schedule_timeout(timeout);
             spin_lock_irq(&signal->obj.wait.lock);
