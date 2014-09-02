@@ -1253,9 +1253,6 @@ gckKERNEL_Dispatch(
 #endif
         /* Free video memory. */
         gcmkONERROR(
-            gckVIDMEM_Free(node));
-
-        gcmkONERROR(
             gckKERNEL_RemoveProcessDB(Kernel,
                                       processID, gcvDB_VIDEO_MEMORY,
                                       node));
@@ -1282,6 +1279,8 @@ gckKERNEL_Dispatch(
                                       node));
         }
 
+        gcmkONERROR(
+            gckVIDMEM_Free(node));
         break;
 
     case gcvHAL_LOCK_VIDEO_MEMORY:
