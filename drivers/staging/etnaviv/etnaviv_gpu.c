@@ -261,7 +261,16 @@ static void etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 	 */
 
 	while (true) {
-		control = gpu_read(gpu, VIVS_HI_CLOCK_CONTROL);
+		control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
+			  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
+
+		/* enable clock */
+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control |
+			  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
+
+		/* Wait for stable clock.  Vivante's code waited for 1ms */
+		usleep_range(1000, 10000);
 
 		/* isolate the GPU. */
 		control |= VIVS_HI_CLOCK_CONTROL_ISOLATE_GPU;
@@ -303,6 +312,15 @@ static void etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 
 		break;
 	}
+
+	/* We rely on the GPU running, so program the clock */
+	control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
+		  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
+
+	/* enable clock */
+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control |
+		  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
 }
 
 int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
