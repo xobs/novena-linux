@@ -553,21 +553,47 @@ static const struct component_master_ops etnaviv_master_ops = {
 	.unbind = etnaviv_unbind,
 };
 
+static const struct component_master_ops etnaviv_master_match_ops = {
+	.bind = etnaviv_bind,
+	.unbind = etnaviv_unbind,
+};
+
+static int compare_str(struct device *dev, void *data)
+{
+	return !strcmp(dev_name(dev), data);
+}
+
 static int etnaviv_pdev_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
 
-	of_platform_populate(node, NULL, NULL, dev);
-
 	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 
-	return component_master_add(&pdev->dev, &etnaviv_master_ops);
+	if (node) {
+		of_platform_populate(node, NULL, NULL, dev);
+
+		return component_master_add(&pdev->dev, &etnaviv_master_ops);
+	} else if (dev->platform_data) {
+		char **names = dev->platform_data;
+		struct component_match *match = NULL;
+		unsigned i;
+
+		for (i = 0; names[i]; i++)
+			component_match_add(dev, &match, compare_str, names[i]);
+
+		return component_master_add_with_match(dev, &etnaviv_master_match_ops,
+						       match);
+	}
+	return -EINVAL;
 }
 
 static int etnaviv_pdev_remove(struct platform_device *pdev)
 {
-	component_master_del(&pdev->dev, &etnaviv_master_ops);
+	if (pdev->dev.of_node)
+		component_master_del(&pdev->dev, &etnaviv_master_ops);
+	else
+		component_master_del(&pdev->dev, &etnaviv_master_match_ops);
 
 	return 0;
 }
@@ -614,3 +640,5 @@ module_exit(etnaviv_exit);
 MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
 MODULE_DESCRIPTION("etnaviv DRM Driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:vivante");
+MODULE_DEVICE_TABLE(of, dt_match);

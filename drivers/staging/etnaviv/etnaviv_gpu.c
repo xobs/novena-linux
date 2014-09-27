@@ -27,6 +27,10 @@
 #include "state_hi.xml.h"
 #include "cmdstream.xml.h"
 
+static const struct platform_device_id gpu_ids[] = {
+	{ .name = "etnaviv-gpu,2d", .driver_data = ETNA_PIPE_2D, },
+	{ },
+};
 
 /*
  * Driver functions:
@@ -926,9 +930,16 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 	if (!gpu)
 		return -ENOMEM;
 
-	match = of_match_device(etnaviv_gpu_match, &pdev->dev);
-	if (!match)
+	if (pdev->dev.of_node) {
+		match = of_match_device(etnaviv_gpu_match, &pdev->dev);
+		if (!match)
+			return -EINVAL;
+		gpu->pipe = (int)match->data;
+	} else if (pdev->id_entry) {
+		gpu->pipe = pdev->id_entry->driver_data;
+	} else {
 		return -EINVAL;
+	}
 
 	gpu->name = pdev->name;
 
@@ -968,8 +979,6 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 	if (IS_ERR(gpu->clk_shader))
 		gpu->clk_shader = NULL;
 
-	gpu->pipe = (int)match->data;
-
 	/* TODO: figure out max mapped size */
 	drm_mm_init(&gpu->mm, 0x80000000, SZ_1G);
 
@@ -1001,4 +1010,5 @@ struct platform_driver etnaviv_gpu_driver = {
 	},
 	.probe = etnaviv_gpu_platform_probe,
 	.remove = etnaviv_gpu_platform_remove,
+	.id_table = gpu_ids,
 };
