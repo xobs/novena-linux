@@ -39,7 +39,6 @@ void __iomem *etnaviv_ioremap(struct platform_device *pdev, const char *name,
 		const char *dbgname)
 {
 	struct resource *res;
-	unsigned long size;
 	void __iomem *ptr;
 
 	if (name)
@@ -47,21 +46,16 @@ void __iomem *etnaviv_ioremap(struct platform_device *pdev, const char *name,
 	else
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	if (!res) {
-		dev_err(&pdev->dev, "failed to get memory resource: %s\n", name);
-		return ERR_PTR(-EINVAL);
-	}
-
-	size = resource_size(res);
-
-	ptr = devm_ioremap_nocache(&pdev->dev, res->start, size);
-	if (!ptr) {
-		dev_err(&pdev->dev, "failed to ioremap: %s\n", name);
-		return ERR_PTR(-ENOMEM);
+	ptr = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(ptr)) {
+		dev_err(&pdev->dev, "failed to ioremap %s: %ld\n", name,
+			PTR_ERR(ptr));
+		return ptr;
 	}
 
 	if (reglog)
-		printk(KERN_DEBUG "IO:region %s %08x %08lx\n", dbgname, (u32)ptr, size);
+		dev_printk(KERN_DEBUG, &pdev->dev, "IO:region %s 0x%p %08zx\n",
+			   dbgname, ptr, (size_t)resource_size(res));
 
 	return ptr;
 }
