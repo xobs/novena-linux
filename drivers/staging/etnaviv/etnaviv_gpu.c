@@ -434,8 +434,8 @@ void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 
 	verify_dma(gpu, &debug);
 
-	seq_printf(m, "\taxi: 0x08%x\n", axi);
-	seq_printf(m, "\tidle: 0x08%x\n", idle);
+	seq_printf(m, "\taxi: 0x%08x\n", axi);
+	seq_printf(m, "\tidle: 0x%08x\n", idle);
 	if ((idle & VIVS_HI_IDLE_STATE_FE) == 0)
 		seq_puts(m, "\t FE is not idle\n");
 	if ((idle & VIVS_HI_IDLE_STATE_DE) == 0)
@@ -489,7 +489,8 @@ void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 	seq_printf(m, "\t address 1: 0x%08x\n", debug.address[1]);
 	seq_printf(m, "\t state 0: 0x%08x\n", debug.state[0]);
 	seq_printf(m, "\t state 1: 0x%08x\n", debug.state[1]);
-	seq_printf(m, "\t last fetch 64 bit word: 0x%08x-0x%08x\n", dma_hi, dma_lo);
+	seq_printf(m, "\t last fetch 64 bit word: 0x%08x 0x%08x\n",
+		   dma_lo, dma_hi);
 }
 #endif
 
