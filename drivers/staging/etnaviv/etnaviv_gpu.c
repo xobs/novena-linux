@@ -861,6 +861,8 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 
+	del_timer(&gpu->hangcheck_timer);
+
 	DBG("%s", gpu->name);
 
 	WARN_ON(!list_empty(&gpu->active_list));
