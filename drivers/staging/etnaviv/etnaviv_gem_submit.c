@@ -382,6 +382,13 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 			goto out;
 		}
 
+		if (submit_cmd.submit_offset % 8) {
+			DRM_ERROR("non-aligned cmdstream buffer size: %u\n",
+					submit_cmd.size);
+			ret = -EINVAL;
+			goto out;
+		}
+
 		/*
 		 * We must have space to add a LINK command at the end of
 		 * the command buffer.
@@ -396,6 +403,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		}
 
 		submit->cmd[i].type = submit_cmd.type;
+		submit->cmd[i].offset = submit_cmd.submit_offset / 4;
 		submit->cmd[i].size = submit_cmd.size / 4;
 		submit->cmd[i].obj = etnaviv_obj;
 
