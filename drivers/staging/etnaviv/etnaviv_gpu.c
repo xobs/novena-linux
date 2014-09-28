@@ -850,9 +850,9 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 	int idx = gpu->pipe;
 
-	dev_info(dev, "pre gpu[idx]: 0x%08x\n", (u32)priv->gpu[idx]);
+	dev_info(dev, "pre gpu[idx]: %p\n", priv->gpu[idx]);
 
-	if (priv->gpu[idx] == 0) {
+	if (priv->gpu[idx] == NULL) {
 		dev_info(dev, "adding core @idx %d\n", idx);
 		priv->gpu[idx] = gpu;
 	} else {
@@ -860,7 +860,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 		goto fail;
 	}
 
-	dev_info(dev, "post gpu[idx]: 0x%08x\n", (u32)priv->gpu[idx]);
+	dev_info(dev, "post gpu[idx]: %p\n", priv->gpu[idx]);
 
 	gpu->dev = drm;
 
