@@ -78,6 +78,11 @@ struct etnaviv_chip_identity {
 	uint32_t buffer_size;
 };
 
+struct etnaviv_event {
+	bool used;
+	uint32_t fence;
+};
+
 struct etnaviv_gpu {
 	const char *name;
 	struct drm_device *dev;
@@ -88,8 +93,7 @@ struct etnaviv_gpu {
 	struct drm_gem_object *buffer;
 
 	/* event management: */
-	bool event_used[30];
-	uint32_t event_to_fence[30];
+	struct etnaviv_event event[30];
 	struct completion event_free;
 	struct spinlock event_spinlock;
 
