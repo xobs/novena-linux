@@ -99,6 +99,12 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct drm_mm_node *node = NULL;
 	int ret;
 
+	/* v1 MMU can optimize single entry (contiguous) scatterlists */
+	if (sgt->nents == 1) {
+		etnaviv_obj->iova = sg_dma_address(sgt->sgl);
+		return 0;
+	}
+
 	node = kzalloc(sizeof(*node), GFP_KERNEL);
 	if (!node)
 		return -ENOMEM;
@@ -123,7 +129,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj)
 {
-	if (etnaviv_obj->iova) {
+	if (etnaviv_obj->gpu_vram_node) {
 		uint32_t offset = etnaviv_obj->gpu_vram_node->start;
 
 		etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt,
