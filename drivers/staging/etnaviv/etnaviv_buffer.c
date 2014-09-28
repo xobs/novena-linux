@@ -30,7 +30,7 @@
 static inline void OUT(struct etnaviv_gem_object *buffer, uint32_t data)
 {
 	u32 *vaddr = (u32 *)buffer->vaddr;
-	BUG_ON(buffer->offset >= buffer->base.size);
+	BUG_ON(buffer->offset * sizeof(*vaddr) >= buffer->base.size);
 
 	vaddr[buffer->offset++] = data;
 }
