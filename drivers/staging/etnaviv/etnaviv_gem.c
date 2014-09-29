@@ -256,8 +256,8 @@ uint64_t etnaviv_gem_mmap_offset(struct drm_gem_object *obj)
  * That means when I do eventually need to add support for unpinning
  * the refcnt counter needs to be atomic_t.
  */
-int etnaviv_gem_get_iova_locked(struct etnaviv_gpu * gpu, struct drm_gem_object *obj,
-		uint32_t *iova)
+int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
+	struct drm_gem_object *obj, uint32_t *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	int ret = 0;
@@ -317,12 +317,14 @@ int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj, in
 
 void etnaviv_gem_put_iova(struct drm_gem_object *obj)
 {
-	// XXX TODO ..
-	// NOTE: probably don't need a _locked() version.. we wouldn't
-	// normally unmap here, but instead just mark that it could be
-	// unmapped (if the iova refcnt drops to zero), but then later
-	// if another _get_iova_locked() fails we can start unmapping
-	// things that are no longer needed..
+	/*
+	 * XXX TODO ..
+	 * NOTE: probably don't need a _locked() version.. we wouldn't
+	 * normally unmap here, but instead just mark that it could be
+	 * unmapped (if the iova refcnt drops to zero), but then later
+	 * if another _get_iova_locked() fails we can start unmapping
+	 * things that are no longer needed..
+	 */
 }
 
 int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
