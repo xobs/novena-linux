@@ -22,6 +22,7 @@
 #include <linux/bitops.h>
 
 #include "etnaviv_gpu.h"
+#include "etnaviv_iommu.h"
 #include "state_hi.xml.h"
 
 #define PT_SIZE		SZ_256K
@@ -136,7 +137,8 @@ static size_t etnaviv_iommu_unmap(struct iommu_domain *domain, unsigned long iov
 	return 0;
 }
 
-phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+static phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain,
+	dma_addr_t iova)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
 
