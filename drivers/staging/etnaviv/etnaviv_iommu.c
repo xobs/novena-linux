@@ -122,8 +122,8 @@ static int etnaviv_iommu_map(struct iommu_domain *domain, unsigned long iova,
 	return 0;
 }
 
-static size_t etnaviv_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-	     size_t size)
+static size_t etnaviv_iommu_unmap(struct iommu_domain *domain,
+	unsigned long iova, size_t size)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
 
@@ -158,6 +158,7 @@ struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
 {
 	struct iommu_domain *domain;
 	struct etnaviv_iommu_domain *etnaviv_domain;
+	uint32_t pgtable;
 	int ret;
 
 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
@@ -172,12 +173,13 @@ struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
 
 	/* set page table address in MC */
 	etnaviv_domain = domain->priv;
+	pgtable = (uint32_t)etnaviv_domain->pgtable.paddr;
 
-	gpu_write(gpu, VIVS_MC_MMU_FE_PAGE_TABLE, (uint32_t)etnaviv_domain->pgtable.paddr);
-	gpu_write(gpu, VIVS_MC_MMU_TX_PAGE_TABLE, (uint32_t)etnaviv_domain->pgtable.paddr);
-	gpu_write(gpu, VIVS_MC_MMU_PE_PAGE_TABLE, (uint32_t)etnaviv_domain->pgtable.paddr);
-	gpu_write(gpu, VIVS_MC_MMU_PEZ_PAGE_TABLE, (uint32_t)etnaviv_domain->pgtable.paddr);
-	gpu_write(gpu, VIVS_MC_MMU_RA_PAGE_TABLE, (uint32_t)etnaviv_domain->pgtable.paddr);
+	gpu_write(gpu, VIVS_MC_MMU_FE_PAGE_TABLE, pgtable);
+	gpu_write(gpu, VIVS_MC_MMU_TX_PAGE_TABLE, pgtable);
+	gpu_write(gpu, VIVS_MC_MMU_PE_PAGE_TABLE, pgtable);
+	gpu_write(gpu, VIVS_MC_MMU_PEZ_PAGE_TABLE, pgtable);
+	gpu_write(gpu, VIVS_MC_MMU_RA_PAGE_TABLE, pgtable);
 
 	return domain;
 

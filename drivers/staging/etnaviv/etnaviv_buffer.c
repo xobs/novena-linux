@@ -30,18 +30,23 @@
 static inline void OUT(struct etnaviv_gem_object *buffer, uint32_t data)
 {
 	u32 *vaddr = (u32 *)buffer->vaddr;
+
 	BUG_ON(buffer->offset >= buffer->base.size / sizeof(*vaddr));
 
 	vaddr[buffer->offset++] = data;
 }
 
-static inline void CMD_LOAD_STATE(struct etnaviv_gem_object *buffer, u32 reg, u32 value)
+static inline void CMD_LOAD_STATE(struct etnaviv_gem_object *buffer,
+	u32 reg, u32 value)
 {
+	u32 index = reg >> VIV_FE_LOAD_STATE_HEADER_OFFSET__SHR;
+
 	buffer->offset = ALIGN(buffer->offset, 2);
 
 	/* write a register via cmd stream */
-	OUT(buffer, VIV_FE_LOAD_STATE_HEADER_OP_LOAD_STATE | VIV_FE_LOAD_STATE_HEADER_COUNT(1) |
-			VIV_FE_LOAD_STATE_HEADER_OFFSET(reg >> VIV_FE_LOAD_STATE_HEADER_OFFSET__SHR));
+	OUT(buffer, VIV_FE_LOAD_STATE_HEADER_OP_LOAD_STATE |
+		    VIV_FE_LOAD_STATE_HEADER_COUNT(1) |
+		    VIV_FE_LOAD_STATE_HEADER_OFFSET(index));
 	OUT(buffer, value);
 }
 
@@ -59,15 +64,18 @@ static inline void CMD_WAIT(struct etnaviv_gem_object *buffer)
 	OUT(buffer, VIV_FE_WAIT_HEADER_OP_WAIT | 200);
 }
 
-static inline void CMD_LINK(struct etnaviv_gem_object *buffer, u16 prefetch, u32 address)
+static inline void CMD_LINK(struct etnaviv_gem_object *buffer,
+	u16 prefetch, u32 address)
 {
 	buffer->offset = ALIGN(buffer->offset, 2);
 
-	OUT(buffer, VIV_FE_LINK_HEADER_OP_LINK | VIV_FE_LINK_HEADER_PREFETCH(prefetch));
+	OUT(buffer, VIV_FE_LINK_HEADER_OP_LINK |
+		    VIV_FE_LINK_HEADER_PREFETCH(prefetch));
 	OUT(buffer, address);
 }
 
-static inline void CMD_STALL(struct etnaviv_gem_object *buffer, u32 from, u32 to)
+static inline void CMD_STALL(struct etnaviv_gem_object *buffer,
+	u32 from, u32 to)
 {
 	buffer->offset = ALIGN(buffer->offset, 2);
 
@@ -86,14 +94,15 @@ static void cmd_select_pipe(struct etnaviv_gem_object *buffer, u8 pipe)
 		flush = VIVS_GL_FLUSH_CACHE_TEXTURE;
 
 	stall = VIVS_GL_SEMAPHORE_TOKEN_FROM(SYNC_RECIPIENT_FE) |
-			VIVS_GL_SEMAPHORE_TOKEN_TO(SYNC_RECIPIENT_PE);
+		VIVS_GL_SEMAPHORE_TOKEN_TO(SYNC_RECIPIENT_PE);
 
 	CMD_LOAD_STATE(buffer, VIVS_GL_FLUSH_CACHE, flush);
 	CMD_LOAD_STATE(buffer, VIVS_GL_SEMAPHORE_TOKEN, stall);
 
 	CMD_STALL(buffer, SYNC_RECIPIENT_FE, SYNC_RECIPIENT_PE);
 
-	CMD_LOAD_STATE(buffer, VIVS_GL_PIPE_SELECT, VIVS_GL_PIPE_SELECT_PIPE(pipe));
+	CMD_LOAD_STATE(buffer, VIVS_GL_PIPE_SELECT,
+		       VIVS_GL_PIPE_SELECT_PIPE(pipe));
 }
 
 static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
@@ -125,7 +134,8 @@ u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 	return buffer->offset;
 }
 
-void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct etnaviv_gem_submit *submit)
+void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
+	struct etnaviv_gem_submit *submit)
 {
 	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
 	struct etnaviv_gem_object *cmd;
@@ -148,7 +158,8 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 	link_size = 6;
 
 	/* trigger event */
-	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) | VIVS_GL_EVENT_FROM_PE);
+	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |
+		       VIVS_GL_EVENT_FROM_PE);
 
 	/* append WAIT/LINK to main buffer */
 	CMD_WAIT(buffer);
