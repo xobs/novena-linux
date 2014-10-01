@@ -864,6 +864,7 @@ static int ldo_regulator_register(struct snd_soc_codec *codec,
 	config.dev = codec->dev;
 	config.driver_data = ldo;
 	config.init_data = init_data;
+	config.ena_gpio = -EINVAL;
 
 	ldo->dev = regulator_register(&ldo->desc, &config);
 	if (IS_ERR(ldo->dev)) {
