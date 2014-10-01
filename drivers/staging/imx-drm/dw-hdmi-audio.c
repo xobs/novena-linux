@@ -331,6 +331,7 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
 
 	runtime->hw = dw_hdmi_hw;
 	snd_pcm_limit_hw_rates(runtime);
+	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
 
 	return 0;
 }
