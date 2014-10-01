@@ -610,12 +610,40 @@ static int snd_dw_hdmi_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int snd_dw_hdmi_suspend(struct device *dev)
+{
+	struct snd_dw_hdmi *dw = dev_get_drvdata(dev);
+
+	snd_power_change_state(dw->card, SNDRV_CTL_POWER_D3cold);
+	snd_pcm_suspend_all(dw->pcm);
+
+	return 0;
+}
+
+static int snd_dw_hdmi_resume(struct device *dev)
+{
+	struct snd_dw_hdmi *dw = dev_get_drvdata(dev);
+
+	snd_power_change_state(dw->card, SNDRV_CTL_POWER_D0);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(snd_dw_hdmi_pm, snd_dw_hdmi_suspend,
+			 snd_dw_hdmi_resume);
+#define PM_OPS &snd_dw_hdmi_pm
+#else
+#define PM_OPS NULL
+#endif
+
 static struct platform_driver snd_dw_hdmi_driver = {
 	.probe	= snd_dw_hdmi_probe,
 	.remove	= snd_dw_hdmi_remove,
 	.driver	= {
 		.name = "dw-hdmi-audio",
 		.owner = THIS_MODULE,
+		.pm = PM_OPS,
 	},
 };
 
