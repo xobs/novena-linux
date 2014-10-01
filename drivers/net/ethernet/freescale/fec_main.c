@@ -46,6 +46,7 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/platform_device.h>
 #include <linux/phy.h>
 #include <linux/fec.h>
@@ -1826,11 +1827,13 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 				goto failed_clk_ref;
 		}
 	} else {
-		clk_disable_unprepare(fep->clk_ahb);
-		clk_disable_unprepare(fep->clk_ipg);
-		if (fep->clk_enet_out)
+		if (__clk_is_enabled(fep->clk_ahb))
+			clk_disable_unprepare(fep->clk_ahb);
+		if (__clk_is_enabled(fep->clk_ipg))
+			clk_disable_unprepare(fep->clk_ipg);
+		if (fep->clk_enet_out && __clk_is_enabled(fep->clk_enet_out))
 			clk_disable_unprepare(fep->clk_enet_out);
-		if (fep->clk_ptp) {
+		if (fep->clk_ptp && __clk_is_enabled(fep->clk_ptp)) {
 			mutex_lock(&fep->ptp_clk_mutex);
 			clk_disable_unprepare(fep->clk_ptp);
 			fep->ptp_clk_on = false;
