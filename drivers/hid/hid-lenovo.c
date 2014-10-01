@@ -88,10 +88,6 @@ static int lenovo_input_mapping_cptkbd(struct hid_device *hdev,
 		case 0x00fa: /* Fn-Esc: Fn-lock toggle */
 			map_key_clear(KEY_FN_ESC);
 			return 1;
-		case 0x00fb: /* Fn-F12: Open My computer (6 boxes) USB-only */
-			/* NB: This mapping is invented in raw_event below */
-			map_key_clear(KEY_FILE);
-			return 1;
 		}
 	}
 
