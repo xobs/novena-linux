@@ -147,6 +147,12 @@ if [ ! -z $KBUILD_DESTDIR ]; then
 	mkdir -p "${tmpdir}/${KBUILD_DESTDIR}"
 fi
 
+if [ ! -z $KBUILD_DESTDIR ]; then
+	installed_image_path="${KBUILD_DESTDIR}/vmlinuz-$version"
+	installed_dtb_path="${KBUILD_DESTDIR}/vmlinuz-$version.dtb"
+	mkdir -p "${tmpdir}/${KBUILD_DESTDIR}"
+fi
+
 # Build and install the kernel
 if [ "$ARCH" = "um" ] ; then
 	mkdir -p "$tmpdir/usr/lib/uml/modules/$version" "$tmpdir/usr/bin" "$tmpdir/usr/share/doc/$packagename"
