@@ -69,6 +69,7 @@ struct etnaviv_gem_object {
 #define to_etnaviv_bo(x) container_of(x, struct etnaviv_gem_object, base)
 
 struct etnaviv_gem_ops {
+	int (*get_pages)(struct etnaviv_gem_object *);
 	void (*release)(struct etnaviv_gem_object *);
 };
 
