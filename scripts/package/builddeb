@@ -91,6 +91,13 @@ if [ "$ARCH" = "um" ] ; then
 	packagename=user-mode-linux-$version
 fi
 
+if [ ! -z "${KDEB_PKGNAME}" ]
+then
+	packagename=linux-image-${KDEB_PKGNAME}
+	fwpackagename=linux-firmware-image-${KDEB_PKGNAME}
+	kernel_headers_packagename=linux-headers-${KDEB_PKGNAME}
+fi
+
 # Not all arches have the same installed path in debian
 # XXX: have each arch Makefile export a variable of the canonical image install
 # path instead
