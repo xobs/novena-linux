@@ -16,6 +16,7 @@
  */
 
 #include "etnaviv_drv.h"
+#include "etnaviv_gem.h"
 #include "etnaviv_mmu.h"
 
 static int etnaviv_fault_handler(struct iommu_domain *iommu, struct device *dev,
@@ -88,6 +89,48 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 	}
 
 	return 0;
+}
+
+int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
+	struct etnaviv_gem_object *etnaviv_obj)
+{
+	struct sg_table *sgt = etnaviv_obj->sgt;
+	uint32_t offset;
+	struct drm_mm_node *node = NULL;
+	int ret;
+
+	node = kzalloc(sizeof(*node), GFP_KERNEL);
+	if (!node)
+		return -ENOMEM;
+
+	ret = drm_mm_insert_node(&mmu->mm, node, etnaviv_obj->base.size, 0,
+				 DRM_MM_SEARCH_DEFAULT);
+
+	if (!ret) {
+		offset = node->start;
+		etnaviv_obj->iova = offset;
+		etnaviv_obj->gpu_vram_node = node;
+
+		ret = etnaviv_iommu_map(mmu, offset, sgt,
+					etnaviv_obj->base.size,
+					IOMMU_READ | IOMMU_WRITE);
+	} else
+		kfree(node);
+
+	return ret;
+}
+
+void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
+	struct etnaviv_gem_object *etnaviv_obj)
+{
+	if (etnaviv_obj->iova) {
+		uint32_t offset = etnaviv_obj->gpu_vram_node->start;
+
+		etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt,
+				    etnaviv_obj->base.size);
+		drm_mm_remove_node(etnaviv_obj->gpu_vram_node);
+		kfree(etnaviv_obj->gpu_vram_node);
+	}
 }
 
 void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
