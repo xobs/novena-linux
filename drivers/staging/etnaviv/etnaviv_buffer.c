@@ -17,6 +17,7 @@
 
 #include "etnaviv_gpu.h"
 #include "etnaviv_gem.h"
+#include "etnaviv_mmu.h"
 
 #include "common.xml.h"
 #include "state.xml.h"
@@ -140,30 +141,38 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
 	struct etnaviv_gem_object *cmd;
 	u32 *lw = buffer->vaddr + ((buffer->offset - 4) * 4);
-	u32 back, link_target, link_size;
+	u32 back, link_target, link_size, reserve_size;
 	u32 i;
 
 	if (drm_debug & DRM_UT_DRIVER)
 		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
 
+	reserve_size = 6;
+
+	/*
+	 * If we need to flush the MMU prior to submitting this buffer, we
+	 * will need to append a mmu flush load state, followed by a new
+	 * link to this buffer - a total of four additional words.
+	 */
+	if (gpu->mmu->need_flush)
+		reserve_size += 4;
+
 	/*
 	 * if we are going to completely overflow the buffer, we need to wrap.
 	 */
-	if (buffer->offset + 6 > buffer->base.size / sizeof(uint32_t))
+	if (buffer->offset + reserve_size >
+	    buffer->base.size / sizeof(uint32_t))
 		buffer->offset = 0;
 
 	/* save offset back into main buffer */
-	back = buffer->offset;
+	back = buffer->offset + reserve_size - 6;
 	link_target = buffer->paddr + buffer->offset * 4;
 	link_size = 6;
 
-	/* trigger event */
-	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |
-		       VIVS_GL_EVENT_FROM_PE);
-
-	/* append WAIT/LINK to main buffer */
-	CMD_WAIT(buffer);
-	CMD_LINK(buffer, 2, buffer->paddr + ((buffer->offset - 1) * 4));
+	if (gpu->mmu->need_flush) {
+		/* Skip over the MMU flush and LINK instructions */
+		link_target += 4 * sizeof(uint32_t);
+	}
 
 	/* update offset for every cmd stream */
 	for (i = submit->nr_cmds; i--; ) {
@@ -201,6 +210,33 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		pr_info("back: 0x%llx\n", (u64)buffer->paddr + (back * 4));
 		pr_info("event: %d\n", event);
 	}
+
+	if (gpu->mmu->need_flush) {
+		uint32_t new_target = buffer->paddr + buffer->offset *
+					sizeof(uint32_t);
+
+		/* Add the MMU flush */
+		CMD_LOAD_STATE(buffer, VIVS_GL_FLUSH_MMU,
+			       VIVS_GL_FLUSH_MMU_FLUSH_FEMMU |
+			       VIVS_GL_FLUSH_MMU_FLUSH_PEMMU);
+
+		/* And the link to the first buffer */
+		CMD_LINK(buffer, link_size, link_target);
+
+		/* Update the link target to point to the flush */
+		link_target = new_target;
+		link_size = 4;
+
+		gpu->mmu->need_flush = false;
+	}
+
+	/* trigger event */
+	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |
+		       VIVS_GL_EVENT_FROM_PE);
+
+	/* append WAIT/LINK to main buffer */
+	CMD_WAIT(buffer);
+	CMD_LINK(buffer, 2, buffer->paddr + ((buffer->offset - 1) * 4));
 
 	/* Change WAIT into a LINK command; write the address first. */
 	*(lw + 1) = link_target;
