@@ -950,8 +950,6 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 
 	if (gpu->mmu)
 		etnaviv_iommu_destroy(gpu->mmu);
-
-	drm_mm_takedown(&gpu->mm);
 }
 
 static const struct component_ops gpu_ops = {
@@ -1031,8 +1029,6 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 	gpu->pipe = (long)match->data;
 
 	/* TODO: figure out max mapped size */
-	drm_mm_init(&gpu->mm, 0x80000000, SZ_1G);
-
 	dev_set_drvdata(dev, gpu);
 
 	err = component_add(&pdev->dev, &gpu_ops);

@@ -111,9 +111,6 @@ struct etnaviv_gpu {
 
 	struct etnaviv_iommu *mmu;
 
-	/* memory manager for GPU address area */
-	struct drm_mm mm;
-
 	/* Power Control: */
 #if 0
 	struct regulator *gpu_reg, *gpu_cx;
