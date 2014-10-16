@@ -134,7 +134,7 @@ static size_t etnaviv_iommu_unmap(struct iommu_domain *domain,
 	pgtable_write(&etnaviv_domain->pgtable, iova, ~0);
 	spin_unlock(&etnaviv_domain->map_lock);
 
-	return 0;
+	return SZ_4K;
 }
 
 static phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain,
