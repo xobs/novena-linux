@@ -278,32 +278,12 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	int ret = 0;
 
-	if (!etnaviv_obj->iova  && !(etnaviv_obj->flags & ETNA_BO_CMDSTREAM)) {
-		struct etnaviv_drm_private *priv = obj->dev->dev_private;
-		struct etnaviv_iommu *mmu = priv->mmu;
+	if (!etnaviv_obj->iova && !(etnaviv_obj->flags & ETNA_BO_CMDSTREAM)) {
 		struct page **pages = etnaviv_gem_get_pages(etnaviv_obj);
-		uint32_t offset;
-		struct drm_mm_node *node = NULL;
-
 		if (IS_ERR(pages))
 			return PTR_ERR(pages);
 
-		node = kzalloc(sizeof(*node), GFP_KERNEL);
-		if (!node)
-			return -ENOMEM;
-
-		ret = drm_mm_insert_node(&mmu->mm, node, obj->size, 0,
-				DRM_MM_SEARCH_DEFAULT);
-
-		if (!ret) {
-			offset = node->start;
-			etnaviv_obj->iova = offset;
-			etnaviv_obj->gpu_vram_node = node;
-
-			ret = etnaviv_iommu_map(mmu, offset, etnaviv_obj->sgt,
-					obj->size, IOMMU_READ | IOMMU_WRITE);
-		} else
-			kfree(node);
+		ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj);
 	}
 
 	if (!ret)
@@ -532,13 +512,8 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 	struct etnaviv_drm_private *priv = obj->dev->dev_private;
 	struct etnaviv_iommu *mmu = priv->mmu;
 
-	if (mmu && etnaviv_obj->iova) {
-		uint32_t offset = etnaviv_obj->gpu_vram_node->start;
-
-		etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt, obj->size);
-		drm_mm_remove_node(etnaviv_obj->gpu_vram_node);
-		kfree(etnaviv_obj->gpu_vram_node);
-	}
+	if (mmu)
+		etnaviv_iommu_unmap_gem(mmu, etnaviv_obj);
 }
 
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)

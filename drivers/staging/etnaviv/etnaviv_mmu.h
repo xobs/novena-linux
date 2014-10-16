@@ -36,12 +36,18 @@ struct etnaviv_iommu {
 	bool need_flush;
 };
 
+struct etnaviv_gem_object;
+
 int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
 	int cnt);
 int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova,
 	struct sg_table *sgt, unsigned len, int prot);
 int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 	struct sg_table *sgt, unsigned len);
+int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
+	struct etnaviv_gem_object *etnaviv_obj);
+void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
+	struct etnaviv_gem_object *etnaviv_obj);
 void etnaviv_iommu_destroy(struct etnaviv_iommu *iommu);
 
 struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev,
