@@ -110,7 +110,9 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev,
 	mmu->dev = dev;
 	mmu->version = version;
 
-	drm_mm_init(&mmu->mm, 0x80000000, SZ_1G);
+	drm_mm_init(&mmu->mm, domain->geometry.aperture_start,
+		    domain->geometry.aperture_end -
+		      domain->geometry.aperture_start + 1);
 
 	iommu_set_fault_handler(domain, etnaviv_fault_handler, dev);
 
