@@ -292,7 +292,7 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 		if (!node)
 			return -ENOMEM;
 
-		ret = drm_mm_insert_node(&gpu->mm, node, obj->size, 0,
+		ret = drm_mm_insert_node(&mmu->mm, node, obj->size, 0,
 				DRM_MM_SEARCH_DEFAULT);
 
 		if (!ret) {

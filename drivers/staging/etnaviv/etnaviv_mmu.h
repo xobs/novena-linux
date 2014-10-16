@@ -31,6 +31,8 @@ struct etnaviv_iommu {
 
 	enum etnaviv_iommu_version version;
 
+	/* memory manager for GPU address area */
+	struct drm_mm mm;
 	bool need_flush;
 };
 
