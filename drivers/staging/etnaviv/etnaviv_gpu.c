@@ -710,6 +710,12 @@ static void hangcheck_handler(unsigned long data)
 		hangcheck_timer_reset(gpu);
 }
 
+static void hangcheck_disable(struct etnaviv_gpu *gpu)
+{
+	del_timer_sync(&gpu->hangcheck_timer);
+	cancel_work_sync(&gpu->recover_work);
+}
+
 /*
  * event management:
  */
@@ -937,9 +943,7 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 
 	DBG("%s", dev_name(gpu->dev));
 
-	/* Safely take down hangcheck */
-	del_timer_sync(&gpu->hangcheck_timer);
-	cancel_work_sync(&gpu->recover_work);
+	hangcheck_disable(gpu);
 
 	WARN_ON(!list_empty(&gpu->active_list));
 
