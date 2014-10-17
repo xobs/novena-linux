@@ -126,8 +126,7 @@ static void load_gpu(struct drm_device *dev)
 			etnaviv_gpu_pm_resume(g);
 			ret = etnaviv_gpu_init(g);
 			if (ret) {
-				dev_err(dev->dev, "%s hw init failed: %d\n",
-					g->name, ret);
+				dev_err(g->dev, "hw init failed: %d\n", ret);
 				priv->gpu[i] = NULL;
 			}
 		}
@@ -206,7 +205,7 @@ static int etnaviv_gpu_show(struct drm_device *dev, struct seq_file *m)
 	for (i = 0; i < ETNA_MAX_PIPES; i++) {
 		gpu = priv->gpu[i];
 		if (gpu) {
-			seq_printf(m, "%s Status:\n", gpu->name);
+			seq_printf(m, "%s Status:\n", dev_name(gpu->dev));
 			etnaviv_gpu_debugfs(gpu, m);
 		}
 	}
@@ -223,7 +222,8 @@ static int etnaviv_gem_show(struct drm_device *dev, struct seq_file *m)
 	for (i = 0; i < ETNA_MAX_PIPES; i++) {
 		gpu = priv->gpu[i];
 		if (gpu) {
-			seq_printf(m, "Active Objects (%s):\n", gpu->name);
+			seq_printf(m, "Active Objects (%s):\n",
+				   dev_name(gpu->dev));
 			etnaviv_gem_describe_objects(&gpu->active_list, m);
 		}
 	}
