@@ -26,6 +26,7 @@ struct etnaviv_iommu {
 
 	/* memory manager for GPU address area */
 	struct drm_mm mm;
+	uint32_t last_iova;
 	bool need_flush;
 };
 
