@@ -85,7 +85,7 @@ struct etnaviv_event {
 
 struct etnaviv_gpu {
 	const char *name;
-	struct drm_device *dev;
+	struct drm_device *drm;
 	struct etnaviv_chip_identity identity;
 	long pipe;
 
