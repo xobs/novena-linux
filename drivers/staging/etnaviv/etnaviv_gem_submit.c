@@ -435,5 +435,14 @@ out:
 	if (submit)
 		submit_cleanup(submit, !!ret);
 	mutex_unlock(&dev->struct_mutex);
+
+	/*
+	 * If we're returning -EAGAIN, it could be due to the userptr code
+	 * wanting to run its workqueue outside of the struct_mutex.
+	 * Flush our workqueue to ensure that it is run in a timely manner.
+	 */
+	if (ret == -EAGAIN)
+		flush_workqueue(priv->wq);
+
 	return ret;
 }
