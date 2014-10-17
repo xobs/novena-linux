@@ -27,37 +27,21 @@
 static int etnaviv_gem_shmem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
 	struct drm_device *dev = etnaviv_obj->base.dev;
-	struct page **p;
-	int npages = etnaviv_obj->base.size >> PAGE_SHIFT;
+	struct page **p = drm_gem_get_pages(&etnaviv_obj->base);
 
-	p = drm_gem_get_pages(&etnaviv_obj->base);
 	if (IS_ERR(p)) {
 		dev_err(dev->dev, "could not get pages: %ld\n", PTR_ERR(p));
 		return PTR_ERR(p);
 	}
 
-	etnaviv_obj->sgt = drm_prime_pages_to_sg(p, npages);
-	if (IS_ERR(etnaviv_obj->sgt)) {
-		dev_err(dev->dev, "failed to allocate sgt\n");
-		drm_gem_put_pages(&etnaviv_obj->base, p, false, false);
-		return PTR_ERR(p);
-	}
-
 	etnaviv_obj->pages = p;
-
-	/* For non-cached buffers, ensure the new pages are clean
-	 * because display controller, GPU, etc. are not coherent:
-	 */
-	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
-		dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
-			   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
 
 	return 0;
 }
 
 static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
-	if (etnaviv_obj->pages) {
+	if (etnaviv_obj->sgt) {
 		struct drm_device *dev = etnaviv_obj->base.dev;
 
 		/*
@@ -81,7 +65,9 @@ static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
 				     DMA_BIDIRECTIONAL);
 		sg_free_table(etnaviv_obj->sgt);
 		kfree(etnaviv_obj->sgt);
-
+		etnaviv_obj->sgt = NULL;
+	}
+	if (etnaviv_obj->pages) {
 		drm_gem_put_pages(&etnaviv_obj->base, etnaviv_obj->pages,
 				  true, false);
 
@@ -97,6 +83,29 @@ struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 		ret = etnaviv_obj->ops->get_pages(etnaviv_obj);
 		if (ret < 0)
 			return ERR_PTR(ret);
+	}
+
+	if (!etnaviv_obj->sgt) {
+		struct drm_device *dev = etnaviv_obj->base.dev;
+		int npages = etnaviv_obj->base.size >> PAGE_SHIFT;
+		struct sg_table *sgt;
+
+		sgt = drm_prime_pages_to_sg(etnaviv_obj->pages, npages);
+		if (IS_ERR(sgt)) {
+			dev_err(dev->dev, "failed to allocate sgt: %ld\n",
+				PTR_ERR(sgt));
+			return ERR_CAST(sgt);
+		}
+
+		etnaviv_obj->sgt = sgt;
+
+		/*
+		 * For non-cached buffers, ensure the new pages are clean
+		 * because display controller, GPU, etc. are not coherent.
+		 */
+		if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
+			dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
+				   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
 	}
 
 	return etnaviv_obj->pages;
