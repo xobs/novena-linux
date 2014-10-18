@@ -895,18 +895,36 @@ static irqreturn_t irq_handler(int irq, void *data)
 	u32 intr = gpu_read(gpu, VIVS_HI_INTR_ACKNOWLEDGE);
 
 	if (intr != 0) {
+		int event;
+
 		dev_dbg(gpu->dev, "intr 0x%08x\n", intr);
 
-		if (intr & VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR)
+		if (intr & VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR) {
 			dev_err(gpu->dev, "AXI bus error\n");
-		else {
-			uint8_t event = __fls(intr);
+			intr &= ~VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR;
+		}
+
+		while ((event = ffs(intr)) != 0) {
+			event -= 1;
+
+			intr &= ~(1 << event);
 
 			dev_dbg(gpu->dev, "event %u\n", event);
-			gpu->retired_fence = gpu->event[event].fence;
+			/*
+			 * Events can be processed out of order.  Eg,
+			 * - allocate and queue event 0
+			 * - allocate event 1
+			 * - event 0 completes, we process it
+			 * - allocate and queue event 0
+			 * - event 1 and event 0 complete
+			 * we can end up processing event 0 first, then 1.
+			 */
+			if (fence_after(gpu->event[event].fence, gpu->retired_fence))
+				gpu->retired_fence = gpu->event[event].fence;
 			event_free(gpu, event);
-			etnaviv_gpu_retire(gpu);
 		}
+
+		etnaviv_gpu_retire(gpu);
 
 		ret = IRQ_HANDLED;
 	}
