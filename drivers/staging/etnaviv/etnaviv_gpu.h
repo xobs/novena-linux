@@ -124,6 +124,7 @@ struct etnaviv_gpu {
 #define DRM_MSM_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_MSM_HANGCHECK_PERIOD)
 	struct timer_list hangcheck_timer;
 	uint32_t hangcheck_fence;
+	uint32_t hangcheck_dma_addr;
 	struct work_struct recover_work;
 };
 
