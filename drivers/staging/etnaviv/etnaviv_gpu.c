@@ -398,6 +398,25 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 	if (ret)
 		return ret;
 
+	if (gpu->identity.model == chipModel_GC320 &&
+	    gpu_read(gpu, VIVS_HI_CHIP_TIME) != 0x2062400 &&
+	    (gpu->identity.revision == 0x5007 ||
+	     gpu->identity.revision == 0x5220)) {
+		u32 mc_memory_debug;
+
+		mc_memory_debug = gpu_read(gpu, VIVS_MC_DEBUG_MEMORY) & ~0xff;
+
+		if (gpu->identity.revision == 0x5007)
+			mc_memory_debug |= 0x0c;
+		else
+			mc_memory_debug |= 0x08;
+
+		gpu_write(gpu, VIVS_MC_DEBUG_MEMORY, mc_memory_debug);
+	}
+
+	/* Update GPU AXI cache atttribute.  This is necessary for iMX6. */
+	gpu_write(gpu, VIVS_HI_AXI_CONFIG, 0x00002200);
+
 	/* set base addresses */
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_RA, 0x0);
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_FE, 0x0);
