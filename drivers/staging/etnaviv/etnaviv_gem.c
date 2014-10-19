@@ -405,16 +405,18 @@ dma_addr_t etnaviv_gem_paddr_locked(struct drm_gem_object *obj)
 }
 
 void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
-		struct etnaviv_gpu *gpu, bool write, uint32_t fence)
+	struct etnaviv_gpu *gpu, uint32_t access, uint32_t fence)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 
 	etnaviv_obj->gpu = gpu;
 
-	if (write)
-		etnaviv_obj->write_fence = fence;
-	else
+	if (access & ETNA_SUBMIT_BO_READ)
 		etnaviv_obj->read_fence = fence;
+	if (access & ETNA_SUBMIT_BO_WRITE)
+		etnaviv_obj->write_fence = fence;
+
+	etnaviv_obj->access |= access;
 
 	list_del_init(&etnaviv_obj->mm_list);
 	list_add_tail(&etnaviv_obj->mm_list, &gpu->active_list);
@@ -431,6 +433,7 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 	etnaviv_obj->gpu = NULL;
 	etnaviv_obj->read_fence = 0;
 	etnaviv_obj->write_fence = 0;
+	etnaviv_obj->access = 0;
 	list_del_init(&etnaviv_obj->mm_list);
 	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
 }

@@ -847,8 +847,10 @@ static void retire_worker(struct work_struct *work)
 		obj = list_first_entry(&gpu->active_list,
 				struct etnaviv_gem_object, mm_list);
 
-		if ((obj->read_fence <= fence) &&
-				(obj->write_fence <= fence)) {
+		if ((!(obj->access & ETNA_SUBMIT_BO_READ) ||
+		     fence_after_eq(fence, obj->read_fence)) &&
+		    (!(obj->access & ETNA_SUBMIT_BO_WRITE) ||
+		     fence_after_eq(fence, obj->write_fence))) {
 			/* move to inactive: */
 			etnaviv_gem_move_to_inactive(&obj->base);
 			etnaviv_gem_put_iova(&obj->base);
@@ -921,13 +923,11 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 						    &iova);
 		}
 
-		if (submit->bos[i].flags & ETNA_SUBMIT_BO_READ)
+		if (submit->bos[i].flags & (ETNA_SUBMIT_BO_READ |
+					    ETNA_SUBMIT_BO_WRITE))
 			etnaviv_gem_move_to_active(&etnaviv_obj->base, gpu,
-						   false, submit->fence);
-
-		if (submit->bos[i].flags & ETNA_SUBMIT_BO_WRITE)
-			etnaviv_gem_move_to_active(&etnaviv_obj->base, gpu,
-						   true, submit->fence);
+						   submit->bos[i].flags,
+						   submit->fence);
 	}
 	hangcheck_timer_reset(gpu);
 
