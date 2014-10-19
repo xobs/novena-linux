@@ -73,7 +73,7 @@
 			regulator-name = "lcd-display-power";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
-			startup-delay-us = <150000>;
+			startup-delay-us = <200000>;
 
 			gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 			enable-active-high;
