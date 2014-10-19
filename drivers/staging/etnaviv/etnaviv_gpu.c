@@ -254,7 +254,7 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 
 	/* Disable fast clear on GC700. */
 	if (gpu->identity.model == 0x700)
-		gpu->identity.features &= ~BIT(0);
+		gpu->identity.features &= ~chipFeatures_FAST_CLEAR;
 
 	if ((gpu->identity.model == 0x500 && gpu->identity.revision < 2) ||
 	    (gpu->identity.model == 0x300 && gpu->identity.revision < 0x2000)) {
@@ -271,7 +271,8 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 		gpu->identity.minor_features0 =
 				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_0);
 
-	if (gpu->identity.minor_features0 & BIT(21)) {
+	if (gpu->identity.minor_features0 &
+	    chipMinorFeatures0_MORE_MINOR_FEATURES) {
 		gpu->identity.minor_features1 =
 				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_1);
 		gpu->identity.minor_features2 =
