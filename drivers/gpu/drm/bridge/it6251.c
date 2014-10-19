@@ -188,7 +188,7 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 
 	/* Sometimes it seems like multiple tries are needed */
 	dev_err(&client->dev, "Trying a bunch of times to enable device\n");
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < 100; i++) {
 		vendor_id_lo = it6251_read(priv, IT6251_VENDOR_ID_LOW);
 		vendor_id_hi = it6251_read(priv, IT6251_VENDOR_ID_HIGH);
 		device_id_lo = it6251_read(priv, IT6251_DEVICE_ID_LOW);
