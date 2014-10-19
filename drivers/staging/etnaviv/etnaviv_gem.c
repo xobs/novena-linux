@@ -23,6 +23,55 @@
 #include "etnaviv_gpu.h"
 #include "etnaviv_mmu.h"
 
+static void etnaviv_gem_scatter_map(struct etnaviv_gem_object *etnaviv_obj)
+{
+	struct drm_device *dev = etnaviv_obj->base.dev;
+
+	/*
+	 * For non-cached buffers, ensure the new pages are clean
+	 * because display controller, GPU, etc. are not coherent.
+	 */
+	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED)) {
+		dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
+			   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
+	} else {
+		struct scatterlist *sg;
+		unsigned int i;
+
+		for_each_sg(sgt->sgl, sg, sgt->nents, i) {
+			sg_dma_address(sg) = sg_phys(sg);
+#ifdef CONFIG_NEED_SG_DMA_LENGTH
+			sg_dma_len(sg) = sg->length;
+#endif
+		}
+	}
+}
+
+static void etnaviv_gem_scatterlist_unmap(struct etnaviv_gem_object *etnaviv_obj)
+{
+	struct drm_device *dev = etnaviv_obj->base.dev;
+
+	/*
+	 * For non-cached buffers, ensure the new pages are clean
+	 * because display controller, GPU, etc. are not coherent:
+	 *
+	 * WARNING: The DMA API does not support concurrent CPU
+	 * and device access to the memory area.  With BIDIRECTIONAL,
+	 * we will clean the cache lines which overlap the region,
+	 * and invalidate all cache lines (partially) contained in
+	 * the region.
+	 *
+	 * If you have dirty data in the overlapping cache lines,
+	 * that will corrupt the GPU-written data.  If you have
+	 * written into the remainder of the region, this can
+	 * discard those writes.
+	 */
+	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
+		dma_unmap_sg(dev->dev, etnaviv_obj->sgt->sgl,
+			     etnaviv_obj->sgt->nents,
+			     DMA_BIDIRECTIONAL);
+}
+
 /* called with dev->struct_mutex held */
 static int etnaviv_gem_shmem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
@@ -42,27 +91,7 @@ static int etnaviv_gem_shmem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
 	if (etnaviv_obj->sgt) {
-		struct drm_device *dev = etnaviv_obj->base.dev;
-
-		/*
-		 * For non-cached buffers, ensure the new pages are clean
-		 * because display controller, GPU, etc. are not coherent:
-		 *
-		 * WARNING: The DMA API does not support concurrent CPU
-		 * and device access to the memory area.  With BIDIRECTIONAL,
-		 * we will clean the cache lines which overlap the region,
-		 * and invalidate all cache lines (partially) contained in
-		 * the region.
-		 *
-		 * If you have dirty data in the overlapping cache lines,
-		 * that will corrupt the GPU-written data.  If you have
-		 * written into the remainder of the region, this can
-		 * discard those writes.
-		 */
-		if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
-			dma_unmap_sg(dev->dev, etnaviv_obj->sgt->sgl,
-				     etnaviv_obj->sgt->nents,
-				     DMA_BIDIRECTIONAL);
+		etnaviv_gem_scatterlist_unmap(etnaviv_obj);
 		sg_free_table(etnaviv_obj->sgt);
 		kfree(etnaviv_obj->sgt);
 		etnaviv_obj->sgt = NULL;
@@ -99,13 +128,7 @@ struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 
 		etnaviv_obj->sgt = sgt;
 
-		/*
-		 * For non-cached buffers, ensure the new pages are clean
-		 * because display controller, GPU, etc. are not coherent.
-		 */
-		if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
-			dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
-				   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
+		etnaviv_gem_scatter_map(etnaviv_obj);
 	}
 
 	return etnaviv_obj->pages;
@@ -837,15 +860,7 @@ static int etnaviv_gem_userptr_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 static void etnaviv_gem_userptr_release(struct etnaviv_gem_object *etnaviv_obj)
 {
 	if (etnaviv_obj->sgt) {
-		/*
-		 * For non-cached buffers, ensure the new pages are clean
-		 * because display controller, GPU, etc. are not coherent:
-		 */
-		if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
-			dma_unmap_sg(etnaviv_obj->base.dev->dev,
-				     etnaviv_obj->sgt->sgl,
-				     etnaviv_obj->sgt->nents,
-				     DMA_BIDIRECTIONAL);
+		etnaviv_gem_scatterlist_unmap(etnaviv_obj);
 		sg_free_table(etnaviv_obj->sgt);
 		kfree(etnaviv_obj->sgt);
 	}
