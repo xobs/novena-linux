@@ -1,0 +1,8 @@
+menu "Vivante GPU support"
+
+config GALCORE 
+	tristate "Vivante GPU support"
+	---help---
+         Say Y to get the GPU driver support.
+
+endmenu

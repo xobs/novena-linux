@@ -23,7 +23,7 @@
 # Linux build file for kernel HAL driver.
 #
 
-AQROOT := $(srctree)/drivers/mxc/gpu-viv
+AQROOT := $(srctree)/drivers/gpu/galcore
 AQARCH := $(AQROOT)/arch/XAQ2
 AQVGARCH := $(AQROOT)/arch/GC350
 
@@ -229,7 +229,7 @@ ifeq ($(VIVANTE_ENABLE_VG), 1)
 EXTRA_CFLAGS += -I$(AQVGARCH)/hal/kernel
 endif
 
-obj-$(CONFIG_MXC_GPU_VIV) += galcore.o
+obj-$(CONFIG_GALCORE) += galcore.o
 
 galcore-objs  := $(OBJS)
 
