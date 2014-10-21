@@ -36,6 +36,8 @@ struct etnaviv_iommu_domain_pgtable {
 };
 
 struct etnaviv_iommu_domain {
+	void *bad_page_cpu;
+	dma_addr_t bad_page_dma;
 	struct etnaviv_iommu_domain_pgtable pgtable;
 	spinlock_t map_lock;
 };
@@ -80,16 +82,36 @@ static void pgtable_write(struct etnaviv_iommu_domain_pgtable *pgtable,
 static int etnaviv_iommu_domain_init(struct iommu_domain *domain)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain;
-	int ret;
+	uint32_t iova, *p;
+	int ret, i;
 
 	etnaviv_domain = kmalloc(sizeof(*etnaviv_domain), GFP_KERNEL);
 	if (!etnaviv_domain)
 		return -ENOMEM;
 
+	etnaviv_domain->bad_page_cpu = dma_alloc_coherent(NULL, SZ_4K,
+						  &etnaviv_domain->bad_page_dma,
+						  GFP_KERNEL);
+	if (!etnaviv_domain->bad_page_cpu) {
+		kfree(etnaviv_domain);
+		return -ENOMEM;
+	}
+	p = etnaviv_domain->bad_page_cpu;
+	for (i = 0; i < SZ_4K / 4; i++)
+		*p++ = 0xdead55aa;
+
 	ret = pgtable_alloc(&etnaviv_domain->pgtable, PT_SIZE);
 	if (ret < 0) {
+		dma_free_coherent(NULL, SZ_4K, etnaviv_domain->bad_page_cpu,
+				  etnaviv_domain->bad_page_dma);
 		kfree(etnaviv_domain);
 		return ret;
+	}
+
+	for (iova = domain->geometry.aperture_start;
+	     iova < domain->geometry.aperture_end; iova += SZ_4K) {
+		pgtable_write(&etnaviv_domain->pgtable, iova,
+			      etnaviv_domain->bad_page_dma);
 	}
 
 	spin_lock_init(&etnaviv_domain->map_lock);
@@ -103,6 +125,8 @@ static void etnaviv_iommu_domain_destroy(struct iommu_domain *domain)
 
 	pgtable_free(&etnaviv_domain->pgtable, PT_SIZE);
 
+	dma_free_coherent(NULL, SZ_4K, etnaviv_domain->bad_page_cpu,
+			  etnaviv_domain->bad_page_dma);
 	kfree(etnaviv_domain);
 	domain->priv = NULL;
 }
@@ -131,7 +155,8 @@ static size_t etnaviv_iommu_unmap(struct iommu_domain *domain,
 		return -EINVAL;
 
 	spin_lock(&etnaviv_domain->map_lock);
-	pgtable_write(&etnaviv_domain->pgtable, iova, ~0);
+	pgtable_write(&etnaviv_domain->pgtable, iova,
+		      etnaviv_domain->bad_page_dma);
 	spin_unlock(&etnaviv_domain->map_lock);
 
 	return SZ_4K;
