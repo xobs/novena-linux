@@ -23,6 +23,7 @@
 
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
+#include <linux/lockdep.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
@@ -111,6 +112,22 @@ const char * _PLATFORM = "\n\0$PLATFORM$Linux$\n";
 #define gcdDETECT_DMA_STATE     1
 
 #define gcdUSE_NON_PAGED_MEMORY_CACHE 10
+
+/* Create a new mutex. */
+static gceSTATUS
+gckOS_CreateNamedMutex(
+    IN gckOS Os,
+    IN struct lock_class_key *key,
+    IN const char *name,
+    OUT gctPOINTER * Mutex
+    );
+
+static struct lock_class_key gckOS_key;
+static struct lock_class_key gckOS_MM_key;
+static struct lock_class_key gckOS_Signal_key;
+#if gcdANDROID_NATIVE_FENCE_SYNC
+static struct lock_class_key gckOS_SyncPoint_key;
+#endif
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -1061,8 +1078,8 @@ gckOS_Construct(
     os->heap = gcvNULL;
 
     /* Initialize the memory lock. */
-    gcmkONERROR(gckOS_CreateMutex(os, &os->memoryLock));
-    gcmkONERROR(gckOS_CreateMutex(os, &os->memoryMapLock));
+    gcmkONERROR(gckOS_CreateNamedMutex(os, &gckOS_key, "memoryLock", &os->memoryLock));
+    gcmkONERROR(gckOS_CreateNamedMutex(os, &gckOS_MM_key, "memoryMapLock", &os->memoryMapLock));
 
     /* Create debug lock mutex. */
     gcmkONERROR(gckOS_CreateMutex(os, &os->debugLock));
@@ -1078,7 +1095,7 @@ gckOS_Construct(
      */
 
     /* Initialize mutex. */
-    gcmkONERROR(gckOS_CreateMutex(os, &os->signalMutex));
+    gcmkONERROR(gckOS_CreateNamedMutex(os, &gckOS_Signal_key, "signalMutex", &os->signalMutex));
 
     /* Initialize signal id database. */
     idr_init(&os->signalDB.idr);
@@ -1089,7 +1106,7 @@ gckOS_Construct(
      */
 
     /* Initialize mutex. */
-    gcmkONERROR(gckOS_CreateMutex(os, &os->syncPointMutex));
+    gcmkONERROR(gckOS_CreateNamedMutex(os, &gckOS_SyncPoint_key, "syncPointMutex", &os->syncPointMutex));
 
     /* Initialize sync point id database lock. */
     spin_lock_init(&os->syncPointDB.lock);
@@ -3061,6 +3078,39 @@ gckOS_CreateMutex(
 
     /* Initialize the mutex. */
     mutex_init(*Mutex);
+
+    /* Return status. */
+    gcmkFOOTER_ARG("*Mutex=0x%X", *Mutex);
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return status. */
+    gcmkFOOTER();
+    return status;
+}
+
+static gceSTATUS
+gckOS_CreateNamedMutex(
+    IN gckOS Os,
+    IN struct lock_class_key *key,
+    IN const char *name,
+    OUT gctPOINTER * Mutex
+    )
+{
+    gceSTATUS status;
+
+    gcmkHEADER_ARG("Os=0x%X", Os);
+
+    /* Validate the arguments. */
+    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
+    gcmkVERIFY_ARGUMENT(Mutex != gcvNULL);
+
+    /* Allocate the mutex structure. */
+    gcmkONERROR(gckOS_Allocate(Os, gcmSIZEOF(struct mutex), Mutex));
+
+    /* Initialize the mutex. */
+    mutex_init(*Mutex);
+    lockdep_set_class_and_name((struct mutex *)Mutex, key, name);
 
     /* Return status. */
     gcmkFOOTER_ARG("*Mutex=0x%X", *Mutex);
