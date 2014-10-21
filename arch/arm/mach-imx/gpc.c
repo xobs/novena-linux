@@ -38,6 +38,7 @@ void imx_gpc_pre_suspend(bool arm_power_off)
 
 	for (i = 0; i < IMR_NUM; i++) {
 		gpc_saved_imrs[i] = readl_relaxed(reg_imr1 + i * 4);
+		pr_err("GPC: imr[%d] IRQ mask: 0x%08x\n", i, gpc_wake_irqs[i]);
 		writel_relaxed(~gpc_wake_irqs[i], reg_imr1 + i * 4);
 	}
 }

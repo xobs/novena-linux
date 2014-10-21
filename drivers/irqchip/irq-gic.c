@@ -259,6 +259,144 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
 #define gic_set_wake	NULL
 #endif
 
+#define DBG_IRQ_WAKE_LIMIT 20
+static int irqs_since_wake = DBG_IRQ_WAKE_LIMIT;
+
+static const char *irqnrstr(u32 irqnr)
+{
+	switch (irqnr) {
+		case 32: return "IOMUXC (General Purpose Register 1 from IOMUXC. Used to notify cores on exception condition while boot)";
+		case 33: return "DAP (Debug Access Port interrupt request)";
+		case 34: return "SDMA (SDMA interrupt request from all channels)";
+		case 35: return "VPU (JPEG codec interrupt request)";
+		case 36: return "SNVS (PMIC power off request)";
+		case 37: return "IPU (IPU error interrupt request)";
+		case 38: return "IPU1 (IPU1 sync interrupt request)";
+		case 39: return "IPU2 (IPU2 error interrupt request)";
+		case 40: return "IPU2 (IPU2 sync interrupt request)";
+		case 41: return "GPU3D (GPU3D interrupt request)";
+		case 42: return "R2D (GPU2D R2D GPU2D general interrupt request)";
+		case 43: return "V2D (GPU2D V2D GPU2D(OpenVG) general interrupt request)";
+		case 44: return "VPU (VPU interrupt request)";
+		case 45: return "APBH-Bridge-DMA (Logical OR of APBH-Bridge-DMA channels 0-3 completion and error interrupts)";
+		case 46: return "EIM (EIM interrupt request)";
+		case 47: return "BCH (BCH operation complete interrupt)";
+		case 48: return "GPMI (GPMI operation timeout error interrupt)";
+		case 49: return "DTCP (DTCP interrupt request)";
+		case 50: return "VDOA (Logical OR of VDOA interrupt requests)";
+		case 51: return "SNVS (SNVS consolidated interrupt)";
+		case 52: return "SNVS (SNVS security interrupt)";
+		case 53: return "CSU (CSU interrupt request 1. Indicates to the processor that one or more alarm inputs were asserted)";
+		case 54: return "uSDHC1 (uSDHC1 (Enhanced SDHC) interrupt request)";
+		case 55: return "uSDHC2 (uSDHC2 (Enhanced SDHC) interrupt request)";
+		case 56: return "uSDHC3 (uSDHC3 (Enhanced SDHC) interrupt request)";
+		case 57: return "uSDHC4 (uSDHC4 (Enhanced SDHC) interrupt request)";
+		case 58: return "UART1 (UART1 interrupt request)";
+		case 59: return "UART2 (UART2 interrupt request)";
+		case 60: return "UART3 (UART3 interrupt request)";
+		case 61: return "UART4 (UART4 interrupt request)";
+		case 62: return "UART5 (UART5 interrupt request)";
+		case 63: return "eCSPI1 (eCSPI1 interrupt request)";
+		case 64: return "eCSPI2 (eCSPI2 interrupt request)";
+		case 65: return "eCSPI3 (eCSPI3 interrupt request)";
+		case 66: return "eCSPI4 (eCSPI4 interrupt request)";
+		case 67: return "eCSPI5 (eCSPI5 interrupt request)";
+		case 68: return "I2C1 (I2C1 interrupt request)";
+		case 69: return "I2C2 (I2C2 interrupt request)";
+		case 70: return "I2C3 (I2C3 interrupt request)";
+		case 71: return "SATA (SATA interrupt request)";
+		case 72: return "USB (USB Host 1 interrupt request)";
+		case 73: return "USB (USB Host 2 interrupt request)";
+		case 74: return "USB (USB Host 3 interrupt request)";
+		case 75: return "USB (USB OTG interrupt request)";
+		case 76: return "USB_PHY (UTMI0 interrupt request)";
+		case 77: return "USB_PHY (UTMI1 interrupt request)";
+		case 78: return "SSI1 (SSI1 interrupt request)";
+		case 79: return "SSI2 (SSI2 interrupt request)";
+		case 80: return "SSI3 (SSI3 interrupt request)";
+		case 81: return "Temprature (Monitor Temperature Sensor (temp. greater than threshold) interrupt request)";
+		case 82: return "ASRC (ASRC interrupt request)";
+		case 83: return "ESAI (ESAI interrupt request)";
+		case 84: return "SPDIF (SPDIF interrupt)";
+		case 85: return "MLB150 (MLB error interrupt request)";
+		case 86: return "PMU (Brown out of 1.1, 2.5 and 3.0 analog regulators occurred)";
+		case 87: return "GPT (Logical OR of GPT rollover interrupt line, input capture 1 & 2 lines, output compare 1, 2 & 3 interrupt lines)";
+		case 88: return "EPIT1 (EPIT1 output compare interrupt)";
+		case 89: return "EPIT2 (EPIT2 output compare interrupt)";
+		case 90: return "GPIO1 (INT7 interrupt request)";
+		case 91: return "GPIO1 (INT6 interrupt request)";
+		case 92: return "GPIO1 (INT5 interrupt request)";
+		case 93: return "GPIO1 (INT4 interrupt request)";
+		case 94: return "GPIO1 (INT3 interrupt request)";
+		case 95: return "GPIO1 (INT2 interrupt request)";
+		case 96: return "GPIO1 (INT1 interrupt request)";
+		case 97: return "GPIO1 (INT0 interrupt request)";
+		case 98: return "GPIO1 (Combined interrupt indication for GPIO1 signals 0 - 15)";
+		case 99: return "GPIO1 (Combined interrupt indication for GPIO1 signals 16 - 31)";
+		case 100: return "GPIO2 (Combined interrupt indication for GPIO2 signals 0 - 15)";
+		case 101: return "GPIO2 (Combined interrupt indication for GPIO2 signals 16 - 31)";
+		case 102: return "GPIO3 (Combined interrupt indication for GPIO3 signals 0 - 15)";
+		case 103: return "GPIO3 (Combined interrupt indication for GPIO3 signals 16 - 31)";
+		case 104: return "GPIO4 (Combined interrupt indication for GPIO4 signals 0 - 15)";
+		case 105: return "GPIO4 (Combined interrupt indication for GPIO4 signals 16 - 31)";
+		case 106: return "GPIO5 (Combined interrupt indication for GPIO5 signals 0 - 15)";
+		case 107: return "GPIO5 (Combined interrupt indication for GPIO5 signals 16 - 31)";
+		case 108: return "GPIO6 (Combined interrupt indication for GPIO6 signals 0 - 15)";
+		case 109: return "GPIO6 (Combined interrupt indication for GPIO6 signals 16 - 31)";
+		case 110: return "GPIO7 (Combined interrupt indication for GPIO7 signals 0 - 15)";
+		case 111: return "GPIO7 (Combined interrupt indication for GPIO7 signals 16 - 31)";
+		case 112: return "WDOG1 (WDOG1 timer reset interrupt request)";
+		case 113: return "WDOG2 (WDOG2 timer reset interrupt request)";
+		case 114: return "KPP (Key Pad interrupt request)";
+		case 115: return "PWM1 (Cumulative interrupt line for PWM1. Logical OR of rollover, compare, and FIFO waterlevel crossing interrupts)";
+		case 116: return "PWM2 (Cumulative interrupt line for PWM2. Logical OR of rollover, compare, and FIFO waterlevel crossing interrupts)";
+		case 117: return "PWM3 (Cumulative interrupt line for PWM3. Logical OR of rollover, compare, and FIFO waterlevel crossing interrupts)";
+		case 118: return "PWM4 (Cumulative interrupt line for PWM4. Logical OR of rollover, compare, and FIFO waterlevel crossing interrupts)";
+		case 119: return "CCM (CCM interrupt request 1)";
+		case 120: return "CCM (CCM interrupt request 2)";
+		case 121: return "GPC (GPC interrupt request 1)";
+		case 122: return "NONE (Reserved)";
+		case 123: return "SRC (SRC interrupt request)";
+		case 124: return "CPU (L2 interrupt request)";
+		case 125: return "CPU (Parity Check error interrupt request)";
+		case 126: return "CPU (Performance Unit interrupt)";
+		case 127: return "CPU (CTI trigger outputs interrupt)";
+		case 128: return "SRC (Combined CPU wdog interrupts (4x) out of SRC)";
+		case 129: return "NONE (Reserved)";
+		case 130: return "NONE (Reserved)";
+		case 131: return "NONE (Reserved)";
+		case 132: return "MIPI_CSI (CSI interrupt request 1)";
+		case 133: return "MIPI_CSI (CSI interrupt request 2)";
+		case 134: return "MIPI_DSI (DSI interrupt request)";
+		case 135: return "MIPI_HSI (HSI interrupt request)";
+		case 136: return "SJC (SJC interrupt from General Purpose register)";
+		case 137: return "CAAM (CAAM job ring 0 interrupt)";
+		case 138: return "CAAM (CAAM job ring 1 interrupt)";
+		case 139: return "NONE (Reserved)";
+		case 140: return "ASC1 (ASC1 interrupt request)";
+		case 141: return "ASC2 (ASC2 interrupt request)";
+		case 142: return "FLEXCAN1 (FLEXCAN1 combined interrupt. Logical OR of ini_int_busoff, ini_int_error, ipi_int_mbor, ipi_int_rxwarning, ipi_int_txwarning (and ipi_int_wakein)";
+		case 143: return "FLEXCAN2 (FLEXCAN2 combined interrupt. Logical OR of ini_int_busoff, ini_int_error, ipi_int_mbor, ipi_int_rxwarning, ipi_int_txwarning (and ipi_int_wakein)";
+		case 144: return "NONE (Reserved)";
+		case 145: return "NONE (Reserved)";
+		case 146: return "NONE (Reserved)";
+		case 147: return "HDMI (HDMI master interrupt request)";
+		case 148: return "HDMI (HDMI CEC engine dedicated interrupt signal raised by a wake-up event)";
+		case 149: return "MLB150 (Channels [31:0] interrupt requests)";
+		case 150: return "ENET (MAC 0 IRQ)";
+		case 151: return "ENET (MAC 0 1588 Timer interrupt [synchronous] request)";
+		case 152: return "PCIe (PCIe interrupt request 1 (intd/msi_ctrl_int))";
+		case 153: return "PCIe (PCIe interrupt request 2 (intc))";
+		case 154: return "PCIe (PCIe interrupt request 3 (intb))";
+		case 155: return "PCIe (PCIe interrupt request 4 (inta))";
+		case 156: return "DCIC1 (Logical OR of DCIC1 interrupt requests)";
+		case 157: return "DCIC2 (Logical OR of DCIC2 interrupt requests)";
+		case 158: return "MLB150 (Logical OR of channel[63:32] interrupt requests)";
+		case 159: return "PMU (Brown out of core, gpu, and soc digital regulators occurred)";
+		default:  return "Unknown";
+	}
+}
+
 static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 {
 	u32 irqstat, irqnr;
@@ -268,6 +406,20 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 	do {
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
 		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+
+		if (irqs_since_wake < DBG_IRQ_WAKE_LIMIT) {
+			irqs_since_wake++;
+			if (irqnr == 1023) {
+				pr_err("Last of the interrupts\n");
+				irqs_since_wake = DBG_IRQ_WAKE_LIMIT;
+			}
+			else if (irqnr > 31) {
+				pr_err("We were probably woken up by IRQ %d (%s)\n", irqnr, irqnrstr(irqnr));
+			}
+			else {
+				pr_err("Probably not woken up by IRQ %d\n", irqnr);
+			}
+		}
 
 		if (likely(irqnr > 15 && irqnr < 1021)) {
 			irqnr = irq_find_mapping(gic->domain, irqnr);
@@ -558,6 +710,7 @@ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 		switch (cmd) {
 		case CPU_PM_ENTER:
 			gic_cpu_save(i);
+			irqs_since_wake = 0;
 			break;
 		case CPU_PM_ENTER_FAILED:
 		case CPU_PM_EXIT:
