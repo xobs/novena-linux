@@ -128,9 +128,9 @@ static ulong registerMemSizeVG = 2 << 10;
 module_param(registerMemSizeVG, ulong, 0644);
 
 #if gcdENABLE_FSCALE_VAL_ADJUST
-static ulong contiguousSize = 128 << 20;
+static ulong contiguousSize = 64 << 20;
 #else
-static ulong contiguousSize = 4 << 20;
+static ulong contiguousSize = 8 << 20;
 #endif
 module_param(contiguousSize, ulong, 0644);
 
