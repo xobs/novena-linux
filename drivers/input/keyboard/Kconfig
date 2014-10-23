@@ -556,6 +556,16 @@ config KEYBOARD_SH_KEYSC
 	  To compile this driver as a module, choose M here: the
 	  module will be called sh_keysc.
 
+config KEYBOARD_SENOKO
+	tristate "Senoko keyboard support"
+	depends on MFD_SENOKO
+	help
+	  Say Y here if you want to use certain predefined buttons on
+	  Senoko as a keyboard.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called senoko-keyboard.
+
 config KEYBOARD_STMPE
 	tristate "STMPE keypad support"
 	depends on MFD_STMPE
