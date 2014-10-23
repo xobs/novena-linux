@@ -798,6 +798,21 @@ config MFD_DB8500_PRCMU
 	  system controller running an XP70 microprocessor, which is accessed
 	  through a register map.
 
+config MFD_SENOKO
+	tristate "Kosagi Senoko battery board"
+	depends on I2C=y
+	depends on OF
+	select MFD_CORE
+	help
+	  Support for the Kosagi Senoko battery board, which acts as a
+	  GPIO port expander, power supply, and RTC.
+
+	  Currently available sub drivers are:
+
+		GPIO: senoko-gpio
+		Keypad: senoko-keypad
+		Regulator: senoko-ts
+
 config MFD_STMPE
 	bool "STMicroelectronics STMPE"
 	depends on (I2C=y || SPI_MASTER=y)
