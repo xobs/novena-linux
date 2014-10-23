@@ -100,6 +100,7 @@ struct etnaviv_gpu {
 	/* list of GEM active objects: */
 	struct list_head active_list;
 
+	uint32_t idle_mask;
 	uint32_t submitted_fence;
 	uint32_t retired_fence;
 
