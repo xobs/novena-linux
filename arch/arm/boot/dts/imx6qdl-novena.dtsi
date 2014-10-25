@@ -92,13 +92,6 @@
 			linux,code = <KEY_POWER>;
 		};
 
-		front-panel-switch {
-			label = "Front Panel";
-			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-			gpio-key,wakeup;
-			linux,code = <KEY_CONFIG>;
-		};
-
 		lid {
 			label = "Lid";
 			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>;
@@ -190,6 +183,17 @@
 		};
 	};
 
+	kpp-keys {
+	     pinctrl_kpp_novena: kppgrp-novena {
+	     	fsl,pins = <
+			/* Front panel button */
+			MX6QDL_PAD_KEY_ROW1__KEY_ROW1 0x1b0b1
+			/* fake column driver, it's not connected to anything; OK because it's a 1x1 keypad */
+			MX6QDL_PAD_KEY_COL1__KEY_COL1 0x1b0b1
+		>;
+		};
+	};	
+		
 	backlight {
 		pinctrl_backlight_novena: backlightgrp-novena {
 			fsl,pins = <
@@ -244,9 +248,6 @@
 
 				/* PCIe Wakeup */
 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x1f0e0
-
-				/* Front panel button */
-				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
 
 				/* Lid switch */
 				MX6QDL_PAD_KEY_COL3__GPIO4_IO12 0x1b0b0
@@ -803,6 +804,18 @@
 					  0x00000200 0x02040400 0x00000000>;
 		kosagi,weim-cs-mapping = <2>;
 	};
+};
+
+
+/* KEY_ROW1 is the actual input we want to monitor. but use KEY_COL1 (dummy column) to configure kpp */
+&kpp  {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_kpp_novena>;
+		linux,keymap = <
+		     MATRIX_KEY(1, 1, KEY_CONFIG)  /* just one key! */
+	>;
+	status = "okay";
+	wakeup;
 };
 
 &pcie {
