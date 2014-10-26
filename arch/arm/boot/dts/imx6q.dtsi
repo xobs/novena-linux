@@ -217,6 +217,28 @@
 				};
 			};
 		};
+		gpu-subsystem {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "vivante,gccore";
+			ranges;
+
+			gpu2d@00134000 {
+				compatible	= "vivante,vivante-gpu-2d";
+				reg		= <0x00134000 0x4000>;
+				clock-names	= "core", "bus";
+				clocks		= <&clks 121>, <&clks 26>;
+				interrupts	= <0 10 0x04>;
+			};
+
+			gpu3d@00130000 {
+				compatible	= "vivante,vivante-gpu-3d";
+				reg		= <0x00130000 0x4000>;
+				clock-names	= "core", "shader", "bus";
+				clocks		= <&clks 122>, <&clks 74>, <&clks 27>;
+				interrupts	= <0 9 0x04>;
+		       } ;
+		};
 	};
 
 	display-subsystem {
