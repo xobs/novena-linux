@@ -304,6 +304,15 @@ config GPIO_SCH311X
 	  To compile this driver as a module, choose M here: the module will
 	  be called gpio-sch311x.
 
+config GPIO_SENOKO
+	tristate "Kosagi Senoko power board over I2C"
+	depends on I2C && OF_GPIO
+	select GENERIC_IRQ_CHIP
+	select GPIOLIB_IRQCHIP
+	help
+	  Say yes here to support the Kosagi Senoko power board over I2C,
+	  which will allow you to use its spare pins as GPIOs.
+
 config GPIO_SPEAR_SPICS
 	bool "ST SPEAr13xx SPI Chip Select as GPIO support"
 	depends on PLAT_SPEAR
