@@ -523,6 +523,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	/* Audio-related clocks configuration */
 	clk_set_parent(clk[IMX6QDL_CLK_SPDIF_SEL], clk[IMX6QDL_CLK_PLL3_PFD3_454M]);
 
+	/* Set the GPU to be parented by PLL3_USB_OTG */
+	clk_set_parent(clk[IMX6QDL_CLK_GPU2D_CORE_SEL], clk[IMX6QDL_CLK_PLL3_USB_OTG]);
+
 	/* All existing boards with PCIe use LVDS1 */
 	if (IS_ENABLED(CONFIG_PCI_IMX6))
 		clk_set_parent(clk[IMX6QDL_CLK_LVDS1_SEL], clk[IMX6QDL_CLK_SATA_REF_100M]);
@@ -531,3 +534,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	imx6q_set_lpm(WAIT_CLOCKED);
 }
 CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
+
+void v7_dma_flush_range(uint32_t start, uint32_t end);
+void v7_dma_map_area(uint32_t start, uint32_t size, uint32_t dir);
+EXPORT_SYMBOL(v7_dma_flush_range);
+EXPORT_SYMBOL(v7_dma_map_area);
