@@ -1054,6 +1054,8 @@ static int drv_init(struct device *pdev)
         device->baseAddress = 0;
     }
 
+    gckHARDWARE_SetFscaleValue(device->kernels[gcvCORE_2D]->hardware, 36);
+
 #ifdef CONFIG_ANDROID_RESERVED_MEMORY_ACCOUNT
     task_free_register(&task_nb);
     viv_gpu_resmem_handler.data = device->kernels[gcvCORE_MAJOR];
