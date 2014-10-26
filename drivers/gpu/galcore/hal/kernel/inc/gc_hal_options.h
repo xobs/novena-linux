@@ -406,7 +406,7 @@
         otherwise GPU will enter gcvPOWER_IDLE.
 */
 #ifndef gcdPOWER_SUSNPEND_WHEN_IDLE
-#   define gcdPOWER_SUSNPEND_WHEN_IDLE          1
+#   define gcdPOWER_SUSNPEND_WHEN_IDLE          0
 #endif
 
 /*
