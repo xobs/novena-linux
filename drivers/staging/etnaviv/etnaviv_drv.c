@@ -188,23 +188,6 @@ static void etnaviv_preclose(struct drm_device *dev, struct drm_file *file)
  */
 
 #ifdef CONFIG_DEBUG_FS
-static int etnaviv_gpu_show(struct drm_device *dev, struct seq_file *m)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-	struct etnaviv_gpu *gpu;
-	unsigned int i;
-
-	for (i = 0; i < ETNA_MAX_PIPES; i++) {
-		gpu = priv->gpu[i];
-		if (gpu) {
-			seq_printf(m, "%s Status:\n", dev_name(gpu->dev));
-			etnaviv_gpu_debugfs(gpu, m);
-		}
-	}
-
-	return 0;
-}
-
 static int etnaviv_gem_show(struct drm_device *dev, struct seq_file *m)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
@@ -267,8 +250,32 @@ static int show_locked(struct seq_file *m, void *arg)
 	return ret;
 }
 
+static int show_each_gpu(struct seq_file *m, void *arg)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct etnaviv_drm_private *priv = dev->dev_private;
+	struct etnaviv_gpu *gpu;
+	int (*show)(struct etnaviv_gpu *gpu, struct seq_file *m) =
+			node->info_ent->data;
+	unsigned int i;
+	int ret = 0;
+
+	for (i = 0; i < ETNA_MAX_PIPES; i++) {
+		gpu = priv->gpu[i];
+		if (!gpu)
+			continue;
+
+		ret = show(gpu, m);
+		if (ret < 0)
+			break;
+	}
+
+	return ret;
+}
+
 static struct drm_info_list etnaviv_debugfs_list[] = {
-		{"gpu", show_locked, 0, etnaviv_gpu_show},
+		{"gpu", show_each_gpu, 0, etnaviv_gpu_debugfs},
 		{"gem", show_locked, 0, etnaviv_gem_show},
 		{ "mm", show_locked, 0, etnaviv_mm_show },
 		{"mmu", show_locked, 0, etnaviv_mmu_show},
