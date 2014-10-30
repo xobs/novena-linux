@@ -645,40 +645,6 @@ static int disable_axi(struct etnaviv_gpu *gpu)
 	return 0;
 }
 
-int etnaviv_gpu_pm_resume(struct etnaviv_gpu *gpu)
-{
-	int ret;
-
-	DBG("%s", dev_name(gpu->dev));
-
-	ret = enable_clk(gpu);
-	if (ret)
-		return ret;
-
-	ret = enable_axi(gpu);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-int etnaviv_gpu_pm_suspend(struct etnaviv_gpu *gpu)
-{
-	int ret;
-
-	DBG("%s", dev_name(gpu->dev));
-
-	ret = disable_axi(gpu);
-	if (ret)
-		return ret;
-
-	ret = disable_clk(gpu);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
 /*
  * Hangcheck detection for locked gpu:
  */
@@ -947,6 +913,38 @@ static irqreturn_t irq_handler(int irq, void *data)
 	return ret;
 }
 
+static int etnaviv_gpu_clk_enable(struct etnaviv_gpu *gpu)
+{
+	int ret;
+
+	ret = enable_clk(gpu);
+	if (ret)
+		return ret;
+
+	ret = enable_axi(gpu);
+	if (ret) {
+		disable_clk(gpu);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int etnaviv_gpu_clk_disable(struct etnaviv_gpu *gpu)
+{
+	int ret;
+
+	ret = disable_axi(gpu);
+	if (ret)
+		return ret;
+
+	ret = disable_clk(gpu);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	void *data)
 {
@@ -954,6 +952,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	struct etnaviv_drm_private *priv = drm->dev_private;
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 	int idx = gpu->pipe;
+	int ret;
 
 	dev_info(dev, "pre gpu[idx]: %p\n", priv->gpu[idx]);
 
@@ -966,6 +965,10 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	}
 
 	dev_info(dev, "post gpu[idx]: %p\n", priv->gpu[idx]);
+
+	ret = etnaviv_gpu_clk_enable(gpu);
+	if (ret < 0)
+		return ret;
 
 	gpu->drm = drm;
 
@@ -990,6 +993,8 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 	hangcheck_disable(gpu);
 
 	WARN_ON(!list_empty(&gpu->active_list));
+
+	etnaviv_gpu_clk_disable(gpu);
 
 	if (gpu->buffer) {
 		drm_gem_object_unreference_unlocked(gpu->buffer);
