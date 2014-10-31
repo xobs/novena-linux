@@ -991,11 +991,17 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 
 	WARN_ON(!list_empty(&gpu->active_list));
 
-	if (gpu->buffer)
+	if (gpu->buffer) {
 		drm_gem_object_unreference_unlocked(gpu->buffer);
+		gpu->buffer = NULL;
+	}
 
-	if (gpu->mmu)
+	if (gpu->mmu) {
 		etnaviv_iommu_destroy(gpu->mmu);
+		gpu->mmu = NULL;
+	}
+
+	gpu->drm = NULL;
 }
 
 static const struct component_ops gpu_ops = {
