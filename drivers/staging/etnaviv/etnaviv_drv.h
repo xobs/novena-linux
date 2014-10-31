@@ -112,6 +112,7 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 	uintptr_t ptr, uint32_t size, uint32_t flags, uint32_t *handle);
 u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
+void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
