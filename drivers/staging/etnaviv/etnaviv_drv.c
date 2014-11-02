@@ -69,7 +69,7 @@ void __iomem *etnaviv_ioremap(struct platform_device *pdev, const char *name,
 void etnaviv_writel(u32 data, void __iomem *addr)
 {
 	if (reglog)
-		printk(KERN_DEBUG "IO:W %08x %08x\n", (u32)addr, data);
+		printk(KERN_DEBUG "IO:W %p %08x\n", addr, data);
 	writel(data, addr);
 }
 
@@ -77,7 +77,7 @@ u32 etnaviv_readl(const void __iomem *addr)
 {
 	u32 val = readl(addr);
 	if (reglog)
-		printk(KERN_ERR "IO:R %08x %08x\n", (u32)addr, val);
+		printk(KERN_DEBUG "IO:R %p %08x\n", addr, val);
 	return val;
 }
 
