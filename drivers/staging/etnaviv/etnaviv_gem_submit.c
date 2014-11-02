@@ -380,7 +380,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		 */
 		max_size = etnaviv_obj->base.size - 8;
 
-		if ((submit_cmd.size + submit_cmd.submit_offset) > max_size) {
+		if (submit_cmd.size > max_size ||
+		    submit_cmd.submit_offset > max_size - submit_cmd.size) {
 			DRM_ERROR("invalid cmdstream size: %u\n", submit_cmd.size);
 			ret = -EINVAL;
 			goto out;
