@@ -526,19 +526,20 @@ static int etnaviv_compare(struct device *dev, void *data)
 
 static int etnaviv_add_components(struct device *master, struct master *m)
 {
-	struct device_node *np	= master->of_node;
 	struct device_node *child_np;
+	int ret = 0;
 
-	child_np = of_get_next_available_child(np, NULL);
-
-	while (child_np) {
+	for_each_available_child_of_node(master->of_node, child_np) {
 		DRM_INFO("add child %s\n", child_np->name);
-		component_master_add_child(m, etnaviv_compare, child_np);
-		of_node_put(child_np);
-		child_np = of_get_next_available_child(np, child_np);
+
+		ret = component_master_add_child(m, etnaviv_compare, child_np);
+		if (ret) {
+			of_node_put(child_np);
+			break;
+		}
 	}
 
-	return 0;
+	return ret;
 }
 
 static int etnaviv_bind(struct device *dev)
