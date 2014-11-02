@@ -57,6 +57,7 @@ fail:
 
 	for_each_sg(sgt->sgl, sg, i, j) {
 		size_t bytes = sg->length + sg->offset;
+
 		iommu_unmap(domain, da, bytes);
 		da += bytes;
 	}
@@ -95,7 +96,8 @@ void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
 	kfree(mmu);
 }
 
-struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev, struct iommu_domain *domain)
+struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev,
+	struct iommu_domain *domain)
 {
 	struct etnaviv_iommu *mmu;
 

@@ -131,7 +131,7 @@ struct drm_etnaviv_gem_cpu_fini {
 struct drm_etnaviv_gem_submit_reloc {
 	uint32_t submit_offset;  /* in, offset from submit_bo */
 	uint32_t or;             /* in, value OR'd with result */
-	int32_t  shift;          /* in, amount of left shift (can be negative) */
+	int32_t  shift;          /* in, amount of left shift (can be -ve) */
 	uint32_t reloc_idx;      /* in, index of reloc_bo buffer */
 	uint64_t reloc_offset;   /* in, offset from start of reloc_bo */
 };
