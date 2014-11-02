@@ -3,6 +3,7 @@ imxdrm-objs := imx-drm-core.o
 
 obj-$(CONFIG_DRM_IMX) += imxdrm.o
 
+obj-$(CONFIG_DRM_IMX) += drm-ddc-connector.o
 obj-$(CONFIG_DRM_IMX_PARALLEL_DISPLAY) += parallel-display.o
 obj-$(CONFIG_DRM_IMX_TVE) += imx-tve.o
 obj-$(CONFIG_DRM_IMX_LDB) += imx-ldb.o
