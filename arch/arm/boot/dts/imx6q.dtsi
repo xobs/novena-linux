@@ -84,6 +84,31 @@
 			clocks = <&clks IMX6QDL_CLK_OCRAM>;
 		};
 
+		gpu_subsystem {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "vivante,gccore";
+			ranges;
+
+			gpu_2d: gpu-2d@00134000 {
+				clocks = <&clks 121>, <&clks 26>;
+				clock-names = "core", "bus";
+				compatible = "vivante,vivante-gpu-2d";
+				interrupt-parent = <&intc>;
+				interrupts = <0 10 0x04>;
+				reg = <0x00134000 0x4000>;
+			};
+
+			gpu_3d: gpu-3d@00130000 {
+				clocks = <&clks 122>, <&clks 74>, <&clks 27>;
+				clock-names = "core", "shader", "bus";
+				compatible = "vivante,vivante-gpu-3d";
+				interrupt-parent = <&intc>;
+				interrupts = <0 9 0x04>;
+				reg = <0x00130000 0x4000>;
+			};
+		};
+
 		aips-bus@02000000 { /* AIPS1 */
 			spba-bus@02000000 {
 				ecspi5: ecspi@02018000 {

@@ -62,6 +62,22 @@
 			clocks = <&clks IMX6QDL_CLK_OCRAM>;
 		};
 
+		gpu_subsystem {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "vivante,gccore";
+			ranges;
+
+			gpu_2d: gpu-2d@00134000 {
+				clocks = <&clks 121>, <&clks 26>;
+				clock-names = "core", "bus";
+				compatible = "vivante,vivante-gpu-2d";
+				interrupt-parent = <&intc>;
+				interrupts = <0 10 0x04>;
+				reg = <0x00134000 0x4000>;
+			};
+		};
+
 		aips1: aips-bus@02000000 {
 			iomuxc: iomuxc@020e0000 {
 				compatible = "fsl,imx6dl-iomuxc";
