@@ -92,6 +92,7 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 
 void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
 {
+	drm_mm_takedown(&mmu->mm);
 	iommu_domain_free(mmu->domain);
 	kfree(mmu);
 }
@@ -107,6 +108,9 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev,
 
 	mmu->domain = domain;
 	mmu->dev = dev;
+
+	drm_mm_init(&mmu->mm, 0x80000000, SZ_1G);
+
 	iommu_set_fault_handler(domain, etnaviv_fault_handler, dev);
 
 	return mmu;

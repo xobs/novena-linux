@@ -23,6 +23,9 @@
 struct etnaviv_iommu {
 	struct drm_device *dev;
 	struct iommu_domain *domain;
+
+	/* memory manager for GPU address area */
+	struct drm_mm mm;
 	bool need_flush;
 };
 
