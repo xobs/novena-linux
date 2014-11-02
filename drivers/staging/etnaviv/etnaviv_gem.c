@@ -519,6 +519,7 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 		if (etnaviv_obj->pages)
 			drm_free_large(etnaviv_obj->pages);
 
+		drm_prime_gem_destroy(obj, etnaviv_obj->sgt);
 	} else {
 		if (etnaviv_obj->vaddr)
 			vunmap(etnaviv_obj->vaddr);
