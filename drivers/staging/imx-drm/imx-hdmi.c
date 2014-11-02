@@ -30,6 +30,7 @@
 #include <video/imx-ipu-v3.h>
 
 #include "dw-hdmi-audio.h"
+#include "dw-hdmi-cec.h"
 #include "imx-hdmi.h"
 #include "imx-drm.h"
 
@@ -117,6 +118,7 @@ struct imx_hdmi {
 	struct drm_encoder encoder;
 
 	struct platform_device *audio;
+	struct platform_device *cec;
 	enum imx_hdmi_devtype dev_type;
 	struct device *dev;
 	struct clk *isfr_clk;
@@ -126,6 +128,7 @@ struct imx_hdmi {
 	int vic;
 
 	u8 edid[HDMI_EDID_LEN];
+	u8 mc_clkdis;
 	bool cable_plugin;
 
 	bool phy_enabled;
@@ -1152,8 +1155,6 @@ static void imx_hdmi_phy_disable(struct imx_hdmi *hdmi)
 /* HDMI Initialization Step B.4 */
 static void imx_hdmi_enable_video_path(struct imx_hdmi *hdmi)
 {
-	u8 clkdis;
-
 	/* control period minimum duration */
 	hdmi_writeb(hdmi, 12, HDMI_FC_CTRLDUR);
 	hdmi_writeb(hdmi, 32, HDMI_FC_EXCTRLDUR);
@@ -1165,23 +1166,28 @@ static void imx_hdmi_enable_video_path(struct imx_hdmi *hdmi)
 	hdmi_writeb(hdmi, 0x21, HDMI_FC_CH2PREAM);
 
 	/* Enable pixel clock and tmds data path */
-	clkdis = 0x7F;
-	clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
-	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_HDCPCLK_DISABLE |
+			   HDMI_MC_CLKDIS_CSCCLK_DISABLE |
+			   HDMI_MC_CLKDIS_AUDCLK_DISABLE |
+			   HDMI_MC_CLKDIS_PREPCLK_DISABLE |
+			   HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
 
-	clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
 
 	/* Enable csc path */
 	if (is_color_space_conversion(hdmi)) {
-		clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
-		hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
+		hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
 	}
 }
 
 static void hdmi_enable_audio_clk(struct imx_hdmi *hdmi)
 {
-	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_AUDCLK_DISABLE;
+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
 }
 
 /* Workaround to clear the overflow condition */
@@ -1576,6 +1582,27 @@ static int imx_hdmi_register(struct drm_device *drm, struct imx_hdmi *hdmi)
 	return 0;
 }
 
+static void imx_hdmi_cec_enable(void *data)
+{
+	struct imx_hdmi *hdmi = data;
+
+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CECCLK_DISABLE;
+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+}
+
+static void imx_hdmi_cec_disable(void *data)
+{
+	struct imx_hdmi *hdmi = data;
+
+	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_CECCLK_DISABLE;
+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+}
+
+static const struct dw_hdmi_cec_ops imx_hdmi_cec_ops = {
+	.enable = imx_hdmi_cec_enable,
+	.disable = imx_hdmi_cec_disable,
+};
+
 static struct platform_device_id imx_hdmi_devtype[] = {
 	{
 		.name = "imx6q-hdmi",
@@ -1604,6 +1631,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	struct device_node *np = dev->of_node;
 	struct device_node *ddc_node;
 	struct dw_hdmi_audio_data audio;
+	struct dw_hdmi_cec_data cec;
 	struct imx_hdmi *hdmi;
 	struct resource *iores;
 	int ret, irq;
@@ -1615,6 +1643,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	hdmi->dev = dev;
 	hdmi->sample_rate = 48000;
 	hdmi->ratio = 100;
+	hdmi->mc_clkdis = 0x7f;
 
 	if (of_id) {
 		const struct platform_device_id *device_id = of_id->data;
@@ -1735,6 +1764,18 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	pdevinfo.dma_mask = DMA_BIT_MASK(32);
 	hdmi->audio = platform_device_register_full(&pdevinfo);
 
+	cec.base = hdmi->regs;
+	cec.irq = irq;
+	cec.ops = &imx_hdmi_cec_ops;
+	cec.ops_data = hdmi;
+
+	pdevinfo.name = "dw-hdmi-cec";
+	pdevinfo.data = &cec;
+	pdevinfo.size_data = sizeof(cec);
+	pdevinfo.dma_mask = 0;
+
+	hdmi->cec = platform_device_register_full(&pdevinfo);
+
 	dev_set_drvdata(dev, hdmi);
 
 	return 0;
@@ -1754,6 +1795,8 @@ static void imx_hdmi_unbind(struct device *dev, struct device *master,
 
 	if (!IS_ERR(hdmi->audio))
 		platform_device_unregister(hdmi->audio);
+	if (!IS_ERR(hdmi->cec))
+		platform_device_unregister(hdmi->cec);
 
 	/* Disable all interrupts */
 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
