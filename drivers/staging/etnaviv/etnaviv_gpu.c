@@ -779,8 +779,6 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu, struct etnaviv_gem_submit *submi
 		goto fail;
 	}
 
-	gpu->event[event].fence = submit->fence;
-
 	etnaviv_buffer_queue(gpu, event, submit);
 
 	priv->lastctx = ctx;
@@ -832,6 +830,7 @@ static irqreturn_t irq_handler(int irq, void *data)
 			uint8_t event = __fls(intr);
 			dev_dbg(gpu->dev->dev, "event %u\n", event);
 			gpu->retired_fence = gpu->event[event].fence;
+			gpu->last_ring_pos = gpu->event[event].ring_pos;
 			event_free(gpu, event);
 			etnaviv_gpu_retire(gpu);
 		}
