@@ -154,7 +154,7 @@ struct drm_etnaviv_gem_submit_cmd {
 	uint32_t size;           /* in, cmdstream size */
 	uint32_t pad;
 	uint32_t nr_relocs;      /* in, number of submit_reloc's */
-	uint64_t __user relocs;  /* in, ptr to array of submit_reloc's */
+	uint64_t relocs;         /* in, ptr to array of submit_reloc's */
 };
 
 /* Each buffer referenced elsewhere in the cmdstream submit (ie. the
@@ -185,8 +185,8 @@ struct drm_etnaviv_gem_submit {
 	uint32_t fence;          /* out */
 	uint32_t nr_bos;         /* in, number of submit_bo's */
 	uint32_t nr_cmds;        /* in, number of submit_cmd's */
-	uint64_t __user bos;     /* in, ptr to array of submit_bo's */
-	uint64_t __user cmds;    /* in, ptr to array of submit_cmd's */
+	uint64_t bos;            /* in, ptr to array of submit_bo's */
+	uint64_t cmds;           /* in, ptr to array of submit_cmd's */
 };
 
 /* The normal way to synchronize with the GPU is just to CPU_PREP on

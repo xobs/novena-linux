@@ -22,6 +22,7 @@
 #include <linux/bitops.h>
 
 #include "etnaviv_gpu.h"
+#include "etnaviv_iommu.h"
 #include "state_hi.xml.h"
 
 
