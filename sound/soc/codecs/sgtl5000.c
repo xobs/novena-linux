@@ -807,6 +807,10 @@ static int ldo_regulator_disable(struct regulator_dev *dev)
 	struct snd_soc_codec *codec = (struct snd_soc_codec *)ldo->codec_data;
 
 	snd_soc_update_bits(codec, SGTL5000_CHIP_ANA_POWER,
+				SGTL5000_LINREG_SIMPLE_POWERUP,
+				SGTL5000_LINREG_SIMPLE_POWERUP);
+
+	snd_soc_update_bits(codec, SGTL5000_CHIP_ANA_POWER,
 				SGTL5000_LINEREG_D_POWERUP,
 				0);
 
@@ -1158,8 +1162,11 @@ static int sgtl5000_set_power_regs(struct snd_soc_codec *codec)
 		 * if vddio and vddd > 3.1v,
 		 * charge pump should be clean before set ana_pwr
 		 */
-		snd_soc_update_bits(codec, SGTL5000_CHIP_ANA_POWER,
-				SGTL5000_VDDC_CHRGPMP_POWERUP, 0);
+// FIXME: this is total crap - we have read this register above into
+// ana_pwr, which we then modify (above), and then write back to the
+// register below.  This modification just gets completely overwritten.
+//		snd_soc_update_bits(codec, SGTL5000_CHIP_ANA_POWER,
+//				SGTL5000_VDDC_CHRGPMP_POWERUP, 0);
 
 		/* VDDC use VDDIO rail */
 		lreg_ctrl |= SGTL5000_VDDC_ASSN_OVRD;
