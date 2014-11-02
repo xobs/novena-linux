@@ -348,6 +348,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		void __user *userptr =
 			to_user_ptr(args->cmds + (i * sizeof(submit_cmd)));
 		struct etnaviv_gem_object *etnaviv_obj;
+		unsigned max_size;
 
 		ret = copy_from_user(&submit_cmd, userptr, sizeof(submit_cmd));
 		if (ret) {
@@ -373,8 +374,13 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 			goto out;
 		}
 
-		if ((submit_cmd.size + submit_cmd.submit_offset) >=
-				etnaviv_obj->base.size) {
+		/*
+		 * We must have space to add a LINK command at the end of
+		 * the command buffer.
+		 */
+		max_size = etnaviv_obj->base.size - 8;
+
+		if ((submit_cmd.size + submit_cmd.submit_offset) > max_size) {
 			DRM_ERROR("invalid cmdstream size: %u\n", submit_cmd.size);
 			ret = -EINVAL;
 			goto out;
