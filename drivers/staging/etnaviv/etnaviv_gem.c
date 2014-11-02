@@ -81,19 +81,12 @@ static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
 	}
 }
 
-struct page **etnaviv_gem_get_pages(struct drm_gem_object *obj)
+struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
-	struct drm_device *dev = obj->dev;
-	struct page **p;
-
-	mutex_lock(&dev->struct_mutex);
-	p = get_pages(to_etnaviv_bo(obj));
-	mutex_unlock(&dev->struct_mutex);
-
-	return p;
+	return get_pages(etnaviv_obj);
 }
 
-void msm_gem_put_pages(struct drm_gem_object *obj)
+void etnaviv_gem_put_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
 	/* when we start tracking the pin count, then do something here */
 }
