@@ -23,6 +23,7 @@
 struct etnaviv_iommu {
 	struct drm_device *dev;
 	struct iommu_domain *domain;
+	bool need_flush;
 };
 
 int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
