@@ -23,6 +23,13 @@
 
 struct etnaviv_gem_ops;
 
+struct etnaviv_gem_userptr {
+	uintptr_t ptr;
+	struct task_struct *task;
+	struct work_struct *work;
+	bool ro;
+};
+
 struct etnaviv_gem_object {
 	struct drm_gem_object base;
 	const struct etnaviv_gem_ops *ops;
@@ -64,6 +71,8 @@ struct etnaviv_gem_object {
 
 	/* for buffer manipulation during submit */
 	u32 offset;
+
+	struct etnaviv_gem_userptr userptr;
 };
 #define to_etnaviv_bo(x) container_of(x, struct etnaviv_gem_object, base)
 

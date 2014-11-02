@@ -202,6 +202,15 @@ struct drm_etnaviv_wait_fence {
 	struct drm_etnaviv_timespec timeout;   /* in */
 };
 
+#define ETNA_USERPTR_READ	0x01
+#define ETNA_USERPTR_WRITE	0x02
+struct drm_etnaviv_gem_userptr {
+	uint64_t user_ptr;	/* in, page aligned user pointer */
+	uint64_t user_size;	/* in, page aligned user size */
+	uint32_t flags;		/* in, flags */
+	uint32_t handle;	/* out, non-zero handle */
+};
+
 #define DRM_ETNAVIV_GET_PARAM          0x00
 /* placeholder:
 #define DRM_MSM_SET_PARAM              0x01
@@ -212,7 +221,8 @@ struct drm_etnaviv_wait_fence {
 #define DRM_ETNAVIV_GEM_CPU_FINI       0x05
 #define DRM_ETNAVIV_GEM_SUBMIT         0x06
 #define DRM_ETNAVIV_WAIT_FENCE         0x07
-#define DRM_ETNAVIV_NUM_IOCTLS         0x08
+#define DRM_ETNAVIV_GEM_USERPTR        0x08
+#define DRM_ETNAVIV_NUM_IOCTLS         0x09
 
 #define DRM_IOCTL_ETNAVIV_GET_PARAM    DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GET_PARAM, struct drm_etnaviv_param)
 #define DRM_IOCTL_ETNAVIV_GEM_NEW      DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_NEW, struct drm_etnaviv_gem_new)
@@ -221,5 +231,6 @@ struct drm_etnaviv_wait_fence {
 #define DRM_IOCTL_ETNAVIV_GEM_CPU_FINI DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_CPU_FINI, struct drm_etnaviv_gem_cpu_fini)
 #define DRM_IOCTL_ETNAVIV_GEM_SUBMIT   DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_SUBMIT, struct drm_etnaviv_gem_submit)
 #define DRM_IOCTL_ETNAVIV_WAIT_FENCE   DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_WAIT_FENCE, struct drm_etnaviv_wait_fence)
+#define DRM_IOCTL_ETNAVIV_GEM_USERPTR  DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_USERPTR, struct drm_etnaviv_gem_userptr)
 
 #endif /* __ETNAVIV_DRM_H__ */
