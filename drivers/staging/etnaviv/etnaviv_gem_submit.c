@@ -245,6 +245,7 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 
 	for (i = 0; i < nr_relocs; i++) {
 		struct drm_etnaviv_gem_submit_reloc submit_reloc;
+		struct etnaviv_gem_object *bobj;
 		void __user *userptr =
 			to_user_ptr(relocs + (i * sizeof(submit_reloc)));
 		uint32_t iova, off;
@@ -269,12 +270,19 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 			return -EINVAL;
 		}
 
-		ret = submit_bo(submit, submit_reloc.reloc_idx, NULL, &iova, &valid);
+		ret = submit_bo(submit, submit_reloc.reloc_idx, &bobj,
+				&iova, &valid);
 		if (ret)
 			return ret;
 
 		if (valid)
 			continue;
+
+		if (submit_reloc.reloc_offset >=
+		    bobj->base.size - sizeof(*ptr)) {
+			DRM_ERROR("relocation %u outside object", i);
+			return -EINVAL;
+		}
 
 		iova += submit_reloc.reloc_offset;
 
