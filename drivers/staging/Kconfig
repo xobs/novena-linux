@@ -118,4 +118,6 @@ source "drivers/staging/skein/Kconfig"
 
 source "drivers/staging/unisys/Kconfig"
 
+source "drivers/staging/etnaviv/Kconfig"
+
 endif # STAGING
