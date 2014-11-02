@@ -115,12 +115,13 @@ static void etnaviv_cmd_select_pipe(struct etnaviv_gem_object *buffer, u8 pipe)
 	CMD_LOAD_STATE(buffer, VIVS_GL_PIPE_SELECT, VIVS_GL_PIPE_SELECT_PIPE(pipe));
 }
 
-static void etnaviv_buffer_dump(struct etnaviv_gem_object *obj, u32 len)
+static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
+	struct etnaviv_gem_object *obj, u32 len)
 {
 	u32 size = obj->base.size;
 	u32 *ptr = obj->vaddr;
 
-	dev_dbg(obj->gpu->dev->dev, "virt %p phys 0x%08x free 0x%08x\n",
+	dev_info(gpu->dev->dev, "virt %p phys 0x%08x free 0x%08x\n",
 			obj->vaddr, obj->paddr, size - len * 4);
 
 	print_hex_dump(KERN_INFO, "cmd ", DUMP_PREFIX_OFFSET, 16, 4,
@@ -150,7 +151,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 	u32 back;
 	u32 i;
 
-	etnaviv_buffer_dump(buffer, 0x50);
+	etnaviv_buffer_dump(gpu, buffer, 0x50);
 
 	/* save offset back into main buffer */
 	back = buffer->offset;
@@ -180,7 +181,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 
 		/* TODO: remove later */
 		if (unlikely(drm_debug & DRM_UT_CORE))
-			etnaviv_buffer_dump(obj, obj->offset);
+			etnaviv_buffer_dump(gpu, obj, submit->cmd[i].size);
 	}
 
 	/* change ll to NOP */
@@ -197,5 +198,5 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 	*(lw)= i;
 	mb();
 
-	etnaviv_buffer_dump(buffer, 0x50);
+	etnaviv_buffer_dump(gpu, buffer, 0x50);
 }
