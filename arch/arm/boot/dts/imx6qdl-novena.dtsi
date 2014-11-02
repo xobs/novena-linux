@@ -88,7 +88,7 @@
 		user-button {
 			label = "User Button";
 			gpios = <&gpio4 14 GPIO_ACTIVE_LOW>;
-			gpio-key,wakeup;
+			/* gpio-key,wakeup; */
 			linux,code = <KEY_POWER>;
 		};
 
