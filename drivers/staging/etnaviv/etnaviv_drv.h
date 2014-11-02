@@ -38,6 +38,7 @@
 
 struct etnaviv_gpu;
 struct etnaviv_mmu;
+struct etnaviv_gem_object;
 struct etnaviv_gem_submit;
 
 struct etnaviv_file_private {
@@ -111,6 +112,8 @@ int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);
+bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
+	struct etnaviv_gem_object *obj, unsigned int offset, unsigned int size);
 
 #ifdef CONFIG_DEBUG_FS
 void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m);
