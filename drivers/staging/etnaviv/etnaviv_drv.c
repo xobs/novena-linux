@@ -303,7 +303,7 @@ int etnaviv_wait_fence_interruptable(struct drm_device *dev, uint32_t pipe,
 	if (!gpu)
 		return -ENXIO;
 
-	if (fence > gpu->submitted_fence) {
+	if (fence_after(fence, gpu->submitted_fence)) {
 		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
 				fence, gpu->submitted_fence);
 		return -EINVAL;
@@ -344,7 +344,8 @@ void etnaviv_update_fence(struct drm_device *dev, uint32_t fence)
 	struct etnaviv_drm_private *priv = dev->dev_private;
 
 	mutex_lock(&dev->struct_mutex);
-	priv->completed_fence = max(fence, priv->completed_fence);
+	if (fence_after(fence, priv->completed_fence))
+		priv->completed_fence = fence;
 	mutex_unlock(&dev->struct_mutex);
 
 	wake_up_all(&priv->fence_event);

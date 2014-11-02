@@ -646,7 +646,7 @@ static void hangcheck_handler(unsigned long data)
 	if (fence != gpu->hangcheck_fence) {
 		/* some progress has been made.. ya! */
 		gpu->hangcheck_fence = fence;
-	} else if (fence < gpu->submitted_fence) {
+	} else if (fence_after(gpu->submitted_fence, fence)) {
 		/* no progress and not done.. hung! */
 		gpu->hangcheck_fence = fence;
 		dev_err(dev->dev, "%s: hangcheck detected gpu lockup!\n",
@@ -659,7 +659,7 @@ static void hangcheck_handler(unsigned long data)
 	}
 
 	/* if still more pending work, reset the hangcheck timer: */
-	if (gpu->submitted_fence > gpu->hangcheck_fence)
+	if (fence_after(gpu->submitted_fence, gpu->hangcheck_fence))
 		hangcheck_timer_reset(gpu);
 }
 

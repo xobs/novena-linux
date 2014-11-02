@@ -126,10 +126,22 @@ u32 etnaviv_readl(const void __iomem *addr);
 #define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 #define VERB(fmt, ...) if (0) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 
+/* returns true if fence a comes after fence b */
+static inline bool fence_after(uint32_t a, uint32_t b)
+{
+	return (int32_t)(a - b) > 0;
+}
+
+static inline bool fence_after_eq(uint32_t a, uint32_t b)
+{
+	return (int32_t)(a - b) >= 0;
+}
+
 static inline bool fence_completed(struct drm_device *dev, uint32_t fence)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
-	return priv->completed_fence >= fence;
+
+	return fence_after_eq(priv->completed_fence, fence);
 }
 
 static inline int align_pitch(int width, int bpp)
