@@ -1033,6 +1033,7 @@ static int drv_init(struct device *pdev)
 
     /* Start the GAL device. */
     gcmkONERROR(gckGALDEVICE_Start(device));
+    gckHARDWARE_SetFscaleValue(device->kernels[gcvCORE_MAJOR]->hardware, 64);
 
     if ((physSize != 0)
        && (device->kernels[gcvCORE_MAJOR] != gcvNULL)
@@ -1054,7 +1055,7 @@ static int drv_init(struct device *pdev)
         device->baseAddress = 0;
     }
 
-    gckHARDWARE_SetFscaleValue(device->kernels[gcvCORE_2D]->hardware, 36);
+    gckHARDWARE_SetFscaleValue(device->kernels[gcvCORE_2D]->hardware, 40);
 
 #ifdef CONFIG_ANDROID_RESERVED_MEMORY_ACCOUNT
     task_free_register(&task_nb);
