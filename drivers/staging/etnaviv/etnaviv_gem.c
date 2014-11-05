@@ -317,7 +317,8 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 		if (IS_ERR(pages))
 			return PTR_ERR(pages);
 
-		ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj);
+		ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj,
+				gpu->memory_base);
 	}
 
 	if (!ret)

@@ -106,14 +106,19 @@ static void cmd_select_pipe(struct etnaviv_gem_object *buffer, u8 pipe)
 		       VIVS_GL_PIPE_SELECT_PIPE(pipe));
 }
 
+static u32 gpu_va(struct etnaviv_gpu *gpu, struct etnaviv_gem_object *obj)
+{
+	return obj->paddr - gpu->memory_base;
+}
+
 static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *obj, u32 off, u32 len)
 {
 	u32 size = obj->base.size;
 	u32 *ptr = obj->vaddr + off;
 
-	dev_info(gpu->dev, "virt %p phys 0x%llx free 0x%08x\n",
-			ptr, (u64)obj->paddr + off, size - len * 4 - off);
+	dev_info(gpu->dev, "virt %p phys 0x%08x free 0x%08x\n",
+			ptr, gpu_va(gpu, obj) + off, size - len * 4 - off);
 
 	print_hex_dump(KERN_INFO, "cmd ", DUMP_PREFIX_OFFSET, 16, 4,
 			ptr, len * 4, 0);
@@ -130,7 +135,7 @@ u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 	cmd_select_pipe(buffer, gpu->pipe);
 
 	CMD_WAIT(buffer);
-	CMD_LINK(buffer, 2, buffer->paddr + ((buffer->offset - 1) * 4));
+	CMD_LINK(buffer, 2, gpu_va(gpu, buffer) + ((buffer->offset - 1) * 4));
 
 	return buffer->offset;
 }
@@ -177,7 +182,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 
 	/* save offset back into main buffer */
 	back = buffer->offset + reserve_size - 6;
-	link_target = buffer->paddr + buffer->offset * 4;
+	link_target = gpu_va(gpu, buffer) + buffer->offset * 4;
 	link_size = 6;
 
 	if (gpu->mmu->need_flush) {
@@ -192,9 +197,9 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		cmd->offset = submit->cmd[i].offset + submit->cmd[i].size;
 
 		if (drm_debug & DRM_UT_DRIVER)
-			pr_info("stream link from buffer %u to 0x%llx @ 0x%llx %p\n",
-				i, (u64)link_target,
-				(u64)cmd->paddr + cmd->offset * 4,
+			pr_info("stream link from buffer %u to 0x%08x @ 0x%08x %p\n",
+				i, link_target,
+				gpu_va(gpu, cmd) + cmd->offset * 4,
 				cmd->vaddr + cmd->offset * 4);
 
 		/* jump back from last cmd to main buffer */
@@ -203,7 +208,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		/* update the size */
 		submit->cmd[i].size = cmd->offset - submit->cmd[i].offset;
 
-		link_target = cmd->paddr + submit->cmd[i].offset * 4;
+		link_target = gpu_va(gpu, cmd) + submit->cmd[i].offset * 4;
 		link_size = submit->cmd[i].size * 2;
 	}
 
@@ -217,13 +222,13 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 
 		pr_info("link op: %p\n", lw);
 		pr_info("link addr: %p\n", lw + 1);
-		pr_info("addr: 0x%llx\n", (u64)link_target);
-		pr_info("back: 0x%llx\n", (u64)buffer->paddr + (back * 4));
+		pr_info("addr: 0x%08x\n", link_target);
+		pr_info("back: 0x%08x\n", gpu_va(gpu, buffer) + (back * 4));
 		pr_info("event: %d\n", event);
 	}
 
 	if (gpu->mmu->need_flush) {
-		uint32_t new_target = buffer->paddr + buffer->offset *
+		uint32_t new_target = gpu_va(gpu, buffer) + buffer->offset *
 					sizeof(uint32_t);
 
 		/* Add the MMU flush */
@@ -247,7 +252,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 
 	/* append WAIT/LINK to main buffer */
 	CMD_WAIT(buffer);
-	CMD_LINK(buffer, 2, buffer->paddr + ((buffer->offset - 1) * 4));
+	CMD_LINK(buffer, 2, gpu_va(gpu, buffer) + ((buffer->offset - 1) * 4));
 
 	/* Change WAIT into a LINK command; write the address first. */
 	*(lw + 1) = link_target;

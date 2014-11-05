@@ -92,6 +92,9 @@ struct etnaviv_gpu {
 	/* 'ring'-buffer: */
 	struct drm_gem_object *buffer;
 
+	/* bus base address of memory  */
+	uint32_t memory_base;
+
 	/* event management: */
 	struct etnaviv_event event[30];
 	struct completion event_free;
