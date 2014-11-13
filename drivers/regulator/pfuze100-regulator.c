@@ -453,7 +453,8 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 	ret = pfuze_identify(pfuze_chip);
 	if (ret) {
 		dev_err(&client->dev, "unrecognized pfuze chip ID!\n");
-		return ret;
+		dev_err(&client->dev, "identify returned %d\n", ret);
+		return -EPROBE_DEFER;
 	}
 
 	/* use the right regulators after identify the right device */
