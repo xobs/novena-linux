@@ -108,7 +108,7 @@
 		heartbeat {
 			label = "novena:white:panel";
 			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-			linux,default-trigger = "phy0rx";
+			linux,default-trigger = "default-on";
 		};
 	};
 
