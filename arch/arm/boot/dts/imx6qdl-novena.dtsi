@@ -106,9 +106,9 @@
 		pinctrl-0 = <&pinctrl_leds_novena>;
 
 		heartbeat {
-			label = "novena:green:onboard";
-			gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
-			linux,default-trigger = "heartbeat";
+			label = "novena:white:panel";
+			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "phy0rx";
 		};
 	};
 
@@ -294,8 +294,7 @@
 	leds {
 		pinctrl_leds_novena: ledsgrp-novena {
 			fsl,pins = <
-				/* GPIO LED */
-				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+				MX6QDL_PAD_SD1_DAT3__GPIO1_IO21 0x80000000
 			>;
 		};
 	};
@@ -381,8 +380,8 @@
 	hog {
 		pinctrl_hog: hoggrp-novena {
 			fsl,pins = <
-				/* Power light */
-				MX6QDL_PAD_EIM_D19__EPIT1_OUT	0x80000000
+				/* Peek array power */
+				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
 			>;
 		};
 	};
