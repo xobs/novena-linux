@@ -37,7 +37,6 @@ struct it6251_bridge {
 	struct i2c_client *client;
 	struct i2c_client *lvds_client;
 	struct regulator *regulator;
-	uint16_t saved_state[0x10];
 };
 
 /* HW register definitions */
@@ -46,6 +45,14 @@ struct it6251_bridge {
 #define IT6251_VENDOR_ID_HIGH				0x01
 #define IT6251_DEVICE_ID_LOW				0x02
 #define IT6251_DEVICE_ID_HIGH				0x03
+#define IT6251_SYSTEM_STATUS				0x0d
+#define IT6251_SYSTEM_STATUS_RINTSTATUS			(1 << 0)
+#define IT6251_SYSTEM_STATUS_RHPDSTATUS			(1 << 1)
+#define IT6251_SYSTEM_STATUS_RVIDEOSTABLE		(1 << 2)
+#define IT6251_SYSTEM_STATUS_RPLL_IOLOCK		(1 << 3)
+#define IT6251_SYSTEM_STATUS_RPLL_XPLOCK		(1 << 4)
+#define IT6251_SYSTEM_STATUS_RPLL_SPLOCK		(1 << 5)
+#define IT6251_SYSTEM_STATUS_RAUXFREQ_LOCK		(1 << 6)
 
 /* HW access functions */
 
@@ -106,71 +113,105 @@ fail:
 
 static int it6251_init(struct it6251_bridge *priv)
 {
-	it6251_write(priv, 0x05, 0x00);
+	int tries;
+	int max_tries = 5;
+	int reg;
+	int ret = -EINVAL;
 
-	it6251_write(priv, 0xfd, 0xbc); // set LVDSRX address, and enable
-	it6251_write(priv, 0xfe, 0x01);
+	for (tries = 0; tries < max_tries; tries++) {
+		it6251_write(priv, 0x05, 0x00);
+		udelay(1000);
 
-	// LVDSRX
-	it6251_lvds_write(priv, 0x05, 0xff);   // reset LVDSRX
-	it6251_lvds_write(priv, 0x05, 0x00);
+		it6251_write(priv, 0xfd, 0xbc); // set LVDSRX address, and enable
+		it6251_write(priv, 0xfe, 0x01);
 
-	it6251_lvds_write(priv, 0x3b, 0x42);  // reset LVDSRX PLL
-	it6251_lvds_write(priv, 0x3b, 0x43);
+		// LVDSRX
+		/* This write always fails, because the chip goes into reset */
+		it6251_lvds_write(priv, 0x05, 0xff);   // reset LVDSRX
+		it6251_lvds_write(priv, 0x05, 0x00);
 
-	it6251_lvds_write(priv, 0x3c, 0x08);  // something with SSC PLL
-	it6251_lvds_write(priv, 0x0b, 0x88);  // don't swap links, but writing reserved registers
+		it6251_lvds_write(priv, 0x3b, 0x42);  // reset LVDSRX PLL
+		it6251_lvds_write(priv, 0x3b, 0x43);
 
-	it6251_lvds_write(priv, 0x2c, 0x01);  // JEIDA, 8-bit depth  0x11   // orig 0x42
-	it6251_lvds_write(priv, 0x32, 0x04);  // "reserved"
-	it6251_lvds_write(priv, 0x35, 0xe0);  // "reserved"
-	it6251_lvds_write(priv, 0x2b, 0x24);  // "reserved" + clock delay
+		it6251_lvds_write(priv, 0x3c, 0x08);  // something with SSC PLL
+		it6251_lvds_write(priv, 0x0b, 0x88);  // don't swap links, but writing reserved registers
 
-	it6251_lvds_write(priv, 0x05, 0x02);  // reset LVDSRX pix clock
-	it6251_lvds_write(priv, 0x05, 0x00);
+		it6251_lvds_write(priv, 0x2c, 0x01);  // JEIDA, 8-bit depth  0x11   // orig 0x42
+		it6251_lvds_write(priv, 0x32, 0x04);  // "reserved"
+		it6251_lvds_write(priv, 0x35, 0xe0);  // "reserved"
+		it6251_lvds_write(priv, 0x2b, 0x24);  // "reserved" + clock delay
 
-	// DPTX
-	it6251_write(priv, 0x16, 0x02); // set for two lane mode, normal op, no swapping, no downspread
+		it6251_lvds_write(priv, 0x05, 0x02);  // reset LVDSRX pix clock
+		it6251_lvds_write(priv, 0x05, 0x00);
 
-	it6251_write(priv, 0x23, 0x40); // some AUX channel EDID magic
+		// DPTX
+		it6251_write(priv, 0x16, 0x02); // set for two lane mode, normal op, no swapping, no downspread
 
-	it6251_write(priv, 0x5c, 0xf3); // power down lanes 3-0
+		it6251_write(priv, 0x23, 0x40); // some AUX channel EDID magic
 
-	it6251_write(priv, 0x5f, 0x06); // enable DP scrambling, change EQ CR phase
+		it6251_write(priv, 0x5c, 0xf3); // power down lanes 3-0
 
-	it6251_write(priv, 0x60, 0x02); // color mode RGB, pclk/2
-	it6251_write(priv, 0x61, 0x04); // dual pixel input mode, no EO swap, no RGB swap
-	it6251_write(priv, 0x62, 0x01); // M444B24 video format
+		it6251_write(priv, 0x5f, 0x06); // enable DP scrambling, change EQ CR phase
 
-	// vesa range / not interlace / vsync high / hsync high
-	//  00001111
-	it6251_write(priv, 0xa0, 0x0F);
+		it6251_write(priv, 0x60, 0x02); // color mode RGB, pclk/2
+		it6251_write(priv, 0x61, 0x04); // dual pixel input mode, no EO swap, no RGB swap
+		it6251_write(priv, 0x62, 0x01); // M444B24 video format
 
-	it6251_write(priv, 0xc9, 0xf5); // hpd event timer set to 1.6-ish ms
+		// vesa range / not interlace / vsync high / hsync high
+		//  00001111
+		it6251_write(priv, 0xa0, 0x0F);
 
-	it6251_write(priv, 0xca, 0x4d); // more reserved magic
-	it6251_write(priv, 0xcb, 0x37);
+		it6251_write(priv, 0xc9, 0xf5); // hpd event timer set to 1.6-ish ms
 
-	it6251_write(priv, 0xd3, 0x03); // enhanced framing mode, auto video fifo reset, video mute disable
+		it6251_write(priv, 0xca, 0x4d); // more reserved magic
+		it6251_write(priv, 0xcb, 0x37);
 
-	it6251_write(priv, 0xd4, 0x45); // "vidstmp" and some reserved stuff
+		it6251_write(priv, 0xd3, 0x03); // enhanced framing mode, auto video fifo reset, video mute disable
 
-	it6251_write(priv, 0xe7, 0xa0); // queue number -- reserved
-	it6251_write(priv, 0xe8, 0x33); // info frame packets  and reserved
-	it6251_write(priv, 0xec, 0x00); // more AVI stuff
+		it6251_write(priv, 0xd4, 0x45); // "vidstmp" and some reserved stuff
 
-	it6251_write(priv, 0x23, 0x42); // select PC master reg for aux channel?
+		it6251_write(priv, 0xe7, 0xa0); // queue number -- reserved
+		it6251_write(priv, 0xe8, 0x33); // info frame packets  and reserved
+		it6251_write(priv, 0xec, 0x00); // more AVI stuff
 
-	it6251_write(priv, 0x24, 0x00); // send PC request commands
-	it6251_write(priv, 0x25, 0x00);
-	it6251_write(priv, 0x26, 0x00);
+		it6251_write(priv, 0x23, 0x42); // select PC master reg for aux channel?
 
-	it6251_write(priv, 0x2b, 0x00); // native aux read
-	it6251_write(priv, 0x23, 0x40); // back to internal
+		it6251_write(priv, 0x24, 0x00); // send PC request commands
+		it6251_write(priv, 0x25, 0x00);
+		it6251_write(priv, 0x26, 0x00);
 
-	it6251_write(priv, 0x17, 0x01); // start link training
+		it6251_write(priv, 0x2b, 0x00); // native aux read
+		it6251_write(priv, 0x23, 0x40); // back to internal
 
-	return 0;
+		it6251_write(priv, 0x17, 0x01); // start link training
+
+		
+		int c;
+		for (c = 0; c < 100; c++) {
+			reg = it6251_read(priv, 0x17);
+			if (reg == 0xe0) {
+				reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
+				if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
+					break;
+			}
+			udelay(2000);
+		}
+
+		reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
+		dev_err(&priv->client->dev, "After %d msec, system status: 0x%02x\n", c * 2, reg);
+		if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE) {
+			ret = 0;
+			break;
+		}
+	}
+
+	if (ret)
+		dev_err(&priv->client->dev,
+			"Display didn't stabilize even after %d tries.  "
+			"This may be because the LVDS port is still "
+			"in powersave mode.\n", tries);
+
+	return ret;
 }
 
 static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv)
@@ -178,8 +219,8 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 	int vendor_id_lo, vendor_id_hi, device_id_lo, device_id_hi;
 	int ret;
 	int i;
+	int max_tries = 5;
 
-	dev_err(&client->dev, "ENabling regulator\n");
 	ret = regulator_enable(priv->regulator);
 	if (ret) {
 		dev_err(&client->dev, "Unable to enable regulator\n");
@@ -187,8 +228,7 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 	}
 
 	/* Sometimes it seems like multiple tries are needed */
-	dev_err(&client->dev, "Trying a bunch of times to enable device\n");
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < max_tries; i++) {
 		vendor_id_lo = it6251_read(priv, IT6251_VENDOR_ID_LOW);
 		vendor_id_hi = it6251_read(priv, IT6251_VENDOR_ID_HIGH);
 		device_id_lo = it6251_read(priv, IT6251_DEVICE_ID_LOW);
@@ -199,21 +239,17 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 		 && (device_id_lo != -1)
 		 && (device_id_hi != -1))
 			break;
-		usleep_range(1000, 2000);
+		usleep_range(100000, 200000);
 	}
-	dev_err(&client->dev, "Ended after %d tries\n", i);
 
 	if ((vendor_id_lo == -1) || (vendor_id_hi == -1)
 	 || (device_id_lo == -1) || (device_id_hi == -1)) {
 
 		dev_err(&client->dev, "well, we're unable to read product id, deferring\n");
 
-		dev_err(&client->dev, "DISabling regulator %s:%d\n", __FILE__, __LINE__);
 		ret = regulator_disable(priv->regulator);
 		if (ret)
 			dev_err(&client->dev, "unable to disable regulator\n");
-		else
-			dev_err(&client->dev, "sucessfully disabled regulator\n");
 
 		return -EPROBE_DEFER;
 	}
@@ -229,7 +265,6 @@ static int it6251_suspend(struct device *dev)
 	struct it6251_bridge *priv = i2c_get_clientdata(client);
 	int ret;
 
-	dev_err(&client->dev, "DISabling regulator\n");
 	ret = regulator_disable(priv->regulator);
 	if (ret) {
 		dev_err(&client->dev, "unable to enable regulator\n");
@@ -264,7 +299,7 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct it6251_bridge *priv;
 	int ret;
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
 		dev_err(&client->dev, "unable to allocate private data\n");
 		return -ENOMEM;
@@ -274,6 +309,7 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (IS_ERR(priv->regulator)) {
 		dev_err(&client->dev, "Unable to get regulator\n");
 		ret = PTR_ERR(priv->regulator);
+		priv->regulator = NULL;
 		goto err;
 	}
 
@@ -290,21 +326,28 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	priv->lvds_client = i2c_new_dummy(priv->client->adapter, 0x5e);
 	if (!priv->lvds_client) {
 		ret = -ENODEV;
-		/* XXX power down regulator here */
 		goto err;
 	}
 
 	ret = it6251_init(priv);
 	if (ret) {
 		dev_err(&client->dev, "Unable to initialize device");
-		/* XXX power down regulator here */
 		goto err;
 	}
 
 	return 0;
 
 err:
-	kfree(priv);
+	if (priv->lvds_client)
+		i2c_unregister_device(priv->lvds_client);
+
+	if (priv->regulator) {
+		int reg_ret = regulator_disable(priv->regulator);
+		if (reg_ret)
+			dev_err(&client->dev, "unable to disable regulator\n");
+	}
+
+	dev_err(&client->dev, "Returning error: %d\n", ret);
 	return ret;
 }
 
@@ -316,14 +359,12 @@ static int it6251_remove(struct i2c_client *client)
 	if (priv->lvds_client)
 		i2c_unregister_device(priv->lvds_client);
 
-	dev_err(&client->dev, "DISabling regulator\n");
 	ret = regulator_disable(priv->regulator);
 	if (ret) {
 		dev_err(&client->dev, "unable to enable regulator\n");
 		return ret;
 	}
 
-	kfree(priv);
 	return 0;
 }
 
