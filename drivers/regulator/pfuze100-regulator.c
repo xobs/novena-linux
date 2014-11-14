@@ -29,6 +29,7 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+#include <linux/delay.h>
 
 #define PFUZE_NUMREGS		128
 #define PFUZE100_VOL_OFFSET	0
@@ -450,12 +451,16 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	ret = pfuze_identify(pfuze_chip);
+	for (i = 0; i < 5 && ((ret = pfuze_identify(pfuze_chip)) != 0); i++)
+		usleep_range(1000, 5000);
+
 	if (ret) {
 		dev_err(&client->dev, "unrecognized pfuze chip ID!\n");
 		dev_err(&client->dev, "identify returned %d\n", ret);
 		return -EPROBE_DEFER;
 	}
+	else
+		dev_info(&client->dev, "identify took %d tries\n", i + 1);
 
 	/* use the right regulators after identify the right device */
 	switch (pfuze_chip->chip_id) {
