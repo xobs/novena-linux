@@ -40,6 +40,7 @@ struct it6251_bridge {
 	struct regulator *regulator;
 	struct delayed_work init_work;
 	int delay_jiffies;
+	int delay_tries;
 };
 
 /* HW register definitions */
@@ -59,7 +60,8 @@ struct it6251_bridge {
 
 #define INIT_RETRY_DELAY_START msecs_to_jiffies(1)
 #define INIT_RETRY_DELAY_MAX msecs_to_jiffies(10000)
-#define INIT_RETRY_DELAY_INC usecs_to_jiffies(10)
+#define INIT_RETRY_DELAY_INC usecs_to_jiffies(100)
+#define INIT_RETRY_MAX_TRIES 20
 
 /* HW access functions */
 
@@ -211,19 +213,25 @@ static void it6251_init(struct work_struct *work)
 	 * that the LVDS channel isn't stable yet.
 	 */
 	if (!(reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)) {
-		priv->delay_jiffies += INIT_RETRY_DELAY_INC;
-		if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
-			priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
 
 		dev_err(&priv->client->dev,
 			"Display didn't stabilize.  This may be because "
-			"the LVDS port is still in powersave mode.  "
-			"Will try again in %d msecs\n",
-			jiffies_to_msecs(priv->delay_jiffies));
-		schedule_delayed_work(&priv->init_work, priv->delay_jiffies);
+			"the LVDS port is still in powersave mode.");
+		if (priv->delay_tries++ > INIT_RETRY_MAX_TRIES) {
+			dev_err(&priv->client->dev,
+				"Too many retries, abandoning.\n");
+		}
+		else {
+			priv->delay_jiffies += INIT_RETRY_DELAY_INC;
+			if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
+				priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
+			dev_err(&priv->client->dev,
+				"Will try again in %d msecs\n",
+				jiffies_to_msecs(priv->delay_jiffies));
+			schedule_delayed_work(&priv->init_work,
+					      priv->delay_jiffies);
+		}
 	}
-	else
-		dev_err(&priv->client->dev, "IT6251 synced successfully\n");
 
 	return;
 }
@@ -303,6 +311,7 @@ static int it6251_resume(struct device *dev)
 		return ret;
 
 	priv->delay_jiffies = INIT_RETRY_DELAY_START;
+	priv->delay_tries = 0;
 	schedule_delayed_work(&priv->init_work, priv->delay_jiffies);
 	return 0;
 }
@@ -348,6 +357,7 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err;
 	}
 
+	priv->delay_tries = 0;
 	priv->delay_jiffies = INIT_RETRY_DELAY_START;
 	schedule_delayed_work(&priv->init_work, priv->delay_jiffies);
 
