@@ -367,12 +367,6 @@ err:
 	if (priv->lvds_client)
 		i2c_unregister_device(priv->lvds_client);
 
-	if (priv->regulator) {
-		int reg_ret = regulator_disable(priv->regulator);
-		if (reg_ret)
-			dev_err(&client->dev, "unable to disable regulator\n");
-	}
-
 	dev_err(&client->dev, "Returning error: %d\n", ret);
 	return ret;
 }
