@@ -29,6 +29,7 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+#include <linux/delay.h>
 
 #define PFUZE_NUMREGS		128
 #define PFUZE100_VOL_OFFSET	0
@@ -450,11 +451,16 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	ret = pfuze_identify(pfuze_chip);
+	for (i = 0; i < 5 && ((ret = pfuze_identify(pfuze_chip)) != 0); i++)
+	       usleep_range(1000, 5000);
+
 	if (ret) {
 		dev_err(&client->dev, "unrecognized pfuze chip ID!\n");
-		return ret;
+		dev_err(&client->dev, "identify returned %d\n", ret);
+		return -EPROBE_DEFER;
 	}
+	else
+		dev_info(&client->dev, "identify took %d tries\n", i + 1);
 
 	/* use the right regulators after identify the right device */
 	switch (pfuze_chip->chip_id) {
@@ -487,6 +493,7 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 		struct regulator_init_data *init_data;
 		struct regulator_desc *desc;
 		int val;
+		int tries;
 
 		desc = &pfuze_chip->regulator_descs[i].desc;
 
@@ -511,10 +518,18 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
 		config.of_node = match_of_node(i);
 		config.ena_gpio = -EINVAL;
 
-		pfuze_chip->regulators[i] =
-			devm_regulator_register(&client->dev, desc, &config);
+		for (tries = 0; tries < 5; tries++) {
+			pfuze_chip->regulators[i] =
+				devm_regulator_register(&client->dev, desc, &config);
+			if (IS_ERR(pfuze_chip->regulators[i])) {
+				dev_err(&client->dev, "register regulator %s failed\n",
+					pfuze_regulators[i].desc.name);
+			}
+			else
+				break;
+		}
 		if (IS_ERR(pfuze_chip->regulators[i])) {
-			dev_err(&client->dev, "register regulator%s failed\n",
+			dev_err(&client->dev, "register regulator %s failed too many times\n",
 				pfuze_regulators[i].desc.name);
 			return PTR_ERR(pfuze_chip->regulators[i]);
 		}
