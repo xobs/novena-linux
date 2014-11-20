@@ -565,11 +565,10 @@
 	pinctrl-0 = <&pinctrl_i2c1_novena>;
 	status = "okay";
 
-	bq20z75@0b {
+	sbs_battery: bq20z75@0b {
 		compatible = "sbs,sbs-battery";
 		reg = <0xb>;
-		sbs,i2c-retry-count = <20>;
-		sbs,poll-retry-count = <20>;
+		sbs,i2c-retry-count = <50>;
 	};
 
 	senoko: senoko@20 {
@@ -579,6 +578,7 @@
 		reg = <0x20>;
 		irq-gpio = <&gpio1 20 GPIO_ACTIVE_HIGH>;
 		irq-reset = <&gpio5 21 GPIO_ACTIVE_HIGH>;
+		supplied-to = "sbs-0-000b";
 	};
 
 	stmpe811@44 {
