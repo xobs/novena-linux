@@ -240,9 +240,13 @@ static irqreturn_t senoko_irq_handler(int irq_ignored, void *devid)
 
 	status = senoko_read(senoko, REG_IRQ_STATUS);
 	if (status < 0) {
+		/*
+		 * This happens when we reflash Senoko, so ignore
+		 * this condition.
+		 */
 		dev_dbg(senoko->dev,
 			"Error when reading IRQ status: %d\n", status);
-		return IRQ_NONE;
+		return IRQ_HANDLED;
 	}
 
 	for (irq = 0; irq < senoko->num_irqs; irq++) {
