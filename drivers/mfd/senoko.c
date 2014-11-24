@@ -153,8 +153,13 @@ struct senoko {
 	enum of_gpio_flags irq_trigger;
 	int irq;
 
+	/* IRQ Enable Register */
 	int ier;
 	int oldier;
+
+	/* IRQ Wake Register, which IRQs are active during suspend */
+	int iwr;
+
 	struct regmap *regmap;
 };
 
@@ -302,11 +307,25 @@ static void senoko_irq_unmask(struct irq_data *data)
 	senoko->ier |= mask;
 }
 
+int senoko_irq_set_wake(struct irq_data *data, unsigned int on)
+{
+	struct senoko *senoko = irq_data_get_irq_chip_data(data);
+	int offset = data->hwirq;
+	int mask = 1 << (offset % 8);
+
+	if (on)
+		senoko->iwr |= mask;
+	else
+		senoko->iwr &= ~mask;
+	return 0;
+}
+
 static struct irq_chip senoko_irq_chip = {
 	.name			= "senoko",
 	.irq_bus_lock		= senoko_irq_lock,
 	.irq_bus_sync_unlock	= senoko_irq_sync_unlock,
 	.irq_mask		= senoko_irq_mask,
+	.irq_set_wake		= senoko_irq_set_wake,
 	.irq_unmask		= senoko_irq_unmask,
 };
 
@@ -489,6 +508,30 @@ static int senoko_remove(struct i2c_client *client)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int senoko_suspend(struct device *dev)
+{
+	struct senoko *senoko = dev_get_drvdata(dev);
+
+	if (senoko->iwr)
+		enable_irq_wake(senoko->irq);
+	senoko_write(senoko, REG_IRQ_ENABLE, senoko->iwr);
+
+	return 0;
+}
+
+static int senoko_resume(struct device *dev)
+{
+	struct senoko *senoko = dev_get_drvdata(dev);
+
+	if (senoko->iwr)
+		disable_irq_wake(senoko->irq);
+	senoko_write(senoko, REG_IRQ_ENABLE, senoko->ier);
+
+	return 0;
+}
+#endif
+
 static const struct of_device_id senoko_of_match[] = {
 	{ .compatible = "kosagi,senoko", },
 	{},
@@ -502,10 +545,13 @@ static const struct i2c_device_id senoko_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, senoko_id);
 
+static SIMPLE_DEV_PM_OPS(senoko_pm_ops, senoko_suspend, senoko_resume);
+
 static struct i2c_driver senoko_driver = {
 	.driver = {
 		.name = "senoko",
 		.of_match_table = senoko_of_match,
+		.pm = &senoko_pm_ops,
 	},
 	.probe = senoko_probe,
 	.remove = senoko_remove,
