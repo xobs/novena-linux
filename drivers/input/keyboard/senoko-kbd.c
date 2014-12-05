@@ -36,6 +36,7 @@ int senoko_write(struct senoko *senoko, int offset, u8 value);
 struct senoko_keypad {
 	struct senoko *senoko;
 	struct input_dev *input;
+	int irq;
 };
 
 static irqreturn_t senoko_keypad_irq(int irq, void *dev)
@@ -67,16 +68,15 @@ static int senoko_keypad_probe(struct platform_device *pdev)
 	struct senoko_keypad *keypad;
 	struct input_dev *input;
 	int error;
-	int irq;
-
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
 
 	keypad = devm_kzalloc(&pdev->dev, sizeof(struct senoko_keypad),
 			      GFP_KERNEL);
 	if (!keypad)
 		return -ENOMEM;
+
+	keypad->irq = platform_get_irq(pdev, 0);
+	if (keypad->irq < 0)
+		return keypad->irq;
 
 	input = devm_input_allocate_device(&pdev->dev);
 	if (!input)
@@ -90,7 +90,7 @@ static int senoko_keypad_probe(struct platform_device *pdev)
 	keypad->senoko = senoko;
 	keypad->input = input;
 
-	error = devm_request_threaded_irq(&pdev->dev, irq,
+	error = devm_request_threaded_irq(&pdev->dev, keypad->irq,
 					  NULL, senoko_keypad_irq,
 					  IRQF_ONESHOT, "senoko-keypad", keypad);
 	if (error) {
@@ -105,6 +105,8 @@ static int senoko_keypad_probe(struct platform_device *pdev)
 		return error;
 	}
 
+	dev_set_drvdata(&pdev->dev, keypad);
+	device_init_wakeup(&pdev->dev, 1);
 	platform_set_drvdata(pdev, keypad);
 
 	return 0;
@@ -112,16 +114,39 @@ static int senoko_keypad_probe(struct platform_device *pdev)
 
 static int senoko_keypad_remove(struct platform_device *pdev)
 {
-//	struct senoko_keypad *keypad = platform_get_drvdata(pdev);
-//
-//	stmpe_disable(keypad->stmpe, STMPE_BLOCK_KEYPAD);
+	device_init_wakeup(&pdev->dev, 0);
 
 	return 0;
 }
 
+static int senoko_keypad_suspend(struct device *dev)
+{
+	struct senoko_keypad *keypad = dev_get_drvdata(dev);
+
+        if (device_may_wakeup(dev))
+		enable_irq_wake(keypad->irq);
+
+	return 0;
+}
+
+static int senoko_keypad_resume(struct device *dev)
+{
+	struct senoko_keypad *keypad = dev_get_drvdata(dev);
+
+        if (device_may_wakeup(dev))
+		disable_irq_wake(keypad->irq);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(senoko_keypad_pm_ops,
+			 senoko_keypad_suspend,
+			 senoko_keypad_resume);
+
 static struct platform_driver senoko_keypad_driver = {
 	.driver.name	= "senoko-keypad",
 	.driver.owner	= THIS_MODULE,
+	.driver.pm	= &senoko_keypad_pm_ops,
 	.probe		= senoko_keypad_probe,
 	.remove		= senoko_keypad_remove,
 };
