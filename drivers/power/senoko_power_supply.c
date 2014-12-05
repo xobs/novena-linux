@@ -93,11 +93,8 @@ static int senoko_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = senoko_read(senoko_supply->senoko, REG_POWER);
-		if (ret < 0) {
-			dev_err(senoko_supply->dev,
-				"Unable to read value: %d\n", ret);
+		if (ret < 0)
 			return ret;
-		}
 
 		val->intval = !!(ret & REG_POWER_AC_STATUS_MASK);
 		break;

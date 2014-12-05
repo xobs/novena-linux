@@ -456,7 +456,7 @@ static int senoko_probe(struct i2c_client *client,
 	struct senoko *senoko;
 	struct device_node *np = client->dev.of_node;
 	int ret;
-	uint8_t signature, ver_major, ver_minor, features;
+	int signature, ver_major, ver_minor, features;
 
 	senoko = devm_kzalloc(&client->dev, sizeof(*senoko), GFP_KERNEL);
 	if (senoko == NULL)
@@ -478,9 +478,21 @@ static int senoko_probe(struct i2c_client *client,
 	}
 
 	features = senoko_read(senoko, REG_FEATURES);
+	if (features < 0)
+		return -EPROBE_DEFER;
+
 	signature = senoko_read(senoko, REG_SIGNATURE);
+	if (signature < 0)
+		return -EPROBE_DEFER;
+
 	ver_major = senoko_read(senoko, REG_VERSION_MAJOR);
+	if (ver_major < 0)
+		return -EPROBE_DEFER;
+
 	ver_minor = senoko_read(senoko, REG_VERSION_MINOR);
+	if (ver_minor < 0)
+		return -EPROBE_DEFER;
+
 	dev_info(senoko->dev, "Senoko '%c' version %d.%d (features: 0x%02x)\n",
 		signature, ver_major, ver_minor, features);
 
