@@ -55,6 +55,7 @@ struct senoko_power_supply {
 	struct work_struct work;
 	struct power_supply supply;
 	int num_supplicants;
+	int irq;
 	char **supplicant_names;
 	void (*old_power_off)(void);
 };
@@ -130,18 +131,17 @@ static int senoko_power_supply_probe(struct platform_device *pdev)
 	struct senoko_power_supply *senoko_supply;
 	struct power_supply *power_supply;
 	struct device_node *np = pdev->dev.parent->of_node;
-	int irq;
 	int ret;
-
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
 
 	senoko_supply = devm_kzalloc(&pdev->dev,
 				     sizeof(*senoko_supply),
 			    	     GFP_KERNEL);
 	if (!senoko_supply)
 		return -ENOMEM;
+
+	senoko_supply->irq = platform_get_irq(pdev, 0);
+	if (senoko_supply->irq < 0)
+		return senoko_supply->irq;
 
 	senoko_supply->senoko = dev_get_drvdata(pdev->dev.parent);
 	senoko_supply->dev = &pdev->dev;
@@ -180,8 +180,9 @@ static int senoko_power_supply_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, senoko_supply);
+	dev_set_drvdata(&pdev->dev, senoko_supply);
 
-	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+	ret = devm_request_threaded_irq(&pdev->dev, senoko_supply->irq, NULL,
 					senoko_supply_changed,
 					IRQF_ONESHOT,
 					"senoko-supply", senoko_supply);
@@ -194,6 +195,7 @@ static int senoko_power_supply_probe(struct platform_device *pdev)
 	senoko_supply->old_power_off = pm_power_off;
 	power_off_supply = senoko_supply;
 	pm_power_off = senoko_supply_power_off;
+	device_init_wakeup(&pdev->dev, 0);
 
 	schedule_work(&senoko_supply->work);
 
@@ -207,9 +209,36 @@ static int senoko_power_supply_remove(struct platform_device *pdev)
 	pm_power_off = senoko_supply->old_power_off;
 	cancel_work_sync(&senoko_supply->work);
 	power_supply_unregister(&senoko_supply->supply);
+	device_init_wakeup(&pdev->dev, 0);
 
 	return 0;
 }
+
+static int senoko_power_supply_suspend(struct device *dev)
+{
+	struct senoko_power_supply *senoko_supply = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		enable_irq_wake(senoko_supply->irq);
+
+	return 0;
+}
+
+static int senoko_power_supply_resume(struct device *dev)
+{
+	struct senoko_power_supply *senoko_supply = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		disable_irq_wake(senoko_supply->irq);
+
+	schedule_work(&senoko_supply->work);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(senoko_power_supply_pm_ops,
+			 senoko_power_supply_suspend,
+			 senoko_power_supply_resume);
 
 static const struct of_device_id senoko_dt_ids[] = {
 	{ .compatible = "kosagi,senoko-power-supply" },
@@ -219,9 +248,10 @@ MODULE_DEVICE_TABLE(of, senoko_dt_ids);
 
 static struct platform_driver senoko_power_supply_driver = {
 	.driver = {
-		.name = "senoko-power-supply",
-		.owner = THIS_MODULE,
-		.of_match_table = senoko_dt_ids,
+		.name		= "senoko-power-supply",
+		.owner		= THIS_MODULE,
+		.of_match_table	= senoko_dt_ids,
+		.pm 		= &senoko_power_supply_pm_ops,
 	},
 	.probe = senoko_power_supply_probe,
 	.remove = senoko_power_supply_remove,
