@@ -161,6 +161,12 @@ struct senoko {
 	int iwr;
 
 	struct regmap *regmap;
+
+	/*
+	 * If there's an error, delay by some amount.  This prevents
+	 * overrunning the kernel log when Senoko is in reset.
+	 */
+	unsigned long timeout_backoff;
 };
 
 static struct resource senoko_gpio_resources[] = {
@@ -221,19 +227,38 @@ static const struct mfd_cell senoko_rtc_cell = {
 
 int senoko_read(struct senoko *senoko, int offset)
 {
-	unsigned int val;
+	unsigned int value;
 	int ret;
-	ret = regmap_read(senoko->regmap, offset, &val);
 
-	if (ret < 0)
+	if (senoko->timeout_backoff
+			&& !time_after(jiffies, senoko->timeout_backoff))
+		return -ETIMEDOUT;
+	senoko->timeout_backoff = 0;
+
+	ret = regmap_read(senoko->regmap, offset, &value);
+	if (ret < 0) {
+		senoko->timeout_backoff = jiffies + msecs_to_jiffies(3000);
 		return ret;
-	return val;
+	}
+
+	return value;
 }
 EXPORT_SYMBOL(senoko_read);
 
 int senoko_write(struct senoko *senoko, int offset, u8 value)
 {
-	return regmap_write(senoko->regmap, offset, value);
+	int ret;
+
+	if (senoko->timeout_backoff
+			&& !time_after(jiffies, senoko->timeout_backoff))
+		return -ETIMEDOUT;
+	senoko->timeout_backoff = 0;
+
+	ret = regmap_write(senoko->regmap, offset, value);
+	if (ret < 0)
+		senoko->timeout_backoff = jiffies + msecs_to_jiffies(3000);
+
+	return ret;
 }
 EXPORT_SYMBOL(senoko_write);
 
