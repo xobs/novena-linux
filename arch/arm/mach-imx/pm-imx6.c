@@ -292,7 +292,7 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 		val |= 0x2 << BP_CLPCR_LPM;
 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
 		val |= BM_CLPCR_VSTBY;
-		val |= BM_CLPCR_SBYOS;
+		val &= ~BM_CLPCR_SBYOS;	/* Leave clocks running -- fix resync bug */
 		if (cpu_is_imx6sl())
 			val |= BM_CLPCR_BYPASS_PMIC_READY;
 		if (cpu_is_imx6sl() || cpu_is_imx6sx())
@@ -368,7 +368,7 @@ static int imx6q_pm_enter(suspend_state_t state)
 		if (!imx6_suspend_in_ocram_fn)
 			imx6q_enable_rbc(true);
 		imx_gpc_pre_suspend(true);
-		imx_anatop_pre_suspend();
+		imx_anatop_pre_suspend(); //
 
 		/*
 		 * L2 can exit by 'reset' or Inband beacon (from remote EP)
@@ -403,7 +403,7 @@ static int imx6q_pm_enter(suspend_state_t state)
 					!IMX6Q_GPR1_PCIE_TEST_PD);
 		}
 
-		imx_anatop_post_resume();
+		imx_anatop_post_resume(); //
 		imx_gpc_post_resume();
 		imx6q_enable_rbc(false);
 		imx6q_enable_wb(false);
