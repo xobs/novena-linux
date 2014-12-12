@@ -749,9 +749,9 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_sound_novena>;
 
-		clocks = <&clks 169>;
-		assigned-clocks = <&clks 201>, <&clks 57>, <&clks 173>, <&clks 169>;
-		assigned-clock-parents = <&clks 169>, <&clks 203>, <&clks 3>, <&clks 100>;
+		clocks = <&clks IMX6QDL_CLK_CKO1>;
+		assigned-clocks = <&clks IMX6QDL_CLK_CKO>, <&clks IMX6QDL_CLK_CKO1_SEL>, <&clks IMX6QDL_CLK_PLL4_AUDIO>, <&clks IMX6QDL_CLK_CKO1>;
+		assigned-clock-parents = <&clks IMX6QDL_CLK_CKO1>, <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>, <&clks IMX6QDL_CLK_OSC>, <&clks IMX6QDL_CLK_CKO1_PODF>;
 		assigned-clock-rates = <0 0 722534400 22579200>;
 	};
 
@@ -791,7 +791,7 @@
 		pinctrl-0 = <&pinctrl_fpga_gpio>;
 		pinctrl-1 = <&pinctrl_fpga_eim>;
 		pinctrl-2 = <&pinctrl_fpga_gpio>;
-		clocks = <&clks 205>, <&clks 207>, <&clks 190>, <&clks 196>;
+		clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>, <&clks IMX6QDL_CLK_LVDS2_GATE>, <&clks IMX6QDL_CLK_ENET_REF>, <&clks IMX6QDL_CLK_EIM_SLOW>;
 		clock-names = "lvds", "lvds-switch", "lvds-parent", "eim-slow";
 		reset-switch = <&gpio1 17 GPIO_ACTIVE_HIGH>;
 		power-switch = <&gpio5 7 GPIO_ACTIVE_HIGH>;
