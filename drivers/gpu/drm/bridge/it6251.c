@@ -57,10 +57,20 @@ struct it6251_bridge {
 #define IT6251_SYSTEM_STATUS_RPLL_XPLOCK		(1 << 4)
 #define IT6251_SYSTEM_STATUS_RPLL_SPLOCK		(1 << 5)
 #define IT6251_SYSTEM_STATUS_RAUXFREQ_LOCK		(1 << 6)
+#define IT6251_REF_STATE				0x0e
+#define IT6251_REF_STATE_MAIN_LINK_DISABLED		(1 << 0)
+#define IT6251_REF_STATE_AUX_CHANNEL_READ		(1 << 1)
+#define IT6251_REF_STATE_CR_PATTERN			(1 << 2)
+#define IT6251_REF_STATE_EQ_PATTERN			(1 << 3)
+#define IT6251_REF_STATE_NORMAL_OPERATION		(1 << 4)
+#define IT6251_REF_STATE_MUTED				(1 << 5)
 
-#define INIT_RETRY_DELAY_START msecs_to_jiffies(1)
-#define INIT_RETRY_DELAY_MAX msecs_to_jiffies(10000)
-#define INIT_RETRY_DELAY_INC usecs_to_jiffies(100)
+#define IT6251_REG_PCLK_CNT_LOW				0x57
+#define IT6251_REG_PCLK_CNT_HIGH			0x58
+
+#define INIT_RETRY_DELAY_START msecs_to_jiffies(50)
+#define INIT_RETRY_DELAY_MAX msecs_to_jiffies(3000)
+#define INIT_RETRY_DELAY_INC msecs_to_jiffies(50)
 #define INIT_RETRY_MAX_TRIES 20
 
 /* HW access functions */
@@ -118,6 +128,69 @@ fail:
 	dev_err(&client->dev, "Error %d reading from subaddress 0x%x\n",
 		   ret, addr);
 	return -1;
+}
+
+static int
+it6251_lvds_read(struct it6251_bridge *priv, uint8_t addr)
+{
+	struct i2c_client *client = priv->lvds_client;
+	uint8_t val;
+	int ret;
+
+	ret = i2c_master_send(client, &addr, sizeof(addr));
+	if (ret < 0)
+		goto fail;
+
+	ret = i2c_master_recv(client, (void *)&val, sizeof(val));
+	if (ret < 0)
+		goto fail;
+
+	return val;
+
+fail:
+	dev_err(&client->dev, "Error %d reading from subaddress 0x%x\n",
+		   ret, addr);
+	return -1;
+}
+
+static int it6251_is_stable(struct it6251_bridge *priv)
+{
+	int status;
+	int clkcnt;
+	int rpclkcnt;
+	int refstate;
+
+	rpclkcnt = ((it6251_read(priv, 0x13) & 0xff)
+		| ((it6251_read(priv, 0x14) << 8) & 0x0f00));
+	dev_info(&priv->client->dev, "RPCLKCnt: %d\n", rpclkcnt);
+
+	status = it6251_read(priv, IT6251_SYSTEM_STATUS);
+	dev_info(&priv->client->dev, "System status: 0x%02x\n", status);
+
+	clkcnt = ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_LOW) & 0xff) |
+		 ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_HIGH) << 8) & 0x0f00));
+	dev_info(&priv->client->dev, "Clock: 0x%02x\n", clkcnt);
+
+	refstate = it6251_lvds_read(priv, IT6251_REF_STATE);
+	dev_info(&priv->client->dev, "Ref Link State: 0x%02x\n", refstate);
+
+//	if (rpclkcnt != 2260)
+//		return 0;
+
+	if ((refstate & 0x1f) != 0)
+		return 0;
+
+	/* If video is muted, that's a failure */
+	if (refstate & IT6251_REF_STATE_MUTED)
+		return 0;
+
+	if (!(status & IT6251_SYSTEM_STATUS_RVIDEOSTABLE))
+		return 0;
+
+	if (clkcnt != 0x193)
+		return 0;
+
+	return 1;
 }
 
 static void it6251_init(struct work_struct *work)
@@ -191,6 +264,9 @@ static void it6251_init(struct work_struct *work)
 	it6251_write(priv, 0x2b, 0x00); // native aux read
 	it6251_write(priv, 0x23, 0x40); // back to internal
 
+	it6251_write(priv, 0x19, 0xff); // voltage swing level 3
+	it6251_write(priv, 0x1a, 0xff); // pre-emphasis level 3
+
 	it6251_write(priv, 0x17, 0x01); // start link training
 
 	
@@ -203,16 +279,12 @@ static void it6251_init(struct work_struct *work)
 		}
 		udelay(2000);
 	}
-
-	reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
-	dev_err(&priv->client->dev,
-		"After %d msec, system status: 0x%02x\n", tries * 2, reg);
 	
 	/*
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
 	 */
-	if (!(reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)) {
+	if (!it6251_is_stable(priv)) {
 
 		dev_err(&priv->client->dev,
 			"Display didn't stabilize.  This may be because "
@@ -275,8 +347,6 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 
 		return -EPROBE_DEFER;
 	}
-
-	dev_err(&client->dev, "Board powered up after %d usec\n", i * 1000 + 150000);
 
 	return 0;
 }
