@@ -405,7 +405,7 @@
 		pinctrl_senoko_novena: senokogrp-novena {
 			fsl,pins = <
 				/* Senoko IRQ line */
-				MX6QDL_PAD_SD1_CLK__GPIO1_IO20 0x80000000
+				MX6QDL_PAD_SD1_CLK__GPIO1_IO20 0x13048
 
 				/* Senoko reset line */
 				MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21 0x80000000
@@ -577,7 +577,6 @@
 		compatible = "kosagi,senoko";
 		reg = <0x20>;
 		irq-gpio = <&gpio1 20 GPIO_ACTIVE_HIGH>;
-		irq-reset = <&gpio5 21 GPIO_ACTIVE_HIGH>;
 		supplied-to = "sbs-0-000b";
 	};
 
