@@ -428,7 +428,7 @@
 	};
 
 	ts {
-		pinctrl_stmpe_novena: stempgrp-novena {
+		pinctrl_stmpe_novena: stmpegrp-novena {
 			fsl,pins = <
 				/* Touchscreen interrupt */
 				MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13 0x80000000
