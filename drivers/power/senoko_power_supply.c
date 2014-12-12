@@ -59,7 +59,6 @@ struct senoko_power_supply {
 	char **supplicant_names;
 	void (*old_power_off)(void);
 };
-static struct senoko_power_supply *power_off_supply;
 
 static enum power_supply_property senoko_power_supply_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
@@ -103,24 +102,6 @@ static int senoko_get_property(struct power_supply *psy,
 	}
 
 	return 0;
-}
-
-static void senoko_supply_power_off(void)
-{
-	struct senoko_power_supply *senoko_supply = power_off_supply;
-        int err;
-
-	dev_info(senoko_supply->dev, "shutting down\n");
-
-	err = senoko_write(senoko_supply->senoko, REG_POWER,
-			   REG_POWER_STATE_OFF | REG_POWER_KEY_WRITE);
-	if (err) {
-		dev_err(senoko_supply->dev, "unable to power off: %d\n", err);
-		return;
-	}
-
-	/* Board should be off now */
-	while(1);
 }
 
 static int senoko_power_supply_probe(struct platform_device *pdev)
@@ -189,9 +170,6 @@ static int senoko_power_supply_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	senoko_supply->old_power_off = pm_power_off;
-	power_off_supply = senoko_supply;
-	pm_power_off = senoko_supply_power_off;
 	device_init_wakeup(&pdev->dev, 0);
 
 	schedule_work(&senoko_supply->work);
