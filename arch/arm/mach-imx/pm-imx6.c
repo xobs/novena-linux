@@ -291,7 +291,7 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 	case STOP_POWER_OFF:
 		val |= 0x2 << BP_CLPCR_LPM;
 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
-		val |= BM_CLPCR_VSTBY;
+		val &= ~BM_CLPCR_VSTBY; /* Don't yank PMIC_STBY, it breaks things now */
 		val &= ~BM_CLPCR_SBYOS;	/* Leave clocks running -- fix resync bug */
 		if (cpu_is_imx6sl())
 			val |= BM_CLPCR_BYPASS_PMIC_READY;
