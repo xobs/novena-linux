@@ -72,6 +72,43 @@ struct i2c_registers {
 	uint8_t wdt_seconds;		/* 0x28 */
 };
 
+struct senoko {
+	struct i2c_client *client;
+	struct device *dev;
+	struct irq_domain *domain;
+
+	/* protect serialized access to the interrupt controller bus */
+	struct mutex irq_lock;
+
+	int num_irqs;
+	int irq_gpio;
+	enum of_gpio_flags irq_trigger;
+	int irq;
+
+	/* IRQ Enable Register */
+	int ier;
+	int oldier;
+
+	/* IRQ Wake Register, which IRQs are active during suspend */
+	int iwr;
+
+	/* A list of reported features */
+	int features;
+
+	struct regmap *regmap;
+
+	/*
+	 * If there's an error, delay by some amount.  This prevents
+	 * overrunning the kernel log when Senoko is in reset.
+	 */
+	unsigned long timeout_backoff;
+
+	/* Previous pm_power_off function */
+	void (*old_power_off)(void);
+};
+
+static struct senoko *g_senoko;
+
 #define REG_SIGNATURE			0x00
 #define REG_VERSION_MAJOR		0x01
 #define REG_VERSION_MINOR		0x02
@@ -138,35 +175,6 @@ static struct regmap_config senoko_regmap_config = {
 	.max_register = REG_WATCHDOG_SECONDS,
 	.writeable_reg = senoko_regmap_is_writeable,
 	.volatile_reg = senoko_regmap_is_volatile,
-};
-
-struct senoko {
-	struct i2c_client *client;
-	struct device *dev;
-	struct irq_domain *domain;
-
-	/* protect serialized access to the interrupt controller bus */
-	struct mutex irq_lock;
-
-	int num_irqs;
-	int irq_gpio;
-	enum of_gpio_flags irq_trigger;
-	int irq;
-
-	/* IRQ Enable Register */
-	int ier;
-	int oldier;
-
-	/* IRQ Wake Register, which IRQs are active during suspend */
-	int iwr;
-
-	struct regmap *regmap;
-
-	/*
-	 * If there's an error, delay by some amount.  This prevents
-	 * overrunning the kernel log when Senoko is in reset.
-	 */
-	unsigned long timeout_backoff;
 };
 
 static struct resource senoko_gpio_resources[] = {
@@ -262,6 +270,24 @@ int senoko_write(struct senoko *senoko, int offset, u8 value)
 }
 EXPORT_SYMBOL(senoko_write);
 
+static void senoko_supply_power_off(void)
+{
+	struct senoko *senoko = g_senoko;
+	int err;
+
+	dev_info(senoko->dev, "shutting down\n");
+
+	err = senoko_write(senoko, REG_POWER,
+			   REG_POWER_STATE_OFF | REG_POWER_KEY_WRITE);
+	if (err) {
+		dev_err(senoko->dev, "unable to power off: %d\n", err);
+		return;
+	}
+
+	/* Board should be off now */
+	while(1);
+}
+
 static irqreturn_t senoko_irq_handler(int irq_ignored, void *devid)
 {
 	struct senoko *senoko = devid;
@@ -278,6 +304,9 @@ static irqreturn_t senoko_irq_handler(int irq_ignored, void *devid)
 			"Error when reading IRQ status: %d\n", status);
 		return IRQ_HANDLED;
 	}
+
+	dev_dbg(senoko->dev,
+		"IRQ status: %d\n", status);
 
 	for (irq = 0; irq < senoko->num_irqs; irq++) {
 		if (status & (1 << irq)) {
@@ -433,13 +462,15 @@ static int senoko_devices_init(struct senoko *senoko)
 	if (ret)
 		return ret;
 
-	senoko_resource_irq_update(&senoko_senoko_power_supply_cell,
-				   senoko_senoko_power_supply_irq);
-	ret = mfd_add_devices(senoko->dev, blocknum++,
-			      &senoko_senoko_power_supply_cell, 1, NULL, 0,
-			      senoko->domain);
-	if (ret)
-		return ret;
+	if (senoko->features & REG_FEATURES_BATTERY) {
+		senoko_resource_irq_update(&senoko_senoko_power_supply_cell,
+					   senoko_senoko_power_supply_irq);
+		ret = mfd_add_devices(senoko->dev, blocknum++,
+				      &senoko_senoko_power_supply_cell,
+				      1, NULL, 0, senoko->domain);
+		if (ret)
+			return ret;
+	}
 
 	senoko_resource_irq_update(&senoko_rtc_cell, senoko_rtc_irq);
 	ret = mfd_add_devices(senoko->dev, blocknum++,
@@ -456,7 +487,7 @@ static int senoko_probe(struct i2c_client *client,
 	struct senoko *senoko;
 	struct device_node *np = client->dev.of_node;
 	int ret;
-	int signature, ver_major, ver_minor, features;
+	int signature, ver_major, ver_minor;
 
 	senoko = devm_kzalloc(&client->dev, sizeof(*senoko), GFP_KERNEL);
 	if (senoko == NULL)
@@ -477,8 +508,8 @@ static int senoko_probe(struct i2c_client *client,
 		return PTR_ERR(senoko->regmap);
 	}
 
-	features = senoko_read(senoko, REG_FEATURES);
-	if (features < 0)
+	senoko->features = senoko_read(senoko, REG_FEATURES);
+	if (senoko->features < 0)
 		return -EPROBE_DEFER;
 
 	signature = senoko_read(senoko, REG_SIGNATURE);
@@ -494,7 +525,7 @@ static int senoko_probe(struct i2c_client *client,
 		return -EPROBE_DEFER;
 
 	dev_info(senoko->dev, "Senoko '%c' version %d.%d (features: 0x%02x)\n",
-		signature, ver_major, ver_minor, features);
+		signature, ver_major, ver_minor, senoko->features);
 
 	senoko->irq_gpio = of_get_named_gpio_flags(np, "irq-gpio", 0,
 						   &senoko->irq_trigger);
@@ -524,6 +555,10 @@ static int senoko_probe(struct i2c_client *client,
 	if (ret)
 		goto remove_devices;
 
+	senoko->old_power_off = pm_power_off;
+	g_senoko = senoko;
+	pm_power_off = senoko_supply_power_off;
+
 	return 0;
 
 remove_devices:
@@ -540,6 +575,7 @@ static int senoko_remove(struct i2c_client *client)
 {
 	struct senoko *senoko = i2c_get_clientdata(client);
 
+	pm_power_off = senoko->old_power_off;
 	mfd_remove_devices(senoko->dev);
 	irq_domain_remove(senoko->domain);
 	return 0;
