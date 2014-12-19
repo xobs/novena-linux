@@ -250,6 +250,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6q-gw552x.dtb \
 	imx6q-hummingboard.dtb \
 	imx6q-nitrogen6x.dtb \
+	imx6q-novena.dtb \
 	imx6q-phytec-pbab01.dtb \
 	imx6q-rex-pro.dtb \
 	imx6q-sabreauto.dtb \
