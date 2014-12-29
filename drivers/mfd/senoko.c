@@ -510,19 +510,19 @@ static int senoko_probe(struct i2c_client *client,
 
 	senoko->features = senoko_read(senoko, REG_FEATURES);
 	if (senoko->features < 0)
-		return -EPROBE_DEFER;
+		return -ENODEV;
 
 	signature = senoko_read(senoko, REG_SIGNATURE);
 	if (signature < 0)
-		return -EPROBE_DEFER;
+		return -ENODEV;
 
 	ver_major = senoko_read(senoko, REG_VERSION_MAJOR);
 	if (ver_major < 0)
-		return -EPROBE_DEFER;
+		return -ENODEV;
 
 	ver_minor = senoko_read(senoko, REG_VERSION_MINOR);
 	if (ver_minor < 0)
-		return -EPROBE_DEFER;
+		return -ENODEV;
 
 	dev_info(senoko->dev, "Senoko '%c' version %d.%d (features: 0x%02x)\n",
 		signature, ver_major, ver_minor, senoko->features);
