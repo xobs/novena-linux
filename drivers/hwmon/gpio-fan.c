@@ -34,10 +34,14 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
+#include <linux/thermal.h>
+
 
 struct gpio_fan_data {
 	struct platform_device	*pdev;
 	struct device		*hwmon_dev;
+	/* Cooling device if any */
+	struct thermal_cooling_device *cdev;
 	struct mutex		lock; /* lock GPIOs operations. */
 	int			num_ctrl;
 	unsigned		*ctrl;
@@ -386,12 +390,63 @@ static int fan_ctrl_init(struct gpio_fan_data *fan_data,
 	return 0;
 }
 
+static int gpio_fan_get_max_state(struct thermal_cooling_device *cdev,
+				  unsigned long *state)
+{
+	struct gpio_fan_data *fan_data = cdev->devdata;
+
+	if (!fan_data)
+		return -EINVAL;
+
+	*state = fan_data->num_speed - 1;
+	return 0;
+}
+
+static int gpio_fan_get_cur_state(struct thermal_cooling_device *cdev,
+				  unsigned long *state)
+{
+	struct gpio_fan_data *fan_data = cdev->devdata;
+	int r;
+
+	if (!fan_data)
+		return -EINVAL;
+
+	r = get_fan_speed_index(fan_data);
+	if (r < 0)
+		return r;
+
+	*state = r;
+	return 0;
+
+}
+
+static int gpio_fan_set_cur_state(struct thermal_cooling_device *cdev,
+				  unsigned long state)
+{
+	struct gpio_fan_data *fan_data = cdev->devdata;
+
+	if (!fan_data)
+		return -EINVAL;
+
+	set_fan_speed(fan_data, state);
+
+	return 0;
+}
+
+static const struct thermal_cooling_device_ops gpio_fan_cooling_ops = {
+	.get_max_state = gpio_fan_get_max_state,
+	.get_cur_state = gpio_fan_get_cur_state,
+	.set_cur_state = gpio_fan_set_cur_state,
+
+};
+
 #ifdef CONFIG_OF_GPIO
 /*
  * Translate OpenFirmware node properties into platform_data
  */
 static int gpio_fan_get_of_pdata(struct device *dev,
-			    struct gpio_fan_platform_data *pdata)
+			         struct gpio_fan_platform_data *pdata,
+				 struct gpio_fan_data *fan_data)
 {
 	struct device_node *node;
 	struct gpio_fan_speed *speed;
@@ -479,6 +534,12 @@ static int gpio_fan_get_of_pdata(struct device *dev,
 		pdata->alarm = alarm;
 	}
 
+	fan_data->cdev = thermal_of_cooling_device_register(node, "gpio-fan",
+							    fan_data,
+						    &gpio_fan_cooling_ops);
+	if (IS_ERR(fan_data->cdev))
+		dev_dbg(dev, "gpio-fan has no valid cooling DT property\n");
+
 	return 0;
 }
 
@@ -494,6 +555,11 @@ static int gpio_fan_probe(struct platform_device *pdev)
 	struct gpio_fan_data *fan_data;
 	struct gpio_fan_platform_data *pdata = dev_get_platdata(&pdev->dev);
 
+	fan_data = devm_kzalloc(&pdev->dev, sizeof(struct gpio_fan_data),
+				GFP_KERNEL);
+	if (!fan_data)
+		return -ENOMEM;
+
 #ifdef CONFIG_OF_GPIO
 	if (!pdata) {
 		pdata = devm_kzalloc(&pdev->dev,
@@ -502,19 +568,18 @@ static int gpio_fan_probe(struct platform_device *pdev)
 		if (!pdata)
 			return -ENOMEM;
 
-		err = gpio_fan_get_of_pdata(&pdev->dev, pdata);
+		err = gpio_fan_get_of_pdata(&pdev->dev, pdata, fan_data);
 		if (err)
 			return err;
 	}
 #else /* CONFIG_OF_GPIO */
 	if (!pdata)
 		return -EINVAL;
+	/* Optional cooling device register for non Device tree platforms */
+	fan_data->cdev = thermal_cooling_device_register("gpio-fan",
+							 fan_data,
+							 &gpio_fan_cooling_ops);
 #endif /* CONFIG_OF_GPIO */
-
-	fan_data = devm_kzalloc(&pdev->dev, sizeof(struct gpio_fan_data),
-				GFP_KERNEL);
-	if (!fan_data)
-		return -ENOMEM;
 
 	fan_data->pdev = pdev;
 	platform_set_drvdata(pdev, fan_data);
@@ -549,6 +614,27 @@ static int gpio_fan_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int gpio_fan_remove(struct platform_device *pdev)
+{
+	struct gpio_fan_data *fan_data = platform_get_drvdata(pdev);
+
+	if (!IS_ERR(fan_data->cdev))
+		thermal_cooling_device_unregister(fan_data->cdev);
+
+	return 0;
+}
+
+static void gpio_fan_shutdown(struct platform_device *pdev)
+{
+	struct gpio_fan_data *fan_data = dev_get_drvdata(&pdev->dev);
+
+	if (!IS_ERR(fan_data->cdev))
+		thermal_cooling_device_unregister(fan_data->cdev);
+
+	if (fan_data->ctrl)
+		set_fan_speed(fan_data, 0);
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int gpio_fan_suspend(struct device *dev)
 {
@@ -580,6 +666,8 @@ static SIMPLE_DEV_PM_OPS(gpio_fan_pm, gpio_fan_suspend, gpio_fan_resume);
 
 static struct platform_driver gpio_fan_driver = {
 	.probe		= gpio_fan_probe,
+	.remove		= gpio_fan_remove,
+	.shutdown	= gpio_fan_shutdown,
 	.driver	= {
 		.name	= "gpio-fan",
 		.pm	= GPIO_FAN_PM,
