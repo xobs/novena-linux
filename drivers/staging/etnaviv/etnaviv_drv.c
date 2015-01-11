@@ -618,12 +618,9 @@ static int etnaviv_pdev_probe(struct platform_device *pdev)
 
 		of_platform_populate(node, NULL, NULL, dev);
 
-		for_each_available_child_of_node(node, child_np) {
-			DRM_INFO("add child %s\n", child_np->name);
-
+		for_each_available_child_of_node(node, child_np)
 			component_match_add(dev, &match, etnaviv_compare,
 					    child_np);
-		}
 	} else if (dev->platform_data) {
 		char **names = dev->platform_data;
 		unsigned i;
