@@ -1092,17 +1092,17 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	int idx = gpu->pipe;
 	int ret;
 
-	dev_info(dev, "pre gpu[idx]: %p\n", priv->gpu[idx]);
+	dev_dbg(dev, "pre gpu[idx]: %p\n", priv->gpu[idx]);
 
 	if (priv->gpu[idx] == NULL) {
-		dev_info(dev, "adding core @idx %d\n", idx);
+		dev_dbg(dev, "adding core @idx %d\n", idx);
 		priv->gpu[idx] = gpu;
 	} else {
 		dev_err(dev, "failed to add core @idx %d\n", idx);
 		goto fail;
 	}
 
-	dev_info(dev, "post gpu[idx]: %p\n", priv->gpu[idx]);
+	dev_dbg(dev, "post gpu[idx]: %p\n", priv->gpu[idx]);
 
 #ifdef CONFIG_PM
 	ret = pm_runtime_get_sync(gpu->dev);
