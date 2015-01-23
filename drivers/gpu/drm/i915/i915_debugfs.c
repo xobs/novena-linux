@@ -158,7 +158,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 			   vma->node.start, vma->node.size);
 	}
 	if (obj->stolen)
-		seq_printf(m, " (stolen: %08lx)", obj->stolen->start);
+		seq_printf(m, " (stolen: %08llx)", obj->stolen->start);
 	if (obj->pin_mappable || obj->fault_mappable) {
 		char s[3], *t = s;
 		if (obj->pin_mappable)
