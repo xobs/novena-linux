@@ -526,7 +526,9 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 	}
 
 	/* Now program the hardware */
+	mutex_lock(&gpu->drm->struct_mutex);
 	etnaviv_gpu_hw_init(gpu);
+	mutex_unlock(&gpu->drm->struct_mutex);
 
 	pm_runtime_mark_last_busy(gpu->dev);
 	pm_runtime_put_autosuspend(gpu->dev);
