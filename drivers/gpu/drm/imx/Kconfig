@@ -53,3 +53,11 @@ config DRM_IMX_HDMI
 	depends on DRM_IMX
 	help
 	  Choose this if you want to use HDMI on i.MX6.
+
+config DRM_DW_HDMI_AUDIO
+	tristate "Synopsis Designware Audio interface"
+	depends on DRM_IMX_HDMI != n
+	help
+	  Support the Audio interface which is part of the Synopsis
+	  Designware HDMI block.  This is used in conjunction with
+	  the i.MX HDMI driver.
