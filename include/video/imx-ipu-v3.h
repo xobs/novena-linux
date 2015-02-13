@@ -28,6 +28,12 @@ enum ipuv3_type {
 
 #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
 
+#define CLK_POL_NEGEDGE		0
+#define CLK_POL_POSEDGE		1
+
+#define ENABLE_POL_LOW		0
+#define ENABLE_POL_HIGH		1
+
 /*
  * Bitfield of Display Interface signal polarities.
  */
@@ -38,7 +44,7 @@ struct ipu_di_signal_cfg {
 	unsigned clksel_en:1;
 	unsigned clkidle_en:1;
 	unsigned data_pol:1;	/* true = inverted */
-	unsigned clk_pol:1;	/* true = rising edge */
+	unsigned clk_pol:1;
 	unsigned enable_pol:1;
 	unsigned Hsync_pol:1;	/* true = active high */
 	unsigned Vsync_pol:1;
