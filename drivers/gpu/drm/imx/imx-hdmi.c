@@ -29,6 +29,7 @@
 #include <drm/drm_encoder_slave.h>
 #include <video/imx-ipu-v3.h>
 
+#include "drm-ddc-connector.h"
 #include "dw-hdmi-audio.h"
 #include "dw-hdmi-cec.h"
 #include "imx-hdmi.h"
@@ -114,7 +115,7 @@ struct hdmi_data_info {
 };
 
 struct imx_hdmi {
-	struct drm_connector connector;
+	struct drm_ddc_connector *ddc_conn;
 	struct drm_encoder encoder;
 
 	struct platform_device *audio;
@@ -135,7 +136,6 @@ struct imx_hdmi {
 	struct drm_display_mode previous_mode;
 
 	struct regmap *regmap;
-	struct i2c_adapter *ddc;
 	void __iomem *regs;
 
 	unsigned int sample_rate;
@@ -1389,45 +1389,16 @@ static void imx_hdmi_poweroff(struct imx_hdmi *hdmi)
 static enum drm_connector_status imx_hdmi_connector_detect(struct drm_connector
 							*connector, bool force)
 {
-	struct imx_hdmi *hdmi = container_of(connector, struct imx_hdmi,
-					     connector);
+	struct imx_hdmi *hdmi = drm_ddc_private(connector);
 
 	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
 		connector_status_connected : connector_status_disconnected;
 }
 
-static int imx_hdmi_connector_get_modes(struct drm_connector *connector)
-{
-	struct imx_hdmi *hdmi = container_of(connector, struct imx_hdmi,
-					     connector);
-	struct edid *edid;
-	int ret;
-
-	if (!hdmi->ddc)
-		return 0;
-
-	edid = drm_get_edid(connector, hdmi->ddc);
-	if (edid) {
-		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
-			edid->width_cm, edid->height_cm);
-
-		drm_mode_connector_update_edid_property(connector, edid);
-		ret = drm_add_edid_modes(connector, edid);
-		/* Store the ELD */
-		drm_edid_to_eld(connector, edid);
-		kfree(edid);
-	} else {
-		dev_dbg(hdmi->dev, "failed to get edid\n");
-	}
-
-	return 0;
-}
-
 static struct drm_encoder *imx_hdmi_connector_best_encoder(struct drm_connector
 							   *connector)
 {
-	struct imx_hdmi *hdmi = container_of(connector, struct imx_hdmi,
-					     connector);
+	struct imx_hdmi *hdmi = drm_ddc_private(connector);
 
 	return &hdmi->encoder;
 }
@@ -1500,11 +1471,11 @@ static struct drm_connector_funcs imx_hdmi_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = imx_hdmi_connector_detect,
-	.destroy = imx_drm_connector_destroy,
+	.destroy = drm_ddc_connector_destroy,
 };
 
 static struct drm_connector_helper_funcs imx_hdmi_connector_helper_funcs = {
-	.get_modes = imx_hdmi_connector_get_modes,
+	.get_modes = drm_ddc_connector_get_modes,
 	.best_encoder = imx_hdmi_connector_best_encoder,
 };
 
@@ -1545,7 +1516,7 @@ static irqreturn_t imx_hdmi_irq(int irq, void *dev_id)
 
 			imx_hdmi_poweroff(hdmi);
 		}
-		drm_helper_hpd_irq_event(hdmi->connector.dev);
+		drm_helper_hpd_irq_event(hdmi->ddc_conn->connector.dev);
 	}
 
 	hdmi_writeb(hdmi, intr_stat, HDMI_IH_PHY_STAT0);
@@ -1563,20 +1534,18 @@ static int imx_hdmi_register(struct drm_device *drm, struct imx_hdmi *hdmi)
 	if (ret)
 		return ret;
 
-	hdmi->connector.polled = DRM_CONNECTOR_POLL_HPD;
+	hdmi->ddc_conn->connector.polled = DRM_CONNECTOR_POLL_HPD;
 
 	drm_encoder_helper_add(&hdmi->encoder, &imx_hdmi_encoder_helper_funcs);
 	drm_encoder_init(drm, &hdmi->encoder, &imx_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS);
 
-	drm_connector_helper_add(&hdmi->connector,
+	drm_connector_helper_add(&hdmi->ddc_conn->connector,
 			&imx_hdmi_connector_helper_funcs);
-	drm_connector_init(drm, &hdmi->connector, &imx_hdmi_connector_funcs,
-			   DRM_MODE_CONNECTOR_HDMIA);
+	drm_ddc_connector_add(drm, hdmi->ddc_conn, &imx_hdmi_connector_funcs,
+			      DRM_MODE_CONNECTOR_HDMIA);
 
-	hdmi->connector.encoder = &hdmi->encoder;
-
-	drm_mode_connector_attach_encoder(&hdmi->connector, &hdmi->encoder);
+	drm_mode_connector_attach_encoder(&hdmi->ddc_conn->connector, &hdmi->encoder);
 
 	return 0;
 }
@@ -1628,7 +1597,6 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 				of_match_device(imx_hdmi_dt_ids, dev);
 	struct drm_device *drm = data;
 	struct device_node *np = dev->of_node;
-	struct device_node *ddc_node;
 	struct dw_hdmi_audio_data audio;
 	struct dw_hdmi_cec_data cec;
 	struct imx_hdmi *hdmi;
@@ -1639,6 +1607,10 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	if (!hdmi)
 		return -ENOMEM;
 
+	hdmi->ddc_conn = drm_ddc_connector_create(drm, np, hdmi);
+	if (IS_ERR(hdmi->ddc_conn))
+		return PTR_ERR(hdmi->ddc_conn);
+
 	hdmi->dev = dev;
 	hdmi->sample_rate = 48000;
 	hdmi->ratio = 100;
@@ -1648,17 +1620,6 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 		const struct platform_device_id *device_id = of_id->data;
 
 		hdmi->dev_type = device_id->driver_data;
-	}
-
-	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
-	if (ddc_node) {
-		hdmi->ddc = of_find_i2c_adapter_by_node(ddc_node);
-		if (!hdmi->ddc)
-			dev_dbg(hdmi->dev, "failed to read ddc node\n");
-
-		of_node_put(ddc_node);
-	} else {
-		dev_dbg(hdmi->dev, "no ddc property found\n");
 	}
 
 	irq = platform_get_irq(pdev, 0);
@@ -1754,7 +1715,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
 	audio.base = hdmi->regs;
 	audio.irq = irq;
 	audio.hdmi = hdmi;
-	audio.eld = hdmi->connector.eld;
+	audio.eld = hdmi->ddc_conn->connector.eld;
 	audio.set_sample_rate = imx_hdmi_set_sample_rate;
 
 	pdevinfo.name = "dw-hdmi-audio";
@@ -1800,12 +1761,10 @@ static void imx_hdmi_unbind(struct device *dev, struct device *master,
 	/* Disable all interrupts */
 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
 
-	hdmi->connector.funcs->destroy(&hdmi->connector);
 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
 
 	clk_disable_unprepare(hdmi->iahb_clk);
 	clk_disable_unprepare(hdmi->isfr_clk);
-	i2c_put_adapter(hdmi->ddc);
 }
 
 static const struct component_ops hdmi_ops = {
