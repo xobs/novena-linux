@@ -61,3 +61,12 @@ config DRM_DW_HDMI_AUDIO
 	  Support the Audio interface which is part of the Synopsis
 	  Designware HDMI block.  This is used in conjunction with
 	  the i.MX HDMI driver.
+
+config DRM_DW_HDMI_CEC
+	tristate "Synopsis Designware CEC interface"
+	depends on DRM_IMX_HDMI != n
+	select HDMI_CEC_CORE
+	help
+	  Support the CEC interface which is part of the Synposis
+	  Designware HDMI block.  This is used in conjunction with
+	  the i.MX HDMI driver.
