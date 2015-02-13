@@ -28,6 +28,11 @@
 		stdout-path = &uart2;
 	};
 
+	display-subsystem {
+		/* Hack to get ipu2 assigned to ldb, and ipu1 to hdmi */
+		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu2_di1>, <&ipu1_di1>;
+	};
+
 	reg_2p5v: 2p5v {
 		compatible = "regulator-fixed";
 		regulator-name = "2P5V";
@@ -55,21 +60,12 @@
 	reg_audio_codec: es8328-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "es8328-power";
-		regulator-boot-on;
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		startup-delay-us = <400000>;
 		gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-	};
-
-	reg_pcie: pcie-regulator {
-		compatible = "regulator-fixed";
-		regulator-name = "pcie-bus-power";
-		regulator-min-microvolt = <1500000>;
-		regulator-max-microvolt = <1500000>;
-		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
+		regulator-boot-on;
 	};
 
 	reg_lvds_lcd: lcd-regulator {
@@ -79,6 +75,7 @@
 		regulator-max-microvolt = <3300000>;
 		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-boot-on;
 	};
 
 	reg_display: display-regulator {
@@ -87,20 +84,34 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		startup-delay-us = <200000>;
+		parent-supply = <&reg_audio_codec>;
 		gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-boot-on;
 	};
 
 	reg_sata: sata-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "sata-power";
-		regulator-boot-on;
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		startup-delay-us = <10000>;
 		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		regulator-boot-on;
+	};
+
+	reg_pcie: pcie-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "pcie-power";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		regulator-state-mem {
+			regulator-on-in-suspend;
+		};
 	};
 
 	gpio-keys {
@@ -127,7 +138,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_leds_novena>;
 
-		heartbeat {
+		front-panel {
 			label = "novena:white:panel";
 			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "default-on";
@@ -148,6 +159,7 @@
 
 	panel: panel {
 		compatible = "innolux,n133hse-ea1", "simple-panel";
+		panel-supply = <&reg_lvds_lcd>;
 		backlight = <&backlight>;
 	};
 
@@ -228,6 +240,15 @@
 		compatible = "sbs,sbs-battery";
 		reg = <0x0b>;
 		sbs,i2c-retry-count = <50>;
+	};
+
+	senoko: senoko@20 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_senoko_novena>;
+		compatible = "kosagi,senoko";
+		reg = <0x20>;
+		irq-gpio = <&gpio1 20 GPIO_ACTIVE_HIGH>;
+		supplied-to = "sbs-0-000b";
 	};
 
 	stmpe811@44 {
@@ -409,7 +430,6 @@
 		compatible = "kosagi,eepromoops";
 		reg = <0x56>;
 		status = "okay";
-		it,panel = <&panel>;
 	};
 
 	it6251@5c {
@@ -422,6 +442,9 @@
 };
 
 &iomuxc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hog>;
+
 	audmux {
 		pinctrl_audmux_novena: audmuxgrp-novena {
 			fsl,pins = <
@@ -751,6 +774,24 @@
 			>;
 		};
 	};
+
+	hog {
+		pinctrl_hog: hoggrp-novena {
+			fsl,pins = <
+				/* Peek array power */
+				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+
+				/* UART3 RTS as GPIO */
+				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16	0x80000000
+
+				/* UART4 RTS as GPIO */
+				MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02 0x80000000
+
+				/* UART4 CTS as GPIO */
+				MX6QDL_PAD_CSI0_DAT17__GPIO6_IO03 0x80000000
+			>;
+		};
+	};
 };
 
 &kpp {
@@ -777,7 +818,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie_novena>;
 	reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
-	bus-supply = <&reg_pcie>;
+	power-supply = <&reg_pcie>;
 	status = "okay";
 };
 
@@ -828,7 +869,6 @@
 
 &usdhc2 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usdhc2_1>;
 	pinctrl-0 = <&pinctrl_usdhc2_novena>;
 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
 	wp-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
