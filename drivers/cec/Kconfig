@@ -1,0 +1,14 @@
+#
+# Consumer Electroncs Control support
+#
+
+menu "Consumer Electronics Control devices"
+
+config CEC
+	bool
+
+config HDMI_CEC_CORE
+	tristate
+	select CEC
+
+endmenu
