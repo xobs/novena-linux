@@ -28,6 +28,11 @@
 		stdout-path = &uart2;
 	};
 
+	display-subsystem {
+		/* Hack to get ipu2 assigned to ldb, and ipu1 to hdmi */
+		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu2_di1>, <&ipu1_di1>;
+	};
+
 	reg_2p5v: 2p5v {
 		compatible = "regulator-fixed";
 		regulator-name = "2P5V";
@@ -55,20 +60,10 @@
 	reg_audio_codec: es8328-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "es8328-power";
-		regulator-boot-on;
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		startup-delay-us = <400000>;
 		gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-	};
-
-	reg_pcie: pcie-regulator {
-		compatible = "regulator-fixed";
-		regulator-name = "pcie-bus-power";
-		regulator-min-microvolt = <1500000>;
-		regulator-max-microvolt = <1500000>;
-		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
 
@@ -87,6 +82,7 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		startup-delay-us = <200000>;
+		parent-supply = <&reg_audio_codec>;
 		gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
@@ -147,6 +143,7 @@
 
 	panel: panel {
 		compatible = "innolux,n133hse-ea1", "simple-panel";
+		panel-supply = <&reg_lvds_lcd>;
 		backlight = <&backlight>;
 	};
 
@@ -227,6 +224,15 @@
 		compatible = "sbs,sbs-battery";
 		reg = <0x0b>;
 		sbs,i2c-retry-count = <50>;
+	};
+
+	senoko: senoko@20 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_senoko_novena>;
+		compatible = "kosagi,senoko";
+		reg = <0x20>;
+		irq-gpio = <&gpio1 20 GPIO_ACTIVE_HIGH>;
+		supplied-to = "sbs-0-000b";
 	};
 
 	stmpe811@44 {
@@ -390,9 +396,31 @@
 		pinctrl-0 = <&pinctrl_sound_novena>;
 
 		clocks = <&clks IMX6QDL_CLK_CKO1>;
-		assigned-clocks = <&clks IMX6QDL_CLK_CKO>, <&clks IMX6QDL_CLK_CKO1_SEL>, <&clks IMX6QDL_CLK_PLL4_AUDIO>, <&clks IMX6QDL_CLK_CKO1>;
-		assigned-clock-parents = <&clks IMX6QDL_CLK_CKO1>, <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>, <&clks IMX6QDL_CLK_OSC>, <&clks IMX6QDL_CLK_CKO1_PODF>;
-		assigned-clock-rates = <0 0 722534400 22579200>;
+		assigned-clocks = <&clks IMX6QDL_CLK_CKO>,
+				  <&clks IMX6QDL_CLK_CKO1_SEL>,
+				  <&clks IMX6QDL_CLK_PLL4>,
+				  <&clks IMX6QDL_CLK_CKO1>;
+		assigned-clock-parents = <&clks IMX6QDL_CLK_CKO1>,
+					 <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>,
+					 <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+					 <&clks IMX6QDL_CLK_CKO1_PODF>;
+		assigned-clock-rates = <0
+					0
+					722534400
+					22579200>;
+	};
+
+	eepromoops@56 {
+		compatible = "kosagi,eepromoops";
+		reg = <0x56>;
+		status = "okay";
+	};
+
+	it6251@5c {
+		compatible = "it,it6251";
+		reg = <0x5c>;
+		power-supply = <&reg_display>;
+		status = "okay";
 	};
 };
 
@@ -726,6 +754,35 @@
 			>;
 		};
 	};
+
+	hog {
+		pinctrl_hog: hoggrp-novena {
+			fsl,pins = <
+				/* Peek array power */
+				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+			>;
+		};
+	};
+
+	sata {
+		pinctrl_sata_novena: satagrp-novena {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_D30__GPIO3_IO30  0x80000000
+			>;
+		};
+	};
+
+	senoko {
+		pinctrl_senoko_novena: senokogrp-novena {
+			fsl,pins = <
+				/* Senoko IRQ line */
+				MX6QDL_PAD_SD1_CLK__GPIO1_IO20 0x13048
+
+				/* Senoko reset line */
+				MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21 0x80000000
+			>;
+		};
+	};
 };
 
 &kpp {
@@ -752,7 +809,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie_novena>;
 	reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
-	bus-supply = <&reg_pcie>;
 	status = "okay";
 };
 
