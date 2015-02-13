@@ -1824,12 +1824,35 @@ static int imx_hdmi_platform_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int imx_hdmi_suspend(struct device *dev)
+{
+	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
+
+	imx_hdmi_poweroff(hdmi);
+	return 0;
+}
+
+static int imx_hdmi_resume(struct device *dev)
+{
+	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
+
+	imx_hdmi_poweron(hdmi);
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(imx_hdmi_pm_ops,
+	       imx_hdmi_suspend,
+	       imx_hdmi_resume);
+
 static struct platform_driver imx_hdmi_driver = {
 	.probe  = imx_hdmi_platform_probe,
 	.remove = imx_hdmi_platform_remove,
 	.driver = {
 		.name = "imx-hdmi",
 		.of_match_table = imx_hdmi_dt_ids,
+		.pm = &imx_hdmi_pm_ops,
 	},
 };
 
