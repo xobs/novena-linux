@@ -265,6 +265,7 @@ static void __init imx6q_axi_init(void)
 static void __init imx6q_init_machine(void)
 {
 	struct device *parent;
+	void __iomem *p;
 
 	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
 			      imx_get_soc_revision());
@@ -281,6 +282,12 @@ static void __init imx6q_init_machine(void)
 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
 	imx6q_1588_init();
 	imx6q_axi_init();
+
+	p = ioremap(0x21b0000, SZ_4K);
+	if (p) {
+		writel(0x7f, p + 0x40);
+		iounmap(p);
+	}
 }
 
 #define OCOTP_CFG3			0x440
