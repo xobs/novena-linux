@@ -801,6 +801,8 @@ static const struct curr_ctrl curr_ctrl[] = {
 		118800000, { 0x091c, 0x091c, 0x06dc },
 	}, {
 		216000000, { 0x06dc, 0x0b5c, 0x091c },
+	}, {
+		241500000, { 0x091c, 0x091c, 0x06dc },
 	}
 };
 
