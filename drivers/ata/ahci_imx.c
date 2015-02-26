@@ -67,7 +67,7 @@ struct imx_ahci_priv {
 	u32 phy_params;
 };
 
-static int ahci_imx_hotplug;
+static int ahci_imx_hotplug = 1;
 module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
 MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
 
