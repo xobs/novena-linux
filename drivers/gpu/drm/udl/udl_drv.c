@@ -16,6 +16,20 @@ static int udl_driver_set_busid(struct drm_device *d, struct drm_master *m)
 	return 0;
 }
 
+static u32 udl_noop_get_vblank_counter(struct drm_device *dev, int crtc)
+{
+	return dev->vblank[crtc].count.counter;
+}
+
+static int udl_noop_enable_vblank(struct drm_device *dev, int crtc)
+{
+	return 0;
+}
+
+static void udl_noop_disable_vblank(struct drm_device *dev, int crtc)
+{
+}
+
 static const struct vm_operations_struct udl_gem_vm_ops = {
 	.fault = udl_gem_fault,
 	.open = drm_gem_vm_open,
@@ -41,6 +55,10 @@ static struct drm_driver driver = {
 	.load = udl_driver_load,
 	.unload = udl_driver_unload,
 	.set_busid = udl_driver_set_busid,
+
+	.get_vblank_counter = udl_noop_get_vblank_counter,
+	.enable_vblank = udl_noop_enable_vblank,
+	.disable_vblank = udl_noop_disable_vblank,
 
 	/* gem hooks */
 	.gem_free_object = udl_gem_free_object,
