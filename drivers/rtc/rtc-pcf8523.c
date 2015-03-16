@@ -376,7 +376,7 @@ static int pcf8523_probe(struct i2c_client *client,
 		return err;
 	}
 
-	err = pcf8523_set_pm(client, 0);
+	err = pcf8523_set_pm(client, 0x20);
 	if (err < 0)
 		return err;
 
