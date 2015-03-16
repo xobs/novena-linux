@@ -33,6 +33,7 @@
 
 struct imx6_pcie {
 	int			reset_gpio;
+	int			power_gpio;
 	struct clk		*pcie_bus;
 	struct clk		*pcie_phy;
 	struct clk		*pcie;
@@ -40,6 +41,11 @@ struct imx6_pcie {
 	struct regmap		*iomuxc_gpr;
 	void __iomem		*mem_base;
 };
+
+extern int (*pci_late_suspend)(void);
+extern int (*pci_early_resume)(void);
+
+static struct pcie_port *g_pp;
 
 /* PCIe Root Complex registers (memory-mapped) */
 #define PCIE_RC_LCR				0x7c
@@ -252,7 +258,7 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
 	return 0;
 }
 
-static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+static int imx6_pcie_deassert_core_reset(struct pcie_port *pp, int sync)
 {
 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
 	int ret;
@@ -289,12 +295,21 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
 
 	/* allow the clocks to stabilize */
-	usleep_range(200, 500);
+	if (sync)
+		udelay(200);
+	else
+		usleep_range(200, 500);
 
 	/* Some boards don't have PCIe reset GPIO. */
 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
 		gpio_set_value(imx6_pcie->reset_gpio, 0);
-		msleep(100);
+		if (sync) {
+			int i;
+			for (i = 0; i < 100; i++)
+				udelay(1000);
+		}
+		else
+			msleep(100);
 		gpio_set_value(imx6_pcie->reset_gpio, 1);
 	}
 	return 0;
@@ -333,12 +348,15 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
 			IMX6Q_GPR8_TX_SWING_LOW, 127 << 25);
 }
 
-static int imx6_pcie_wait_for_link(struct pcie_port *pp)
+static int imx6_pcie_wait_for_link(struct pcie_port *pp, int sync)
 {
 	int count = 200;
 
 	while (!dw_pcie_link_up(pp)) {
-		usleep_range(100, 1000);
+		if (sync)
+			udelay(100);
+		else
+			usleep_range(100, 1000);
 		if (--count)
 			continue;
 
@@ -359,7 +377,7 @@ static irqreturn_t imx6_pcie_msi_handler(int irq, void *arg)
 	return dw_handle_msi_irq(pp);
 }
 
-static int imx6_pcie_start_link(struct pcie_port *pp)
+static int imx6_pcie_start_link(struct pcie_port *pp, int sync)
 {
 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
 	uint32_t tmp;
@@ -379,7 +397,7 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
 			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
 
-	ret = imx6_pcie_wait_for_link(pp);
+	ret = imx6_pcie_wait_for_link(pp, sync);
 	if (ret)
 		return ret;
 
@@ -403,12 +421,15 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
 		/* Test if the speed change finished. */
 		if (!(tmp & PORT_LOGIC_SPEED_CHANGE))
 			break;
-		usleep_range(100, 1000);
+		if (sync)
+			udelay(100);
+		else
+			usleep_range(100, 1000);
 	}
 
 	/* Make sure link training is finished as well! */
 	if (count)
-		ret = imx6_pcie_wait_for_link(pp);
+		ret = imx6_pcie_wait_for_link(pp, sync);
 	else
 		ret = -EINVAL;
 
@@ -428,11 +449,11 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
 
 	imx6_pcie_init_phy(pp);
 
-	imx6_pcie_deassert_core_reset(pp);
+	imx6_pcie_deassert_core_reset(pp, 0);
 
 	dw_pcie_setup_rc(pp);
 
-	imx6_pcie_start_link(pp);
+	imx6_pcie_start_link(pp, 0);
 
 	if (IS_ENABLED(CONFIG_PCI_MSI))
 		dw_pcie_msi_init(pp);
@@ -553,6 +574,46 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+static int imx6_pcie_late_suspend(void)
+{
+	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
+
+	/*
+	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
+	 * toggling phy_powerdown has same effect as 'inband beacon'
+	 * So, toggle bit18 of GPR1, used as a workaround of errata
+	 * "PCIe PCIe does not support L2 Power Down"
+	 */
+	imx6_pcie_assert_core_reset(g_pp);
+
+	if (gpio_is_valid(imx6_pcie->power_gpio))
+		gpio_set_value(imx6_pcie->power_gpio, 0);
+
+	return 0;
+}
+
+static int imx6_pcie_early_resume(void)
+{
+	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
+
+	if (gpio_is_valid(imx6_pcie->power_gpio))
+		gpio_set_value(imx6_pcie->power_gpio, 1);
+
+	imx6_pcie_init_phy(g_pp);
+
+	imx6_pcie_deassert_core_reset(g_pp, 1);
+
+	dw_pcie_setup_rc(g_pp);
+
+	imx6_pcie_start_link(g_pp, 1);
+
+	if (IS_ENABLED(CONFIG_PCI_MSI))
+		dw_pcie_msi_init(g_pp);
+
+	return 0;
+}
+
+
 static int __init imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie;
@@ -584,6 +645,16 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 					    GPIOF_OUT_INIT_LOW, "PCIe reset");
 		if (ret) {
 			dev_err(&pdev->dev, "unable to get reset gpio\n");
+			return ret;
+		}
+	}
+
+	imx6_pcie->power_gpio = of_get_named_gpio(np, "power-gpio", 0);
+	if (gpio_is_valid(imx6_pcie->power_gpio)) {
+		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->power_gpio,
+					    GPIOF_OUT_INIT_HIGH, "PCIe power");
+		if (ret) {
+			dev_err(&pdev->dev, "unable to get power gpio\n");
 			return ret;
 		}
 	}
@@ -621,6 +692,10 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	ret = imx6_add_pcie_port(pp, pdev);
 	if (ret < 0)
 		return ret;
+
+	g_pp = pp;
+	pci_late_suspend = imx6_pcie_late_suspend;
+	pci_early_resume = imx6_pcie_early_resume;
 
 	platform_set_drvdata(pdev, imx6_pcie);
 	return 0;
