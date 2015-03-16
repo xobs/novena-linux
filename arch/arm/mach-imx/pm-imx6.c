@@ -64,6 +64,9 @@
 #define MX6Q_SUSPEND_OCRAM_SIZE		0x1000
 #define MX6_MAX_MMDC_IO_NUM		33
 
+int (*pci_late_suspend)(void);
+int (*pci_early_resume)(void);
+
 static void __iomem *ccm_base;
 static void __iomem *suspend_ocram_base;
 static void (*imx6_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
@@ -336,6 +339,8 @@ static int imx6q_suspend_finish(unsigned long val)
 
 static int imx6q_pm_enter(suspend_state_t state)
 {
+	if (pci_late_suspend)
+		pci_late_suspend();
 	switch (state) {
 	case PM_SUSPEND_STANDBY:
 		imx6q_set_lpm(STOP_POWER_ON);
@@ -377,6 +382,8 @@ static int imx6q_pm_enter(suspend_state_t state)
 	default:
 		return -EINVAL;
 	}
+	if (pci_early_resume)
+		pci_early_resume();
 
 	return 0;
 }
