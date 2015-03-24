@@ -462,15 +462,13 @@ static int senoko_devices_init(struct senoko *senoko)
 	if (ret)
 		return ret;
 
-	if (senoko->features & REG_FEATURES_BATTERY) {
-		senoko_resource_irq_update(&senoko_senoko_power_supply_cell,
-					   senoko_senoko_power_supply_irq);
-		ret = mfd_add_devices(senoko->dev, blocknum++,
-				      &senoko_senoko_power_supply_cell,
-				      1, NULL, 0, senoko->domain);
-		if (ret)
-			return ret;
-	}
+	senoko_resource_irq_update(&senoko_senoko_power_supply_cell,
+				   senoko_senoko_power_supply_irq);
+	ret = mfd_add_devices(senoko->dev, blocknum++,
+			      &senoko_senoko_power_supply_cell,
+			      1, NULL, 0, senoko->domain);
+	if (ret)
+		return ret;
 
 	senoko_resource_irq_update(&senoko_rtc_cell, senoko_rtc_irq);
 	ret = mfd_add_devices(senoko->dev, blocknum++,
