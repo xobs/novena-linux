@@ -80,6 +80,13 @@
 		};
 	};
 
+	gpio-fan {
+		compatible = "gpio-fan";
+		gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
+		gpio-fan,speed-map = <0    0
+				      3000 1>;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
