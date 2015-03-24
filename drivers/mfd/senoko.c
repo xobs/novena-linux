@@ -374,6 +374,10 @@ int senoko_irq_set_wake(struct irq_data *data, unsigned int on)
 	return 0;
 }
 
+static void senoko_irq_ack(struct irq_data *data)
+{
+}
+
 static struct irq_chip senoko_irq_chip = {
 	.name			= "senoko",
 	.irq_bus_lock		= senoko_irq_lock,
@@ -381,6 +385,7 @@ static struct irq_chip senoko_irq_chip = {
 	.irq_mask		= senoko_irq_mask,
 	.irq_set_wake		= senoko_irq_set_wake,
 	.irq_unmask		= senoko_irq_unmask,
+	.irq_ack		= senoko_irq_ack,
 };
 
 static int senoko_irq_map(struct irq_domain *d, unsigned int virq,
