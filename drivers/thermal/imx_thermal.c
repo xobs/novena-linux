@@ -96,9 +96,9 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
 			TEMPSENSE0_ALARM_VALUE_SHIFT);
 }
 
-static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+static int __imx_get_temp(void *devdata, long *temp)
 {
-	struct imx_thermal_data *data = tz->devdata;
+	struct imx_thermal_data *data = devdata;
 	struct regmap *map = data->tempmon;
 	unsigned int n_meas;
 	bool wait;
@@ -135,7 +135,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 	}
 
 	if ((val & TEMPSENSE0_FINISHED) == 0) {
-		dev_dbg(&tz->device, "temp measurement never finished\n");
+		dev_dbg(&data->tz->device, "temp measurement never finished\n");
 		return -EAGAIN;
 	}
 
@@ -149,12 +149,12 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 		imx_set_alarm_temp(data, data->temp_critical);
 	if (data->alarm_temp == data->temp_critical && *temp < data->temp_passive) {
 		imx_set_alarm_temp(data, data->temp_passive);
-		dev_dbg(&tz->device, "thermal alarm off: T < %lu\n",
+		dev_dbg(&data->tz->device, "thermal alarm off: T < %lu\n",
 			data->alarm_temp / 1000);
 	}
 
 	if (*temp != data->last_temp) {
-		dev_dbg(&tz->device, "millicelsius: %ld\n", *temp);
+		dev_dbg(&data->tz->device, "millicelsius: %ld\n", *temp);
 		data->last_temp = *temp;
 	}
 
@@ -165,6 +165,13 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 	}
 
 	return 0;
+}
+
+static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+{
+	struct imx_thermal_data *data = tz->devdata;
+
+	return __imx_get_temp(data, temp);
 }
 
 static int imx_get_mode(struct thermal_zone_device *tz,
@@ -292,7 +299,12 @@ static int imx_unbind(struct thermal_zone_device *tz,
 	return 0;
 }
 
- int imx_get_trend(struct thermal_zone_device *tz,
+static int __imx_get_trend(void *p, long *trend)
+{
+	return -ENOTSUPP;
+}
+
+int imx_get_trend(struct thermal_zone_device *tz,
 	 int trip, enum thermal_trend *trend)
 {
 	int ret;
@@ -319,7 +331,6 @@ static struct thermal_zone_device_ops imx_tz_ops = {
 	.get_trip_type = imx_get_trip_type,
 	.get_trip_temp = imx_get_trip_temp,
 	.get_crit_temp = imx_get_crit_temp,
-	.get_trend = imx_get_trend,
 	.set_trip_temp = imx_set_trip_temp,
 };
 
@@ -483,19 +494,27 @@ static int imx_thermal_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	data->tz = thermal_zone_device_register("imx_thermal_zone",
-						IMX_TRIP_NUM,
-						BIT(IMX_TRIP_PASSIVE), data,
-						&imx_tz_ops, NULL,
-						IMX_PASSIVE_DELAY,
-						IMX_POLLING_DELAY);
+	data->tz = thermal_zone_of_sensor_register(&pdev->dev, 0,
+						   data, 
+						   __imx_get_temp,
+						   __imx_get_trend);
 	if (IS_ERR(data->tz)) {
-		ret = PTR_ERR(data->tz);
-		dev_err(&pdev->dev,
-			"failed to register thermal zone device %d\n", ret);
-		cpufreq_cooling_unregister(data->cdev[0]);
-		devfreq_cooling_unregister(data->cdev[1]);
-		return ret;
+		data->tz = thermal_zone_device_register("imx_thermal_zone",
+							IMX_TRIP_NUM,
+							BIT(IMX_TRIP_PASSIVE),
+							data, &imx_tz_ops,
+							NULL,
+							IMX_PASSIVE_DELAY,
+							IMX_POLLING_DELAY);
+		if (IS_ERR(data->tz)) {
+			ret = PTR_ERR(data->tz);
+			dev_err(&pdev->dev,
+				"failed to register thermal zone device %d\n",
+				ret);
+			cpufreq_cooling_unregister(data->cdev[0]);
+			devfreq_cooling_unregister(data->cdev[1]);
+			return ret;
+		}
 	}
 
 	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
