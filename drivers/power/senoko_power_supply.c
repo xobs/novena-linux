@@ -93,7 +93,7 @@ static int senoko_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = senoko_read(senoko_supply->senoko, REG_POWER);
 		if (ret < 0)
-			return ret;
+			return -ENODATA;
 
 		val->intval = !!(ret & REG_POWER_AC_STATUS_MASK);
 		break;
