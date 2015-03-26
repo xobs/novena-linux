@@ -8,6 +8,7 @@
 
 #include <linux/clk.h>
 #include <linux/cpu.h>
+#include <linux/cpu_cooling.h>
 #include <linux/cpufreq.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -33,6 +34,7 @@ static struct clk *pll2_pfd2_396m_clk;
 static struct device *cpu_dev;
 static struct cpufreq_frequency_table *freq_table;
 static unsigned int transition_latency;
+static struct thermal_cooling_device *cdev;
 
 static u32 *imx6_soc_volt;
 static u32 soc_opp_count;
@@ -301,6 +303,17 @@ soc_opp_out:
 		goto free_freq_table;
 	}
 
+	/*
+	 * For now, just loading the cooling device;
+	 * thermal DT code takes care of matching them.
+	 */
+	if (of_find_property(np, "#cooling-cells", NULL)) {
+		cdev = of_cpufreq_cooling_register(np, cpu_present_mask);
+		if (IS_ERR(cdev))
+			pr_err("running cpufreq without cooling device: %ld\n",
+			       PTR_ERR(cdev));
+	}
+
 	of_node_put(np);
 	return 0;
 
@@ -330,6 +343,7 @@ put_clk:
 
 static int imx6q_cpufreq_remove(struct platform_device *pdev)
 {
+	cpufreq_cooling_unregister(cdev);
 	cpufreq_unregister_driver(&imx6q_cpufreq_driver);
 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
 	regulator_put(arm_reg);
