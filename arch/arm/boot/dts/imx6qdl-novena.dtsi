@@ -177,7 +177,7 @@
 					type = "active";
 				};
 				cpu_alert1: cpu-alert1 {
-					temperature = <80000>; /* millicelsius */
+					temperature = <85000>; /* millicelsius */
 					hysteresis = <8000>; /* millicelsius */
 					type = "passive";
 				};
