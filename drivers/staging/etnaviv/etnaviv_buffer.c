@@ -84,7 +84,7 @@ static inline void CMD_STALL(struct etnaviv_gem_object *buffer,
 	OUT(buffer, VIV_FE_STALL_TOKEN_FROM(from) | VIV_FE_STALL_TOKEN_TO(to));
 }
 
-static void cmd_select_pipe(struct etnaviv_gem_object *buffer, u8 pipe)
+static void etnaviv_cmd_select_pipe(struct etnaviv_gem_object *buffer, u8 pipe)
 {
 	u32 flush;
 	u32 stall;
@@ -132,8 +132,6 @@ u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 	buffer->offset = 0;
 	buffer->is_ring_buffer = true;
 
-	cmd_select_pipe(buffer, gpu->pipe);
-
 	CMD_WAIT(buffer);
 	CMD_LINK(buffer, 2, gpu_va(gpu, buffer) + ((buffer->offset - 1) * 4));
 
@@ -157,21 +155,29 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
 	struct etnaviv_gem_object *cmd;
 	u32 *lw = buffer->vaddr + ((buffer->offset - 4) * 4);
-	u32 back, link_target, link_size, reserve_size;
+	u32 back, link_target, link_size, reserve_size, extra_size = 0;
 	u32 i;
 
 	if (drm_debug & DRM_UT_DRIVER)
 		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
-
-	reserve_size = 6;
 
 	/*
 	 * If we need to flush the MMU prior to submitting this buffer, we
 	 * will need to append a mmu flush load state, followed by a new
 	 * link to this buffer - a total of four additional words.
 	 */
-	if (gpu->mmu->need_flush)
-		reserve_size += 4;
+	if (gpu->mmu->need_flush || gpu->switch_context) {
+		/* link command */
+		extra_size += 2;
+		/* flush command */
+		if (gpu->mmu->need_flush)
+			extra_size += 2;
+		/* pipe switch commands */
+		if (gpu->switch_context)
+			extra_size += 8;
+	}
+
+	reserve_size = 6 + extra_size;
 
 	/*
 	 * if we are going to completely overflow the buffer, we need to wrap.
@@ -185,10 +191,8 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	link_target = gpu_va(gpu, buffer) + buffer->offset * 4;
 	link_size = 6;
 
-	if (gpu->mmu->need_flush) {
-		/* Skip over the MMU flush and LINK instructions */
-		link_target += 4 * sizeof(uint32_t);
-	}
+	/* Skip over any extra instructions */
+	link_target += extra_size * sizeof(uint32_t);
 
 	/* update offset for every cmd stream */
 	for (i = submit->nr_cmds; i--; ) {
@@ -227,26 +231,33 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		pr_info("event: %d\n", event);
 	}
 
-	if (gpu->mmu->need_flush) {
+	if (gpu->mmu->need_flush || gpu->switch_context) {
 		uint32_t new_target = gpu_va(gpu, buffer) + buffer->offset *
 					sizeof(uint32_t);
 
-		/* Add the MMU flush */
-		CMD_LOAD_STATE(buffer, VIVS_GL_FLUSH_MMU,
-			       VIVS_GL_FLUSH_MMU_FLUSH_FEMMU |
-			       VIVS_GL_FLUSH_MMU_FLUSH_UNK1 |
-			       VIVS_GL_FLUSH_MMU_FLUSH_UNK2 |
-			       VIVS_GL_FLUSH_MMU_FLUSH_PEMMU |
-			       VIVS_GL_FLUSH_MMU_FLUSH_UNK4);
+		if (gpu->mmu->need_flush) {
+			/* Add the MMU flush */
+			CMD_LOAD_STATE(buffer, VIVS_GL_FLUSH_MMU,
+				       VIVS_GL_FLUSH_MMU_FLUSH_FEMMU |
+				       VIVS_GL_FLUSH_MMU_FLUSH_UNK1 |
+				       VIVS_GL_FLUSH_MMU_FLUSH_UNK2 |
+				       VIVS_GL_FLUSH_MMU_FLUSH_PEMMU |
+				       VIVS_GL_FLUSH_MMU_FLUSH_UNK4);
+
+			gpu->mmu->need_flush = false;
+		}
+
+		if (gpu->switch_context) {
+			etnaviv_cmd_select_pipe(buffer, submit->exec_state);
+			gpu->switch_context = false;
+		}
 
 		/* And the link to the first buffer */
 		CMD_LINK(buffer, link_size, link_target);
 
-		/* Update the link target to point to the flush */
+		/* Update the link target to point to above instructions */
 		link_target = new_target;
-		link_size = 4;
-
-		gpu->mmu->need_flush = false;
+		link_size = extra_size;
 	}
 
 	/* trigger event */

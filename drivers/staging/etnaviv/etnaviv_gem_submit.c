@@ -349,6 +349,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		ret = -ENOMEM;
 		goto out;
 	}
+	submit->exec_state = args->exec_state;
 
 	ret = submit_lookup_objects(submit, args, file);
 	if (ret)
