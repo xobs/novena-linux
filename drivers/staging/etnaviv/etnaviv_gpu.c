@@ -736,7 +736,7 @@ static void hangcheck_timer_reset(struct etnaviv_gpu *gpu)
 {
 	DBG("%s", dev_name(gpu->dev));
 	mod_timer(&gpu->hangcheck_timer,
-			round_jiffies_up(jiffies + DRM_MSM_HANGCHECK_JIFFIES));
+		  round_jiffies_up(jiffies + DRM_ETNAVIV_HANGCHECK_JIFFIES));
 }
 
 static void hangcheck_handler(unsigned long data)

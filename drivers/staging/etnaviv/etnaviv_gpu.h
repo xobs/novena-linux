@@ -121,8 +121,8 @@ struct etnaviv_gpu {
 	struct clk *clk_shader;
 
 	/* Hang Detction: */
-#define DRM_MSM_HANGCHECK_PERIOD 500 /* in ms */
-#define DRM_MSM_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_MSM_HANGCHECK_PERIOD)
+#define DRM_ETNAVIV_HANGCHECK_PERIOD 500 /* in ms */
+#define DRM_ETNAVIV_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_ETNAVIV_HANGCHECK_PERIOD)
 	struct timer_list hangcheck_timer;
 	uint32_t hangcheck_fence;
 	uint32_t hangcheck_dma_addr;
