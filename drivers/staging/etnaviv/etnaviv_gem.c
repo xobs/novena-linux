@@ -467,13 +467,12 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op,
 		struct timespec *timeout)
 {
-/*
+
 	struct drm_device *dev = obj->dev;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-*/
+
 	int ret = 0;
-	/* TODO */
-#if 0
+
 	if (is_active(etnaviv_obj)) {
 		uint32_t fence = 0;
 
@@ -485,11 +484,11 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op,
 			timeout = NULL;
 
 		ret = etnaviv_wait_fence_interruptable(dev, etnaviv_obj->gpu,
-			       fence, timeout);
+						       fence, timeout);
 	}
 
 	/* TODO cache maintenance */
-#endif
+
 	return ret;
 }
 
