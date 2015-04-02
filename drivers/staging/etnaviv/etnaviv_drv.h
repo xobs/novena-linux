@@ -61,12 +61,7 @@ struct etnaviv_drm_private {
 	struct list_head inactive_list;
 
 	struct workqueue_struct *wq;
-
-	/* registered MMUs: */
-	struct etnaviv_iommu *mmu;
 };
-
-void etnaviv_register_mmu(struct drm_device *dev, struct etnaviv_iommu *mmu);
 
 int etnaviv_wait_fence_interruptable(struct drm_device *dev,
 		struct etnaviv_gpu *gpu, uint32_t fence,

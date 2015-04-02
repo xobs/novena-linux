@@ -521,7 +521,6 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 		ret = -ENOMEM;
 		goto fail;
 	}
-	etnaviv_register_mmu(gpu->drm, gpu->mmu);
 
 	/* Create buffer: */
 	gpu->buffer = etnaviv_gem_new(gpu->drm, PAGE_SIZE, ETNA_BO_CMDSTREAM);
