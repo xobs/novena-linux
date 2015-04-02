@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 2014 Etnaviv Project
+ * Copyright (C) 2014 Etnaviv Project
  * Author: Christian Gmeiner <christian.gmeiner@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
