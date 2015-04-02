@@ -1245,8 +1245,8 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	err = devm_request_irq(&pdev->dev, gpu->irq, irq_handler,
-			IRQF_TRIGGER_HIGH, dev_name(gpu->dev), gpu);
+	err = devm_request_irq(&pdev->dev, gpu->irq, irq_handler, 0,
+			       dev_name(gpu->dev), gpu);
 	if (err) {
 		dev_err(dev, "failed to request IRQ%u: %d\n", gpu->irq, err);
 		goto fail;
