@@ -30,6 +30,13 @@ struct etnaviv_gem_userptr {
 	bool ro;
 };
 
+struct etnaviv_vram_mapping {
+	struct list_head obj_head;
+	struct etnaviv_iommu *mmu;
+	struct drm_mm_node vram_node;
+	uint32_t iova;
+};
+
 struct etnaviv_gem_object {
 	struct drm_gem_object base;
 	const struct etnaviv_gem_ops *ops;
@@ -59,7 +66,6 @@ struct etnaviv_gem_object {
 	struct page **pages;
 	struct sg_table *sgt;
 	void *vaddr;
-	uint32_t iova;
 
 	/* for ETNA_BO_CMDSTREAM */
 	dma_addr_t paddr;
@@ -68,7 +74,7 @@ struct etnaviv_gem_object {
 	struct reservation_object *resv;
 	struct reservation_object _resv;
 
-	struct drm_mm_node *gpu_vram_node;
+	struct list_head vram_list;
 
 	/* for buffer manipulation during submit */
 	bool is_ring_buffer;
@@ -121,6 +127,9 @@ struct etnaviv_gem_submit {
 	} bos[0];
 };
 
+struct etnaviv_vram_mapping *
+etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
+			     struct etnaviv_iommu *mmu);
 int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
 	struct etnaviv_gem_object **res);
 int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj);
