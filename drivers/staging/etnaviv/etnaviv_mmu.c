@@ -92,12 +92,21 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 }
 
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
-	struct etnaviv_gem_object *etnaviv_obj, uint32_t memory_base)
+	struct etnaviv_gem_object *etnaviv_obj, uint32_t memory_base,
+	struct etnaviv_vram_mapping **out_mapping)
 {
 	struct etnaviv_drm_private *priv = etnaviv_obj->base.dev->dev_private;
 	struct sg_table *sgt = etnaviv_obj->sgt;
+	struct etnaviv_vram_mapping *mapping, *free = NULL;
 	struct drm_mm_node *node;
 	int ret;
+
+	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+	if (!mapping)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&mapping->obj_head);
+	mapping->mmu = mmu;
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
 	if (sgt->nents == 1) {
@@ -105,15 +114,16 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 		iova = sg_dma_address(sgt->sgl) - memory_base;
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
-			etnaviv_obj->iova = iova;
+			mapping->iova = iova;
+			list_add_tail(&mapping->obj_head,
+				      &etnaviv_obj->vram_list);
+			if (out_mapping)
+				*out_mapping = mapping;
 			return 0;
 		}
 	}
 
-	node = kzalloc(sizeof(*node), GFP_KERNEL);
-	if (!node)
-		return -ENOMEM;
-
+	node = &mapping->vram_node;
 	while (1) {
 		struct etnaviv_gem_object *o, *n;
 		struct list_head list;
@@ -142,8 +152,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		found = 0;
 		INIT_LIST_HEAD(&list);
 		list_for_each_entry(o, &priv->inactive_list, mm_list) {
-			if (!o->gpu_vram_node ||
-			    o->gpu_vram_node->mm != &mmu->mm)
+			free = etnaviv_gem_get_vram_mapping(o, mmu);
+			if (!free)
 				continue;
 
 			/*
@@ -154,7 +164,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 				continue;
 
 			list_add(&o->submit_entry, &list);
-			if (drm_mm_scan_add_block(o->gpu_vram_node)) {
+			if (drm_mm_scan_add_block(&free->vram_node)) {
 				found = true;
 				break;
 			}
@@ -163,7 +173,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		if (!found) {
 			/* Nothing found, clean up and fail */
 			list_for_each_entry_safe(o, n, &list, submit_entry)
-				BUG_ON(drm_mm_scan_remove_block(o->gpu_vram_node));
+				BUG_ON(drm_mm_scan_remove_block(&free->vram_node));
 			break;
 		}
 
@@ -174,12 +184,12 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		 * can leave the block pinned.
 		 */
 		list_for_each_entry_safe(o, n, &list, submit_entry)
-			if (!drm_mm_scan_remove_block(o->gpu_vram_node))
+			if (!drm_mm_scan_remove_block(&free->vram_node))
 				list_del_init(&o->submit_entry);
 
 		list_for_each_entry_safe(o, n, &list, submit_entry) {
 			list_del_init(&o->submit_entry);
-			etnaviv_iommu_unmap_gem(mmu, o);
+			etnaviv_iommu_unmap_gem(mmu, o, free);
 		}
 
 		/*
@@ -191,40 +201,43 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	}
 
 	if (ret < 0) {
-		kfree(node);
+		kfree(mapping);
 		return ret;
 	}
 
 	mmu->last_iova = node->start + etnaviv_obj->base.size;
-	etnaviv_obj->iova = node->start;
-	etnaviv_obj->gpu_vram_node = node;
+	mapping->iova = node->start;
 	ret = etnaviv_iommu_map(mmu, node->start, sgt, etnaviv_obj->base.size,
 				IOMMU_READ | IOMMU_WRITE);
 
 	if (ret < 0) {
 		drm_mm_remove_node(node);
-		kfree(node);
-
-		etnaviv_obj->iova = 0;
-		etnaviv_obj->gpu_vram_node = NULL;
+		kfree(mapping);
+		return ret;
 	}
+
+	list_add_tail(&mapping->obj_head, &etnaviv_obj->vram_list);
+	if (out_mapping)
+		*out_mapping = mapping;
 
 	return ret;
 }
 
 void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
-	struct etnaviv_gem_object *etnaviv_obj)
+			     struct etnaviv_gem_object *etnaviv_obj,
+			     struct etnaviv_vram_mapping *mapping)
 {
-	if (etnaviv_obj->gpu_vram_node) {
-		uint32_t offset = etnaviv_obj->gpu_vram_node->start;
+	if (mapping) {
+		uint32_t offset = mapping->vram_node.start;
 
-		etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt,
-				    etnaviv_obj->base.size);
-		drm_mm_remove_node(etnaviv_obj->gpu_vram_node);
-		kfree(etnaviv_obj->gpu_vram_node);
-
-		etnaviv_obj->gpu_vram_node = NULL;
-		etnaviv_obj->iova = 0;
+		if (mapping->iova >= 0x80000000) {
+			etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt,
+					    etnaviv_obj->base.size);
+			drm_mm_remove_node(&mapping->vram_node);
+		}
+		list_del(&mapping->obj_head);
+		kfree(mapping);
+		mapping = NULL;
 	}
 }
 
