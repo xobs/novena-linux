@@ -564,14 +564,6 @@ static struct drm_driver etnaviv_drm_driver = {
 /*
  * Platform driver:
  */
-
-static int etnaviv_compare(struct device *dev, void *data)
-{
-	struct device_node *np = data;
-
-	return dev->of_node == np;
-}
-
 static int etnaviv_bind(struct device *dev)
 {
 	return drm_platform_init(&etnaviv_drm_driver, to_platform_device(dev));
@@ -587,6 +579,13 @@ static const struct component_master_ops etnaviv_master_ops = {
 	.unbind = etnaviv_unbind,
 };
 
+static int compare_of(struct device *dev, void *data)
+{
+	struct device_node *np = data;
+
+	return dev->of_node == np;
+}
+
 static int compare_str(struct device *dev, void *data)
 {
 	return !strcmp(dev_name(dev), data);
@@ -601,13 +600,18 @@ static int etnaviv_pdev_probe(struct platform_device *pdev)
 	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 
 	if (node) {
-		struct device_node *child_np;
+		struct device_node *core_node;
+		int i;
 
-		of_platform_populate(node, NULL, NULL, dev);
+		for (i = 0; ; i++) {
+			core_node = of_parse_phandle(node, "cores", i);
+			if (!core_node)
+				break;
 
-		for_each_available_child_of_node(node, child_np)
-			component_match_add(dev, &match, etnaviv_compare,
-					    child_np);
+			component_match_add(&pdev->dev, &match, compare_of,
+					    core_node);
+			of_node_put(core_node);
+		}
 	} else if (dev->platform_data) {
 		char **names = dev->platform_data;
 		unsigned i;
@@ -627,7 +631,7 @@ static int etnaviv_pdev_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id dt_match[] = {
-	{ .compatible = "vivante,gccore" },
+	{ .compatible = "fsl,imx-gpu-subsystem" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, dt_match);
