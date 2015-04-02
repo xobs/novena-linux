@@ -919,6 +919,9 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	gpu->submitted_fence = submit->fence;
 	gpu->event[event].fence = submit->fence;
 
+	if (priv->lastctx != ctx)
+		gpu->mmu->need_flush = true;
+
 	etnaviv_buffer_queue(gpu, event, submit);
 
 	priv->lastctx = ctx;
