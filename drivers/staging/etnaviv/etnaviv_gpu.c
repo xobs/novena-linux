@@ -187,27 +187,6 @@ static void etnaviv_hw_specs(struct etnaviv_gpu *gpu)
 		gpu->identity.instruction_count = 256;
 		break;
 	}
-
-	dev_info(gpu->dev, "stream_count:  %x\n",
-		 gpu->identity.stream_count);
-	dev_info(gpu->dev, "register_max: %x\n",
-		 gpu->identity.register_max);
-	dev_info(gpu->dev, "thread_count: %x\n",
-		 gpu->identity.thread_count);
-	dev_info(gpu->dev, "vertex_cache_size: %x\n",
-		 gpu->identity.vertex_cache_size);
-	dev_info(gpu->dev, "shader_core_count: %x\n",
-		 gpu->identity.shader_core_count);
-	dev_info(gpu->dev, "pixel_pipes: %x\n",
-		 gpu->identity.pixel_pipes);
-	dev_info(gpu->dev, "vertex_output_buffer_size: %x\n",
-		 gpu->identity.vertex_output_buffer_size);
-	dev_info(gpu->dev, "buffer_size: %x\n",
-		 gpu->identity.buffer_size);
-	dev_info(gpu->dev, "instruction_count: %x\n",
-		 gpu->identity.instruction_count);
-	dev_info(gpu->dev, "num_constants: %x\n",
-		 gpu->identity.num_constants);
 }
 
 static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
@@ -252,7 +231,7 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 		}
 	}
 
-	dev_info(gpu->dev, "model: %x - revision %x\n",
+	dev_info(gpu->dev, "model: GC%x, revision: %x\n",
 		 gpu->identity.model, gpu->identity.revision);
 
 	gpu->identity.features = gpu_read(gpu, VIVS_HI_CHIP_FEATURE);
@@ -285,15 +264,6 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 		gpu->identity.minor_features3 =
 				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_3);
 	}
-
-	dev_info(gpu->dev, "minor_features:  %x\n",
-		 gpu->identity.minor_features0);
-	dev_info(gpu->dev, "minor_features1: %x\n",
-		 gpu->identity.minor_features1);
-	dev_info(gpu->dev, "minor_features2: %x\n",
-		 gpu->identity.minor_features2);
-	dev_info(gpu->dev, "minor_features3: %x\n",
-		 gpu->identity.minor_features3);
 
 	/* GC600 idle register reports zero bits where modules aren't present */
 	if (gpu->identity.model == chipModel_GC600) {
@@ -603,6 +573,38 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 	idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
 
 	verify_dma(gpu, &debug);
+
+	seq_puts(m, "\tfeatures\n");
+	seq_printf(m, "\t minor_features0: 0x%08x\n",
+		   gpu->identity.minor_features0);
+	seq_printf(m, "\t minor_features1: 0x%08x\n",
+		   gpu->identity.minor_features1);
+	seq_printf(m, "\t minor_features2: 0x%08x\n",
+		   gpu->identity.minor_features2);
+	seq_printf(m, "\t minor_features3: 0x%08x\n",
+		   gpu->identity.minor_features3);
+
+	seq_puts(m, "\tspecs\n");
+	seq_printf(m, "\t stream_count:  %d\n",
+			gpu->identity.stream_count);
+	seq_printf(m, "\t register_max: %d\n",
+			gpu->identity.register_max);
+	seq_printf(m, "\t thread_count: %d\n",
+			gpu->identity.thread_count);
+	seq_printf(m, "\t vertex_cache_size: %d\n",
+			gpu->identity.vertex_cache_size);
+	seq_printf(m, "\t shader_core_count: %d\n",
+			gpu->identity.shader_core_count);
+	seq_printf(m, "\t pixel_pipes: %d\n",
+			gpu->identity.pixel_pipes);
+	seq_printf(m, "\t vertex_output_buffer_size: %d\n",
+			gpu->identity.vertex_output_buffer_size);
+	seq_printf(m, "\t buffer_size: %d\n",
+			gpu->identity.buffer_size);
+	seq_printf(m, "\t instruction_count: %d\n",
+			gpu->identity.instruction_count);
+	seq_printf(m, "\t num_constants: %d\n",
+			gpu->identity.num_constants);
 
 	seq_printf(m, "\taxi: 0x%08x\n", axi);
 	seq_printf(m, "\tidle: 0x%08x\n", idle);
