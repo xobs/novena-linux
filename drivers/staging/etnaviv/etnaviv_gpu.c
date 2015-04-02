@@ -437,6 +437,16 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 		  VIVS_HI_AXI_CONFIG_AWCACHE(2) |
 		  VIVS_HI_AXI_CONFIG_ARCACHE(2));
 
+	/* GC2000 rev 5108 needs a special bus config */
+	if (gpu->identity.model == 0x2000 && gpu->identity.revision == 0x5108) {
+		u32 bus_config = gpu_read(gpu, VIVS_MC_BUS_CONFIG);
+		bus_config &= ~(VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__MASK |
+				VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__MASK);
+		bus_config |= VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG(1) |
+			      VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG(0);
+		gpu_write(gpu, VIVS_MC_BUS_CONFIG, bus_config);
+	}
+
 	/* set base addresses */
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_RA, gpu->memory_base);
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_FE, gpu->memory_base);
