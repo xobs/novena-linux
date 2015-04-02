@@ -28,7 +28,7 @@
 #include "cmdstream.xml.h"
 
 static const struct platform_device_id gpu_ids[] = {
-	{ .name = "etnaviv-gpu,2d", .driver_data = ETNA_PIPE_2D, },
+	{ .name = "etnaviv-gpu,2d" },
 	{ },
 };
 
@@ -919,8 +919,10 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	gpu->submitted_fence = submit->fence;
 	gpu->event[event].fence = submit->fence;
 
-	if (priv->lastctx != ctx)
+	if (priv->lastctx != ctx) {
 		gpu->mmu->need_flush = true;
+		gpu->switch_context = true;
+	}
 
 	etnaviv_buffer_queue(gpu, event, submit);
 
@@ -1108,20 +1110,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	struct drm_device *drm = data;
 	struct etnaviv_drm_private *priv = drm->dev_private;
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-	int idx = gpu->pipe;
 	int ret;
-
-	dev_dbg(dev, "pre gpu[idx]: %p\n", priv->gpu[idx]);
-
-	if (priv->gpu[idx] == NULL) {
-		dev_dbg(dev, "adding core @idx %d\n", idx);
-		priv->gpu[idx] = gpu;
-	} else {
-		dev_err(dev, "failed to add core @idx %d\n", idx);
-		goto fail;
-	}
-
-	dev_dbg(dev, "post gpu[idx]: %p\n", priv->gpu[idx]);
 
 #ifdef CONFIG_PM
 	ret = pm_runtime_get_sync(gpu->dev);
@@ -1140,12 +1129,12 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	setup_timer(&gpu->hangcheck_timer, hangcheck_handler,
 			(unsigned long)gpu);
 
+	priv->gpu[priv->num_gpus++] = gpu;
+
 	pm_runtime_mark_last_busy(gpu->dev);
 	pm_runtime_put_autosuspend(gpu->dev);
 
 	return 0;
-fail:
-	return -1;
 }
 
 static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
@@ -1186,23 +1175,13 @@ static const struct component_ops gpu_ops = {
 
 static const struct of_device_id etnaviv_gpu_match[] = {
 	{
-		.compatible = "vivante,vivante-gpu-2d",
-		.data = (void *)ETNA_PIPE_2D
+		.compatible = "vivante,gc"
 	},
-	{
-		.compatible = "vivante,vivante-gpu-3d",
-		.data = (void *)ETNA_PIPE_3D
-	},
-	{
-		.compatible = "vivante,vivante-gpu-vg",
-		.data = (void *)ETNA_PIPE_VG
-	},
-	{ }
+	{ /* sentinel */ }
 };
 
 static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *match;
 	struct device *dev = &pdev->dev;
 	struct etnaviv_gpu *gpu;
 	int err = 0;
@@ -1210,17 +1189,6 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 	gpu = devm_kzalloc(dev, sizeof(*gpu), GFP_KERNEL);
 	if (!gpu)
 		return -ENOMEM;
-
-	if (pdev->dev.of_node) {
-		match = of_match_device(etnaviv_gpu_match, &pdev->dev);
-		if (!match)
-			return -EINVAL;
-		gpu->pipe = (long)match->data;
-	} else if (pdev->id_entry) {
-		gpu->pipe = pdev->id_entry->driver_data;
-	} else {
-		return -EINVAL;
-	}
 
 	gpu->dev = &pdev->dev;
 
