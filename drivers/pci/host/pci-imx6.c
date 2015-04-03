@@ -22,6 +22,7 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/resource.h>
 #include <linux/signal.h>
 #include <linux/types.h>
@@ -33,7 +34,7 @@
 
 struct imx6_pcie {
 	int			reset_gpio;
-	int			power_gpio;
+	struct regulator	*power_supply;
 	struct clk		*pcie_bus;
 	struct clk		*pcie_phy;
 	struct clk		*pcie;
@@ -578,16 +579,18 @@ static int imx6_pcie_late_suspend(void)
 {
 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
 
-	/*
-	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
-	 * toggling phy_powerdown has same effect as 'inband beacon'
-	 * So, toggle bit18 of GPR1, used as a workaround of errata
-	 * "PCIe PCIe does not support L2 Power Down"
-	 */
-	imx6_pcie_assert_core_reset(g_pp);
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, IMX6Q_GPR1_PCIE_TEST_PD);
 
-	if (gpio_is_valid(imx6_pcie->power_gpio))
-		gpio_set_value(imx6_pcie->power_gpio, 0);
+	/*
+	if (imx6_pcie->power_supply) {
+		int ret;
+		ret = regulator_disable(imx6_pcie->power_supply);
+		if (ret)
+			dev_err(imx6_pcie->pp.dev,
+				"unable to disable regulator: %d\n", ret);
+	}
+	*/
 
 	return 0;
 }
@@ -596,19 +599,18 @@ static int imx6_pcie_early_resume(void)
 {
 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
 
-	if (gpio_is_valid(imx6_pcie->power_gpio))
-		gpio_set_value(imx6_pcie->power_gpio, 1);
+	/*
+	if (imx6_pcie->power_supply) {
+		int ret;
+		ret = regulator_enable(imx6_pcie->power_supply);
+		if (ret)
+		dev_err(imx6_pcie->pp.dev,
+			"unable to enable regulator: %d\n", ret);
+	}
+	*/
 
-	imx6_pcie_init_phy(g_pp);
-
-	imx6_pcie_deassert_core_reset(g_pp, 1);
-
-	dw_pcie_setup_rc(g_pp);
-
-	imx6_pcie_start_link(g_pp, 1);
-
-	if (IS_ENABLED(CONFIG_PCI_MSI))
-		dw_pcie_msi_init(g_pp);
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, 0);
 
 	return 0;
 }
@@ -649,12 +651,19 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 		}
 	}
 
-	imx6_pcie->power_gpio = of_get_named_gpio(np, "power-gpio", 0);
-	if (gpio_is_valid(imx6_pcie->power_gpio)) {
-		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->power_gpio,
-					    GPIOF_OUT_INIT_HIGH, "PCIe power");
+	imx6_pcie->power_supply = devm_regulator_get_optional(&pdev->dev,
+							      "power");
+	if (IS_ERR(imx6_pcie->power_supply)) {
+		ret = PTR_ERR(imx6_pcie->power_supply);
+		if (ret == -EPROBE_DEFER)
+			return ret;
+		imx6_pcie->power_supply = NULL;
+	}
+	else {
+		ret = regulator_enable(imx6_pcie->power_supply);
 		if (ret) {
-			dev_err(&pdev->dev, "unable to get power gpio\n");
+			dev_err(&pdev->dev, "unable to enable regulator: %d\n",
+				ret);
 			return ret;
 		}
 	}
