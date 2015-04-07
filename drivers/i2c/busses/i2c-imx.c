@@ -416,6 +416,7 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
 {
 	unsigned long orig_jiffies = jiffies;
 	unsigned int temp;
+	int successes = 0;
 
 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
 
@@ -429,14 +430,26 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
 			return -EAGAIN;
 		}
 
-		if (for_busy && (temp & I2SR_IBB))
-			break;
-		if (!for_busy && !(temp & I2SR_IBB))
-			break;
+		if (for_busy) {
+			if ((temp & I2SR_IBB)) {
+				if (successes++ > 2)
+					break;
+			}
+			else
+				successes = 0;
+		}
+		if (!for_busy) {
+			if (!(temp & I2SR_IBB)) {
+				if (successes++ > 2)
+					break;
+			}
+			else
+				successes = 0;
+		}
 		if (time_after(jiffies, orig_jiffies + msecs_to_jiffies(500))) {
 			dev_dbg(&i2c_imx->adapter.dev,
 				"<%s> I2C bus is busy\n", __func__);
-			return -ETIMEDOUT;
+			return -EAGAIN;
 		}
 		schedule();
 	}
@@ -450,7 +463,7 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 
 	if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
-		return -ETIMEDOUT;
+		return -EAGAIN;
 	}
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> TRX complete\n", __func__);
 	i2c_imx->i2csr = 0;
@@ -459,8 +472,24 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 
 static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
 {
-	if (imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR) & I2SR_RXAK) {
+	unsigned int sr;
+
+	sr = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+	if (sr & I2SR_RXAK) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
+
+		dev_dbg(&i2c_imx->adapter.dev,
+				"<%s> CONTROL: 0x%08x\n", __func__,
+				imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR));
+		dev_dbg(&i2c_imx->adapter.dev,
+				"<%s> STATUS: 0x%08x\n", __func__, sr);
+
+		/* check for arbitration lost */
+		if ((sr & I2SR_IAL) || (sr & I2SR_IBB)) {
+			sr &= ~I2SR_IAL;
+			imx_i2c_write_reg(sr, i2c_imx, IMX_I2C_I2SR);
+			return -EAGAIN;
+		}
 		return -EIO;  /* No ACK */
 	}
 
@@ -513,6 +542,7 @@ static void i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx)
 
 static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
 {
+	unsigned long orig_jiffies = jiffies;
 	unsigned int temp = 0;
 	int result;
 
@@ -524,21 +554,43 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
 	if (result)
 		return result;
 	imx_i2c_write_reg(i2c_imx->ifdr, i2c_imx, IMX_I2C_IFDR);
-	/* Enable I2C controller */
-	imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
-	imx_i2c_write_reg(i2c_imx->hwdata->i2cr_ien_opcode, i2c_imx, IMX_I2C_I2CR);
 
-	/* Wait controller to be stable */
-	udelay(50);
+	do {
+		/* Enable I2C controller */
+		imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode,
+				  i2c_imx, IMX_I2C_I2SR);
+		imx_i2c_write_reg(i2c_imx->hwdata->i2cr_ien_opcode,
+				  i2c_imx, IMX_I2C_I2CR);
 
-	/* Start I2C transaction */
-	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-	temp |= I2CR_MSTA;
-	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-	result = i2c_imx_bus_busy(i2c_imx, 1);
+		/* Wait controller to be stable */
+		udelay(50);
+
+		/* Wait for bus to be idle */
+		result = i2c_imx_bus_busy(i2c_imx, 0);
+		if (result) {
+			schedule();
+		}
+		else {
+			/* Start I2C transaction */
+			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+			temp |= I2CR_MSTA;
+			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+			result = i2c_imx_bus_busy(i2c_imx, 1);
+			if (result) {
+				udelay(50);
+				schedule();
+			}
+			i2c_imx->stopped = 0;
+		}
+
+		if (time_after(jiffies, orig_jiffies + msecs_to_jiffies(500))) {
+			dev_dbg(&i2c_imx->adapter.dev,
+				"<%s> I2C bus is busy\n", __func__);
+			break;
+		}
+	} while (result == -EAGAIN);
 	if (result)
 		return result;
-	i2c_imx->stopped = 0;
 
 	temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
 	temp &= ~I2CR_DMAEN;
@@ -950,6 +1002,9 @@ fail0:
 	/* Stop I2C transfer */
 	i2c_imx_stop(i2c_imx);
 
+	if (result == -EAGAIN)
+		schedule();
+
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> exit with: %s: %d\n", __func__,
 		(result < 0) ? "error" : "success msg",
 			(result < 0) ? result : num);
@@ -1008,6 +1063,8 @@ static int i2c_imx_probe(struct platform_device *pdev)
 	i2c_imx->adapter.algo		= &i2c_imx_algo;
 	i2c_imx->adapter.dev.parent	= &pdev->dev;
 	i2c_imx->adapter.nr		= pdev->id;
+	i2c_imx->adapter.retries	= 15;
+	i2c_imx->adapter.timeout	= msecs_to_jiffies(2000);
 	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
 	i2c_imx->base			= base;
 
