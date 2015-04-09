@@ -11,6 +11,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/clk/clk-conf.h>
 #include <linux/delay.h>
 #include <linux/of_device.h>
 #include <linux/module.h>
@@ -621,6 +622,10 @@ static int es8328_resume(struct snd_soc_codec *codec)
 
 	es8328 = snd_soc_codec_get_drvdata(codec);
 
+	ret = of_clk_set_defaults(codec->dev->of_node, false);
+	if (ret)
+		dev_err(codec->dev, "unable to set clock defaults: %d\n", ret);
+
 	ret = clk_prepare_enable(es8328->clk);
 	if (ret) {
 		dev_err(codec->dev, "unable to enable clock\n");
@@ -698,6 +703,7 @@ static int es8328_remove(struct snd_soc_codec *codec)
 const struct regmap_config es8328_regmap_config = {
 	.reg_bits	= 8,
 	.val_bits	= 8,
+	.use_single_rw	= true,
 	.max_register	= ES8328_REG_MAX,
 	.cache_type	= REGCACHE_RBTREE,
 };
