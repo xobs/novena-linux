@@ -191,7 +191,6 @@ static int imx_es8328_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	platform_set_drvdata(pdev, data);
 fail:
 	of_node_put(ssi_np);
 	of_node_put(codec_np);
@@ -201,7 +200,9 @@ fail:
 
 static int imx_es8328_remove(struct platform_device *pdev)
 {
-	struct imx_es8328_data *data = platform_get_drvdata(pdev);
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	struct imx_es8328_data *data = container_of(card,
+					struct imx_es8328_data, card);
 
 	snd_soc_jack_free_gpios(&headset_jack, ARRAY_SIZE(headset_jack_gpios),
 				headset_jack_gpios);
@@ -220,6 +221,7 @@ MODULE_DEVICE_TABLE(of, imx_es8328_dt_ids);
 static struct platform_driver imx_es8328_driver = {
 	.driver = {
 		.name = "imx-es8328",
+		.pm = &snd_soc_pm_ops,
 		.of_match_table = imx_es8328_dt_ids,
 	},
 	.probe = imx_es8328_probe,
