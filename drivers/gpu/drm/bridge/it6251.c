@@ -33,11 +33,15 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <drm/drm_panel.h>
+
+extern bool simple_panel_enabled;
 
 struct it6251_bridge {
 	struct i2c_client *client;
 	struct i2c_client *lvds_client;
 	struct regulator *regulator;
+	struct drm_panel *panel;
 	struct delayed_work init_work;
 	int delay_jiffies;
 	int delay_tries;
@@ -217,6 +221,27 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 	return 1;
 }
 
+static void it6251_reschedule_init(struct it6251_bridge *priv)
+{
+	dev_err(&priv->client->dev,
+		"Display didn't stabilize.  This may be because "
+		"the LVDS port is still in powersave mode.");
+	if (priv->delay_tries++ > INIT_RETRY_MAX_TRIES) {
+		dev_err(&priv->client->dev,
+			"Too many retries, abandoning.\n");
+	}
+	else {
+		priv->delay_jiffies += INIT_RETRY_DELAY_INC;
+		if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
+			priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
+		dev_err(&priv->client->dev,
+			"Will try again in %d msecs\n",
+			jiffies_to_msecs(priv->delay_jiffies));
+		schedule_delayed_work(&priv->init_work,
+				      priv->delay_jiffies);
+	}
+}
+
 static void it6251_init(struct work_struct *work)
 {
 	int reg;
@@ -225,8 +250,17 @@ static void it6251_init(struct work_struct *work)
 						  init_work.work);
 
 	/* The bootloader can leave the chip already initialized */
-	if (it6251_is_stable(priv))
+	if (it6251_is_stable(priv)) {
+		dev_info(&priv->client->dev, "eDP system is already stable\n");
 		return;
+	}
+
+	/* If the panel itself isn't enabled, try again later */
+	if (!simple_panel_enabled) { //drm_panel_enabled(priv->panel)) {
+		dev_info(&priv->client->dev, "panel not enabled, deferring\n");
+		it6251_reschedule_init(priv);
+		return;
+	}
 
 	it6251_write(priv, 0x05, 0x00);
 	udelay(1000);
@@ -314,26 +348,8 @@ static void it6251_init(struct work_struct *work)
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
 	 */
-	if (!it6251_is_stable(priv)) {
-
-		dev_err(&priv->client->dev,
-			"Display didn't stabilize.  This may be because "
-			"the LVDS port is still in powersave mode.");
-		if (priv->delay_tries++ > INIT_RETRY_MAX_TRIES) {
-			dev_err(&priv->client->dev,
-				"Too many retries, abandoning.\n");
-		}
-		else {
-			priv->delay_jiffies += INIT_RETRY_DELAY_INC;
-			if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
-				priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
-			dev_err(&priv->client->dev,
-				"Will try again in %d msecs\n",
-				jiffies_to_msecs(priv->delay_jiffies));
-			schedule_delayed_work(&priv->init_work,
-					      priv->delay_jiffies);
-		}
-	}
+	if (!it6251_is_stable(priv))
+		it6251_reschedule_init(priv);
 
 	return;
 }
@@ -426,6 +442,8 @@ static int
 it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct it6251_bridge *priv;
+	struct device_node *panel_node;
+	struct device_node *np = client->dev.of_node;
 	int ret;
 
 	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
@@ -433,6 +451,16 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "unable to allocate private data\n");
 		return -ENOMEM;
 	}
+
+	panel_node = of_parse_phandle(np, "it,panel", 0);
+	if (panel_node) {
+//		priv->panel = of_drm_find_panel(panel_node);
+	}
+	else {
+		dev_err(&client->dev, "Unable to find it,panel node\n");
+	}
+	if (!simple_panel_enabled)//drm_panel_enabled(priv->panel))
+		return -EPROBE_DEFER;
 
 	INIT_DELAYED_WORK(&priv->init_work, it6251_init);
 
