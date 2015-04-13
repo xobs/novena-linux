@@ -77,6 +77,9 @@ struct panel_simple {
 	struct gpio_desc *enable_gpio;
 };
 
+bool simple_panel_enabled;
+EXPORT_SYMBOL(simple_panel_enabled);
+
 static inline struct panel_simple *to_panel_simple(struct drm_panel *panel)
 {
 	return container_of(panel, struct panel_simple, base);
@@ -131,6 +134,7 @@ static int panel_simple_disable(struct drm_panel *panel)
 		msleep(p->desc->delay.disable);
 
 	p->enabled = false;
+	simple_panel_enabled = false;
 
 	return 0;
 }
@@ -180,6 +184,13 @@ static int panel_simple_prepare(struct drm_panel *panel)
 	return 0;
 }
 
+static int panel_simple_enabled(struct drm_panel *panel)
+{
+	struct panel_simple *p = to_panel_simple(panel);
+
+	return p->enabled;
+}
+
 static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
@@ -196,6 +207,7 @@ static int panel_simple_enable(struct drm_panel *panel)
 	}
 
 	p->enabled = true;
+	simple_panel_enabled = true;
 
 	return 0;
 }
@@ -227,6 +239,7 @@ static const struct drm_panel_funcs panel_simple_funcs = {
 	.prepare = panel_simple_prepare,
 	.enable = panel_simple_enable,
 	.get_modes = panel_simple_get_modes,
+	.enabled = panel_simple_enabled,
 };
 
 static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
@@ -239,6 +252,7 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	if (!panel)
 		return -ENOMEM;
 
+	simple_panel_enabled = false;
 	panel->enabled = false;
 	panel->prepared = false;
 	panel->desc = desc;
