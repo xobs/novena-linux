@@ -68,6 +68,7 @@ struct drm_panel_funcs {
 	int (*prepare)(struct drm_panel *panel);
 	int (*enable)(struct drm_panel *panel);
 	int (*get_modes)(struct drm_panel *panel);
+	int (*enabled)(struct drm_panel *panel);
 };
 
 struct drm_panel {
@@ -108,6 +109,14 @@ static inline int drm_panel_enable(struct drm_panel *panel)
 {
 	if (panel && panel->funcs && panel->funcs->enable)
 		return panel->funcs->enable(panel);
+
+	return panel ? -ENOSYS : -EINVAL;
+}
+
+static inline int drm_panel_enabled(struct drm_panel *panel)
+{
+	if (panel && panel->funcs && panel->funcs->enabled)
+		return panel->funcs->enabled(panel);
 
 	return panel ? -ENOSYS : -EINVAL;
 }
