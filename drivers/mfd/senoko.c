@@ -20,10 +20,6 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
-#define SIGNATURE 0
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 1
-
 #define BACKOFF_MS 800
 
 /*
