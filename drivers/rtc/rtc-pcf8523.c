@@ -118,6 +118,26 @@ static int pcf8523_rtc_check_oscillator(struct i2c_client *client)
 	return 0;
 }
 
+static int pcf8523_set_12p5_pf(struct i2c_client *client)
+{
+	u8 value;
+	int err;
+
+	err = pcf8523_read(client, REG_CONTROL1, &value);
+	if (err < 0)
+		goto out;
+
+	if (value & REG_CONTROL1_CAP_SEL)
+		return 0;
+
+	value |= REG_CONTROL1_CAP_SEL;
+
+	err = pcf8523_write(client, REG_CONTROL1, value);
+
+out:
+	return err;
+}
+
 static int pcf8523_switch_capacitance(struct i2c_client *client)
 {
 	u8 value;
@@ -138,6 +158,8 @@ out:
 static int pcf8523_enable_oscillator(struct i2c_client *client)
 {
 	int err, loop;
+
+	pcf8523_set_12p5_pf(client);
 
 	loop = 0;
 	while (loop < 200) {
