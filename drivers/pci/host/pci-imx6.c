@@ -669,8 +669,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	imx6_pcie->vdd3p3 = devm_regulator_get_optional(&pdev->dev, "vdd3p3");
 	if (IS_ERR(imx6_pcie->vdd3p3)) {
 		ret = PTR_ERR(imx6_pcie->vdd3p3);
-		if (ret == -EPROBE_DEFER)
-			return ret;
 		imx6_pcie->vdd3p3 = NULL;
 	}
 	else {
@@ -685,8 +683,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	imx6_pcie->vdd1p5 = devm_regulator_get_optional(&pdev->dev, "vdd1p5");
 	if (IS_ERR(imx6_pcie->vdd1p5)) {
 		ret = PTR_ERR(imx6_pcie->vdd1p5);
-		if (ret == -EPROBE_DEFER)
-			return ret;
 		imx6_pcie->vdd1p5 = NULL;
 	}
 	else {
@@ -768,7 +764,7 @@ static int __init imx6_pcie_init(void)
 {
 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
 }
-module_init(imx6_pcie_init);
+late_initcall(imx6_pcie_init);
 
 MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
 MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
