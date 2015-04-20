@@ -33,6 +33,8 @@
 
 struct imx6_pcie {
 	int			reset_gpio;
+	struct regulator	*vdd3p3;
+	struct regulator	*vdd1p5;
 	struct clk		*pcie_bus;
 	struct clk		*pcie_phy;
 	struct clk		*pcie;
@@ -556,6 +558,57 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+static int imx6_pcie_late_suspend(void)
+{
+	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
+
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, IMX6Q_GPR1_PCIE_TEST_PD);
+
+	if (imx6_pcie->vdd3p3) {
+		int ret;
+		ret = regulator_disable(imx6_pcie->vdd3p3);
+		if (ret)
+			dev_err(imx6_pcie->pp.dev,
+				"unable to disable 3.3V regulator: %d\n", ret);
+	}
+	if (imx6_pcie->vdd1p5) {
+		int ret;
+		ret = regulator_disable(imx6_pcie->vdd1p5);
+		if (ret)
+			dev_err(imx6_pcie->pp.dev,
+				"unable to disable 1.5V regulator: %d\n", ret);
+	}
+
+	return 0;
+}
+
+static int imx6_pcie_early_resume(void)
+{
+	struct imx6_pcie *imx6_pcie = to_imx6_pcie(g_pp);
+
+	if (imx6_pcie->vdd3p3) {
+		int ret;
+		ret = regulator_enable(imx6_pcie->vdd3p3);
+		if (ret)
+		dev_err(imx6_pcie->pp.dev,
+			"unable to enable 3.3V regulator: %d\n", ret);
+	}
+	if (imx6_pcie->vdd1p5) {
+		int ret;
+		ret = regulator_enable(imx6_pcie->vdd1p5);
+		if (ret)
+		dev_err(imx6_pcie->pp.dev,
+			"unable to enable 1.5V regulator: %d\n", ret);
+	}
+
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, 0);
+
+	return 0;
+}
+
+
 static int __init imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie;
@@ -587,6 +640,38 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 					    GPIOF_OUT_INIT_LOW, "PCIe reset");
 		if (ret) {
 			dev_err(&pdev->dev, "unable to get reset gpio\n");
+			return ret;
+		}
+	}
+
+	imx6_pcie->vdd3p3 = devm_regulator_get_optional(&pdev->dev, "vdd3p3");
+	if (IS_ERR(imx6_pcie->vdd3p3)) {
+		ret = PTR_ERR(imx6_pcie->vdd3p3);
+		if (ret == -EPROBE_DEFER)
+			return ret;
+		imx6_pcie->vdd3p3 = NULL;
+	}
+	else {
+		ret = regulator_enable(imx6_pcie->vdd3p3);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable regulator: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
+	imx6_pcie->vdd1p5 = devm_regulator_get_optional(&pdev->dev, "vdd1p5");
+	if (IS_ERR(imx6_pcie->vdd1p5)) {
+		ret = PTR_ERR(imx6_pcie->vdd1p5);
+		if (ret == -EPROBE_DEFER)
+			return ret;
+		imx6_pcie->vdd1p5 = NULL;
+	}
+	else {
+		ret = regulator_enable(imx6_pcie->vdd1p5);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable regulator: %d\n",
+				ret);
 			return ret;
 		}
 	}
