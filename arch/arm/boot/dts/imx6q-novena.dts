@@ -818,7 +818,8 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie_novena>;
 	reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
-	power-supply = <&reg_pcie>;
+	vdd3p3-supply = <&reg_pcie>;
+	vdd1p5-supply = <&vgen2_reg>;
 	status = "okay";
 };
 
