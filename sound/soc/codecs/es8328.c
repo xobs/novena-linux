@@ -67,6 +67,7 @@ struct es8328_priv {
 	struct regmap *regmap;
 	struct clk *clk;
 	int playback_fs;
+	int recording_fs;
 	bool deemph;
 	struct regulator_bulk_data supplies[ES8328_SUPPLY_NUM];
 };
@@ -431,6 +432,47 @@ static int es8328_mute(struct snd_soc_dai *dai, int mute)
 			mute ? ES8328_DACCONTROL3_DACMUTE : 0);
 }
 
+static int es8328_set_rates(struct snd_soc_codec *codec,
+			    struct es8328_priv *es8328)
+{
+	int clk_rate;
+	int ret;
+	int i;
+	u8 playback_ratio;
+	u8 recording_ratio;
+
+	clk_rate = clk_get_rate(es8328->clk);
+
+	/* find master mode MCLK to sampling frequency ratio */
+	playback_ratio = mclk_ratios[0].rate;
+	recording_ratio = mclk_ratios[0].rate;
+	for (i = 1; i < ARRAY_SIZE(mclk_ratios); i++) {
+		if (es8328->playback_fs <= mclk_ratios[i].rate)
+			playback_ratio = mclk_ratios[i].ratio;
+		if (es8328->recording_fs <= mclk_ratios[i].rate)
+			recording_ratio = mclk_ratios[i].ratio;
+	}
+
+	/* Master serial port mode, with BCLK generated automatically */
+	if (clk_rate == ES8328_SYSCLK_RATE_1X)
+		snd_soc_write(codec, ES8328_MASTERMODE,
+				ES8328_MASTERMODE_MSC);
+	else
+		snd_soc_write(codec, ES8328_MASTERMODE,
+				ES8328_MASTERMODE_MCLKDIV2 |
+				ES8328_MASTERMODE_MSC);
+
+	ret = snd_soc_update_bits(codec, ES8328_DACCONTROL2,
+				  ES8328_RATEMASK, playback_ratio);
+	if (ret < 0)
+		return ret;
+
+	es8328_set_deemph(codec);
+
+	return snd_soc_update_bits(codec, ES8328_ADCCONTROL5,
+				   ES8328_RATEMASK, recording_ratio);
+}
+
 static int es8328_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params,
 	struct snd_soc_dai *dai)
@@ -438,14 +480,6 @@ static int es8328_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_codec *codec = dai->codec;
 	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
 	int clk_rate;
-	int i;
-	int reg;
-	u8 ratio;
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		reg = ES8328_DACCONTROL2;
-	else
-		reg = ES8328_ADCCONTROL5;
 
 	clk_rate = clk_get_rate(es8328->clk);
 
@@ -458,26 +492,18 @@ static int es8328_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	/* find master mode MCLK to sampling frequency ratio */
-	ratio = mclk_ratios[0].rate;
-	for (i = 1; i < ARRAY_SIZE(mclk_ratios); i++)
-		if (params_rate(params) <= mclk_ratios[i].rate)
-			ratio = mclk_ratios[i].ratio;
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		es8328->playback_fs = params_rate(params);
-		es8328_set_deemph(codec);
-	}
+	else
+		es8328->recording_fs = params_rate(params);
 
-	return snd_soc_update_bits(codec, reg, ES8328_RATEMASK, ratio);
+	return es8328_set_rates(codec, es8328);
 }
 
 static int es8328_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		unsigned int fmt)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
-	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
-	int clk_rate;
 	u8 mode = ES8328_DACCONTROL1_DACWL_16;
 
 	/* set master/slave audio interface */
@@ -505,16 +531,6 @@ static int es8328_set_dai_fmt(struct snd_soc_dai *codec_dai,
 
 	snd_soc_write(codec, ES8328_DACCONTROL1, mode);
 	snd_soc_write(codec, ES8328_ADCCONTROL4, mode);
-
-	/* Master serial port mode, with BCLK generated automatically */
-	clk_rate = clk_get_rate(es8328->clk);
-	if (clk_rate == ES8328_SYSCLK_RATE_1X)
-		snd_soc_write(codec, ES8328_MASTERMODE,
-				ES8328_MASTERMODE_MSC);
-	else
-		snd_soc_write(codec, ES8328_MASTERMODE,
-				ES8328_MASTERMODE_MCLKDIV2 |
-				ES8328_MASTERMODE_MSC);
 
 	return 0;
 }
@@ -622,10 +638,6 @@ static int es8328_resume(struct snd_soc_codec *codec)
 
 	es8328 = snd_soc_codec_get_drvdata(codec);
 
-	ret = of_clk_set_defaults(codec->dev->of_node, false);
-	if (ret)
-		dev_err(codec->dev, "unable to set clock defaults: %d\n", ret);
-
 	ret = clk_prepare_enable(es8328->clk);
 	if (ret) {
 		dev_err(codec->dev, "unable to enable clock\n");
@@ -645,6 +657,8 @@ static int es8328_resume(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "unable to sync regcache\n");
 		return ret;
 	}
+
+	es8328_set_rates(codec, es8328);
 
 	return 0;
 }
