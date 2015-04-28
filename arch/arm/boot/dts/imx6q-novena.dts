@@ -226,6 +226,31 @@
 		spi-max-frequency = <30000000>;
 		reg = <0>;
 	};
+
+	fpga@1 {
+		compatible = "kosagi,novena-fpga";
+
+		spi-max-frequency = <30000000>;
+		reg = <1>;
+
+		pinctrl-names = "default", "state-eim", "state-gpio";
+		pinctrl-0 = <&pinctrl_fpga_gpio>;
+		pinctrl-1 = <&pinctrl_fpga_eim>;
+		pinctrl-2 = <&pinctrl_fpga_gpio>;
+		clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>,
+		         <&clks IMX6QDL_CLK_LVDS2_GATE>,
+			 <&clks IMX6QDL_CLK_ENET_REF>,
+			 <&clks IMX6QDL_CLK_EIM_SLOW>;
+		clock-names = "lvds", "lvds-switch", "lvds-parent", "eim-slow";
+		reset-switch = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		power-switch = <&gpio5 7 GPIO_ACTIVE_HIGH>;
+
+		kosagi,weim-cs0-timing = <0x31910BBF 0x00001000 0x09014000
+					  0x00000000 0x09080800 0x00000000>;
+		kosagi,weim-cs1-timing = <0x81910CBF 0x00001000 0x07001000
+					  0x00000200 0x02040400 0x00000000>;
+		kosagi,weim-cs-mapping = <2>;
+	};
 };
 
 &hdmi {
