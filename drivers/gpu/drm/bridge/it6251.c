@@ -78,7 +78,7 @@ struct it6251_bridge {
 #define IT6251_REG_LVDS_PORT_CTRL			0xfe
 #define IT6251_REG_LVDS_PORT_CTRL_EN			(1 << 0)
 
-#define INIT_RETRY_DELAY_START msecs_to_jiffies(50)
+#define INIT_RETRY_DELAY_START msecs_to_jiffies(350)
 #define INIT_RETRY_DELAY_MAX msecs_to_jiffies(3000)
 #define INIT_RETRY_DELAY_INC msecs_to_jiffies(50)
 #define INIT_RETRY_MAX_TRIES 20
@@ -182,7 +182,7 @@ fail:
 static int it6251_is_stable(struct it6251_bridge *priv)
 {
 	int status;
-	//int rpclkcnt;
+	int rpclkcnt;
 	int clkcnt;
 	int refstate;
 
@@ -192,11 +192,11 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 	if (!(status & IT6251_SYSTEM_STATUS_RVIDEOSTABLE))
 		return 0;
 
-	/*
 	rpclkcnt = ((it6251_read(priv, 0x13) & 0xff)
 		| ((it6251_read(priv, 0x14) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "RPCLKCnt: %d\n", rpclkcnt);
 
+	/*
 	if (rpclkcnt != 2260)
 		return 0;
 	*/
@@ -205,8 +205,10 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 		 ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_HIGH) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "Clock: 0x%02x\n", clkcnt);
 
+	/*
 	if (clkcnt != 0x193)
 		return 0;
+	*/
 
 	refstate = it6251_lvds_read(priv, IT6251_REF_STATE);
 	dev_info(&priv->client->dev, "Ref Link State: 0x%02x\n", refstate);
