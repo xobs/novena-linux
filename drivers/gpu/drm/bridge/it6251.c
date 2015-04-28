@@ -33,11 +33,13 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <drm/drm_panel.h>
 
 struct it6251_bridge {
 	struct i2c_client *client;
 	struct i2c_client *lvds_client;
 	struct regulator *regulator;
+	struct drm_panel *panel;
 	struct delayed_work init_work;
 	int delay_jiffies;
 	int delay_tries;
@@ -74,7 +76,7 @@ struct it6251_bridge {
 #define IT6251_REG_LVDS_PORT_CTRL			0xfe
 #define IT6251_REG_LVDS_PORT_CTRL_EN			(1 << 0)
 
-#define INIT_RETRY_DELAY_START msecs_to_jiffies(50)
+#define INIT_RETRY_DELAY_START msecs_to_jiffies(350)
 #define INIT_RETRY_DELAY_MAX msecs_to_jiffies(3000)
 #define INIT_RETRY_DELAY_INC msecs_to_jiffies(50)
 #define INIT_RETRY_MAX_TRIES 20
@@ -178,7 +180,7 @@ fail:
 static int it6251_is_stable(struct it6251_bridge *priv)
 {
 	int status;
-	//int rpclkcnt;
+	int rpclkcnt;
 	int clkcnt;
 	int refstate;
 
@@ -188,11 +190,11 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 	if (!(status & IT6251_SYSTEM_STATUS_RVIDEOSTABLE))
 		return 0;
 
-	/*
 	rpclkcnt = ((it6251_read(priv, 0x13) & 0xff)
 		| ((it6251_read(priv, 0x14) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "RPCLKCnt: %d\n", rpclkcnt);
 
+	/*
 	if (rpclkcnt != 2260)
 		return 0;
 	*/
@@ -201,8 +203,10 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 		 ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_HIGH) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "Clock: 0x%02x\n", clkcnt);
 
+	/*
 	if (clkcnt != 0x193)
 		return 0;
+	*/
 
 	refstate = it6251_lvds_read(priv, IT6251_REF_STATE);
 	dev_info(&priv->client->dev, "Ref Link State: 0x%02x\n", refstate);
@@ -217,6 +221,27 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 	return 1;
 }
 
+static void it6251_reschedule_init(struct it6251_bridge *priv)
+{
+	dev_err(&priv->client->dev,
+		"Display didn't stabilize.  This may be because "
+		"the LVDS port is still in powersave mode.");
+	if (priv->delay_tries++ > INIT_RETRY_MAX_TRIES) {
+		dev_err(&priv->client->dev,
+			"Too many retries, abandoning.\n");
+	}
+	else {
+		priv->delay_jiffies += INIT_RETRY_DELAY_INC;
+		if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
+			priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
+		dev_err(&priv->client->dev,
+			"Will try again in %d msecs\n",
+			jiffies_to_msecs(priv->delay_jiffies));
+		schedule_delayed_work(&priv->init_work,
+				      priv->delay_jiffies);
+	}
+}
+
 static void it6251_init(struct work_struct *work)
 {
 	int reg;
@@ -225,9 +250,13 @@ static void it6251_init(struct work_struct *work)
 						  init_work.work);
 
 	/* The bootloader can leave the chip already initialized */
-	if (it6251_is_stable(priv))
+	if (it6251_is_stable(priv)) {
+		dev_info(&priv->client->dev, "eDP system is already stable\n");
 		return;
+	}
 
+	/* Reset DP */
+	it6251_write(priv, 0x05, 0xff);
 	it6251_write(priv, 0x05, 0x00);
 	udelay(1000);
 
@@ -314,26 +343,8 @@ static void it6251_init(struct work_struct *work)
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
 	 */
-	if (!it6251_is_stable(priv)) {
-
-		dev_err(&priv->client->dev,
-			"Display didn't stabilize.  This may be because "
-			"the LVDS port is still in powersave mode.");
-		if (priv->delay_tries++ > INIT_RETRY_MAX_TRIES) {
-			dev_err(&priv->client->dev,
-				"Too many retries, abandoning.\n");
-		}
-		else {
-			priv->delay_jiffies += INIT_RETRY_DELAY_INC;
-			if (priv->delay_jiffies > INIT_RETRY_DELAY_MAX)
-				priv->delay_jiffies = INIT_RETRY_DELAY_MAX;
-			dev_err(&priv->client->dev,
-				"Will try again in %d msecs\n",
-				jiffies_to_msecs(priv->delay_jiffies));
-			schedule_delayed_work(&priv->init_work,
-					      priv->delay_jiffies);
-		}
-	}
+	if (!it6251_is_stable(priv))
+		it6251_reschedule_init(priv);
 
 	return;
 }
@@ -381,14 +392,14 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 	return 0;
 }
 
-static int it6251_suspend(struct device *dev)
+static int it6251_suspend(struct device *dev, bool do_power_down)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it6251_bridge *priv = i2c_get_clientdata(client);
 
 	cancel_delayed_work_sync(&priv->init_work);
 
-	if (regulator_is_enabled(priv->regulator)) {
+	if (do_power_down && regulator_is_enabled(priv->regulator)) {
 		int ret;
 
 		ret = regulator_disable(priv->regulator);
@@ -401,17 +412,20 @@ static int it6251_suspend(struct device *dev)
 	return 0;
 }
 
-static int it6251_resume(struct device *dev)
+static int it6251_resume(struct device *dev, bool do_power_up)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it6251_bridge *priv = i2c_get_clientdata(client);
-	int ret;
 
 	priv = i2c_get_clientdata(client);
 
-	ret = it6251_power_up(client, priv);
-	if (ret)
-		return ret;
+	if (do_power_up) {
+		int ret;
+
+		ret = it6251_power_up(client, priv);
+		if (ret)
+			return ret;
+	}
 
 	priv->delay_jiffies = INIT_RETRY_DELAY_START;
 	priv->delay_tries = 0;
@@ -421,6 +435,26 @@ static int it6251_resume(struct device *dev)
 
 
 /* I2C driver functions */
+
+static int it6251_pm_suspend(struct device *dev)
+{
+	return it6251_suspend(dev, true);
+}
+
+static int it6251_pm_resume(struct device *dev)
+{
+	return it6251_resume(dev, true);
+}
+
+static int it6251_pm_freeze(struct device *dev)
+{
+	return it6251_suspend(dev, false);
+}
+
+static int it6251_pm_thaw(struct device *dev)
+{
+	return it6251_resume(dev, false);
+}
 
 static int
 it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -493,8 +527,14 @@ static int it6251_remove(struct i2c_client *client)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(it6251_dev_pm_ops,
-			it6251_suspend, it6251_resume);
+static const struct dev_pm_ops it6251_dev_pm_ops = {
+	.suspend = it6251_pm_suspend,
+	.resume = it6251_pm_resume,
+	.freeze = it6251_pm_freeze,
+	.thaw = it6251_pm_thaw,
+	.poweroff = it6251_pm_freeze,
+	.restore = it6251_pm_resume,
+};
 
 static struct i2c_device_id it6251_ids[] = {
 	{ "it6251", 0 },
@@ -510,10 +550,10 @@ MODULE_DEVICE_TABLE(of, it6251_of_match);
 
 static struct i2c_driver it6251_driver = {
 	.driver = {
-		.name	= "it6251",
-		.owner	= THIS_MODULE,
-		.pm 	= &it6251_dev_pm_ops,
-		.of_match_table = it6251_of_match,
+		.name		= "it6251",
+		.owner		= THIS_MODULE,
+		.pm 		= &it6251_dev_pm_ops,
+		.of_match_table	= it6251_of_match,
 	},
 	.probe		= it6251_probe,
 	.remove		= it6251_remove,
