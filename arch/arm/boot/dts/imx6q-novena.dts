@@ -268,7 +268,7 @@
 	sbs_battery: bq20z75@0b {
 		compatible = "sbs,sbs-battery";
 		reg = <0x0b>;
-		sbs,i2c-retry-count = <0>;
+		sbs,i2c-retry-count = <3>;
 	};
 
 	senoko: senoko@20 {
