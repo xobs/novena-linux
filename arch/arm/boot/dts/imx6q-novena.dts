@@ -151,7 +151,7 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 10000000>;
+		pwms = <&pwm1 0 2500000>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_backlight_novena>;
