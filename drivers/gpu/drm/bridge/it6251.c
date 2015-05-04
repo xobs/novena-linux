@@ -399,14 +399,14 @@ static int it6251_power_up(struct i2c_client *client, struct it6251_bridge *priv
 	return 0;
 }
 
-static int it6251_suspend(struct device *dev)
+static int it6251_suspend(struct device *dev, bool do_power_down)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it6251_bridge *priv = i2c_get_clientdata(client);
 
 	cancel_delayed_work_sync(&priv->init_work);
 
-	if (regulator_is_enabled(priv->regulator)) {
+	if (do_power_down && regulator_is_enabled(priv->regulator)) {
 		int ret;
 
 		ret = regulator_disable(priv->regulator);
@@ -419,17 +419,20 @@ static int it6251_suspend(struct device *dev)
 	return 0;
 }
 
-static int it6251_resume(struct device *dev)
+static int it6251_resume(struct device *dev, bool do_power_up)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it6251_bridge *priv = i2c_get_clientdata(client);
-	int ret;
 
 	priv = i2c_get_clientdata(client);
 
-	ret = it6251_power_up(client, priv);
-	if (ret)
-		return ret;
+	if (do_power_up) {
+		int ret;
+
+		ret = it6251_power_up(client, priv);
+		if (ret)
+			return ret;
+	}
 
 	priv->delay_jiffies = INIT_RETRY_DELAY_START;
 	priv->delay_tries = 0;
@@ -439,6 +442,26 @@ static int it6251_resume(struct device *dev)
 
 
 /* I2C driver functions */
+
+static int it6251_pm_suspend(struct device *dev)
+{
+	return it6251_suspend(dev, true);
+}
+
+static int it6251_pm_resume(struct device *dev)
+{
+	return it6251_resume(dev, true);
+}
+
+static int it6251_pm_freeze(struct device *dev)
+{
+	return it6251_suspend(dev, false);
+}
+
+static int it6251_pm_thaw(struct device *dev)
+{
+	return it6251_resume(dev, false);
+}
 
 static int
 it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -523,8 +546,14 @@ static int it6251_remove(struct i2c_client *client)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(it6251_dev_pm_ops,
-			it6251_suspend, it6251_resume);
+static const struct dev_pm_ops it6251_dev_pm_ops = {
+	.suspend = it6251_pm_suspend,
+	.resume = it6251_pm_resume,
+	.freeze = it6251_pm_freeze,
+	.thaw = it6251_pm_thaw,
+	.poweroff = it6251_pm_freeze,
+	.restore = it6251_pm_resume,
+};
 
 static struct i2c_device_id it6251_ids[] = {
 	{ "it6251", 0 },
@@ -540,10 +569,10 @@ MODULE_DEVICE_TABLE(of, it6251_of_match);
 
 static struct i2c_driver it6251_driver = {
 	.driver = {
-		.name	= "it6251",
-		.owner	= THIS_MODULE,
-		.pm 	= &it6251_dev_pm_ops,
-		.of_match_table = it6251_of_match,
+		.name		= "it6251",
+		.owner		= THIS_MODULE,
+		.pm 		= &it6251_dev_pm_ops,
+		.of_match_table	= it6251_of_match,
 	},
 	.probe		= it6251_probe,
 	.remove		= it6251_remove,
