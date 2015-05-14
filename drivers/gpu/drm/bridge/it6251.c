@@ -196,19 +196,9 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 		| ((it6251_read(priv, 0x14) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "RPCLKCnt: %d\n", rpclkcnt);
 
-	/*
-	if (rpclkcnt != 2260)
-		return 0;
-	*/
-
 	clkcnt = ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_LOW) & 0xff) |
 		 ((it6251_lvds_read(priv, IT6251_REG_PCLK_CNT_HIGH) << 8) & 0x0f00));
 	dev_info(&priv->client->dev, "Clock: 0x%02x\n", clkcnt);
-
-	/*
-	if (clkcnt != 0x193)
-		return 0;
-	*/
 
 	refstate = it6251_read(priv, IT6251_REF_STATE);
 	dev_info(&priv->client->dev, "Ref Link State: 0x%02x\n", refstate);
@@ -251,14 +241,8 @@ static void it6251_init(struct work_struct *work)
 	struct it6251_bridge *priv = container_of(work, struct it6251_bridge,
 						  init_work.work);
 
-	/* The bootloader can leave the chip already initialized */
-	if (it6251_is_stable(priv)) {
-		dev_info(&priv->client->dev, "eDP system is already stable\n");
-		return;
-	}
-
 	/* If the panel itself isn't enabled, try again later */
-	if (!simple_panel_enabled) { //drm_panel_enabled(priv->panel)) {
+	if (!simple_panel_enabled) {
 		dev_info(&priv->client->dev, "panel not enabled, deferring\n");
 		it6251_reschedule_init(priv);
 		return;
@@ -333,6 +317,7 @@ static void it6251_init(struct work_struct *work)
 	it6251_write(priv, 0x19, 0xff); // voltage swing level 3
 	it6251_write(priv, 0x1a, 0xff); // pre-emphasis level 3
 
+	it6251_write(priv, 0x17, 0x04);
 	it6251_write(priv, 0x17, 0x01); // start link training
 
 	
