@@ -127,6 +127,7 @@
 			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
 				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
 			clock-names = "bus", "core";
+			power-domains = <&gpc 1>;
 		};
 
 		gpu_3d: gpu@00130000 {
@@ -137,6 +138,7 @@
 				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
 				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
 			clock-names = "bus", "core", "shader";
+			power-domains = <&gpc 1>;
 		};
 
 		hdmi: hdmi@0120000 {
