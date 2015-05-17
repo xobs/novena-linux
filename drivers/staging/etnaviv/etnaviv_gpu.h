@@ -104,8 +104,11 @@ struct etnaviv_gpu {
 	struct list_head active_list;
 
 	uint32_t idle_mask;
+
+	/* Fencing support */
 	uint32_t submitted_fence;
 	uint32_t retired_fence;
+	wait_queue_head_t fence_event;
 
 	/* worker for handling active-list retiring: */
 	struct work_struct retire_work;
@@ -139,6 +142,11 @@ static inline u32 gpu_read(struct etnaviv_gpu *gpu, u32 reg)
 	return etnaviv_readl(gpu->mmio + reg);
 }
 
+static inline bool fence_completed(struct etnaviv_gpu *gpu, uint32_t fence)
+{
+	return fence_after_eq(gpu->retired_fence, fence);
+}
+
 int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, uint32_t param,
 	uint64_t *value);
 
@@ -149,6 +157,8 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
 #endif
 
 void etnaviv_gpu_retire(struct etnaviv_gpu *gpu);
+int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
+	uint32_t fence, struct timespec *timeout);
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx);
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu);
