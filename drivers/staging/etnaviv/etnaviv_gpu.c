@@ -730,7 +730,8 @@ static void recover_worker(struct work_struct *work)
 	/* TODO gpu->funcs->recover(gpu); */
 	mutex_unlock(&dev->struct_mutex);
 
-	etnaviv_gpu_retire(gpu);
+	/* Retire the buffer objects in a work */
+	etnaviv_queue_work(gpu->dev, &gpu->retire_work);
 }
 
 static void hangcheck_timer_reset(struct etnaviv_gpu *gpu)
@@ -743,8 +744,6 @@ static void hangcheck_timer_reset(struct etnaviv_gpu *gpu)
 static void hangcheck_handler(unsigned long data)
 {
 	struct etnaviv_gpu *gpu = (struct etnaviv_gpu *)data;
-	struct drm_device *dev = gpu->drm;
-	struct etnaviv_drm_private *priv = dev->dev_private;
 	uint32_t fence = gpu->retired_fence;
 	bool progress = false;
 
@@ -768,7 +767,7 @@ static void hangcheck_handler(unsigned long data)
 		dev_err(gpu->dev, "     completed fence: %u\n", fence);
 		dev_err(gpu->dev, "     submitted fence: %u\n",
 			gpu->submitted_fence);
-		queue_work(priv->wq, &gpu->recover_work);
+		etnaviv_queue_work(gpu->dev, &gpu->recover_work);
 	}
 
 	/* if still more pending work, reset the hangcheck timer: */
@@ -865,14 +864,6 @@ static void retire_worker(struct work_struct *work)
 	mutex_unlock(&dev->struct_mutex);
 
 	wake_up_all(&gpu->fence_event);
-}
-
-/* call from irq handler to schedule work to retire bo's */
-void etnaviv_gpu_retire(struct etnaviv_gpu *gpu)
-{
-	struct etnaviv_drm_private *priv = gpu->drm->dev_private;
-
-	queue_work(priv->wq, &gpu->retire_work);
 }
 
 int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
@@ -1046,7 +1037,8 @@ static irqreturn_t irq_handler(int irq, void *data)
 			pm_runtime_put_autosuspend(gpu->dev);
 		}
 
-		etnaviv_gpu_retire(gpu);
+		/* Retire the buffer objects in a work */
+		etnaviv_queue_work(gpu->dev, &gpu->retire_work);
 
 		ret = IRQ_HANDLED;
 	}
