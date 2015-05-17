@@ -434,7 +434,7 @@ static int etnaviv_ioctl_gem_userptr(struct drm_device *dev, void *data,
 
 	if (offset_in_page(args->user_ptr | args->user_size) ||
 	    (uintptr_t)args->user_ptr != args->user_ptr ||
-	    (uint32_t)args->user_size != args->user_size)
+	    (u32)args->user_size != args->user_size)
 		return -EINVAL;
 
 	if (args->flags & ETNA_USERPTR_WRITE)

@@ -34,7 +34,7 @@ struct etnaviv_iommu {
 
 	/* memory manager for GPU address area */
 	struct drm_mm mm;
-	uint32_t last_iova;
+	u32 last_iova;
 	bool need_flush;
 };
 
@@ -42,12 +42,12 @@ struct etnaviv_gem_object;
 
 int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
 	int cnt);
-int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova,
+int etnaviv_iommu_map(struct etnaviv_iommu *iommu, u32 iova,
 	struct sg_table *sgt, unsigned len, int prot);
-int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
+int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, u32 iova,
 	struct sg_table *sgt, unsigned len);
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
-	struct etnaviv_gem_object *etnaviv_obj, uint32_t memory_base,
+	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
 	struct etnaviv_vram_mapping **mapping);
 void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj,
