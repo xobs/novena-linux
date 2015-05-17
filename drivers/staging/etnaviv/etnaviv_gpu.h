@@ -26,60 +26,60 @@ struct etnaviv_gem_submit;
 
 struct etnaviv_chip_identity {
 	/* Chip model. */
-	uint32_t model;
+	u32 model;
 
 	/* Revision value.*/
-	uint32_t revision;
+	u32 revision;
 
 	/* Supported feature fields. */
-	uint32_t features;
+	u32 features;
 
 	/* Supported minor feature fields. */
-	uint32_t minor_features0;
+	u32 minor_features0;
 
 	/* Supported minor feature 1 fields. */
-	uint32_t minor_features1;
+	u32 minor_features1;
 
 	/* Supported minor feature 2 fields. */
-	uint32_t minor_features2;
+	u32 minor_features2;
 
 	/* Supported minor feature 3 fields. */
-	uint32_t minor_features3;
+	u32 minor_features3;
 
 	/* Number of streams supported. */
-	uint32_t stream_count;
+	u32 stream_count;
 
 	/* Total number of temporary registers per thread. */
-	uint32_t register_max;
+	u32 register_max;
 
 	/* Maximum number of threads. */
-	uint32_t thread_count;
+	u32 thread_count;
 
 	/* Number of shader cores. */
-	uint32_t shader_core_count;
+	u32 shader_core_count;
 
 	/* Size of the vertex cache. */
-	uint32_t vertex_cache_size;
+	u32 vertex_cache_size;
 
 	/* Number of entries in the vertex output buffer. */
-	uint32_t vertex_output_buffer_size;
+	u32 vertex_output_buffer_size;
 
 	/* Number of pixel pipes. */
-	uint32_t pixel_pipes;
+	u32 pixel_pipes;
 
 	/* Number of instructions. */
-	uint32_t instruction_count;
+	u32 instruction_count;
 
 	/* Number of constants. */
-	uint32_t num_constants;
+	u32 num_constants;
 
 	/* Buffer size */
-	uint32_t buffer_size;
+	u32 buffer_size;
 };
 
 struct etnaviv_event {
 	bool used;
-	uint32_t fence;
+	u32 fence;
 };
 
 struct etnaviv_gpu {
@@ -93,7 +93,7 @@ struct etnaviv_gpu {
 	struct drm_gem_object *buffer;
 
 	/* bus base address of memory  */
-	uint32_t memory_base;
+	u32 memory_base;
 
 	/* event management: */
 	struct etnaviv_event event[30];
@@ -103,11 +103,11 @@ struct etnaviv_gpu {
 	/* list of GEM active objects: */
 	struct list_head active_list;
 
-	uint32_t idle_mask;
+	u32 idle_mask;
 
 	/* Fencing support */
-	uint32_t submitted_fence;
-	uint32_t retired_fence;
+	u32 submitted_fence;
+	u32 retired_fence;
 	wait_queue_head_t fence_event;
 
 	/* worker for handling active-list retiring: */
@@ -127,8 +127,8 @@ struct etnaviv_gpu {
 #define DRM_ETNAVIV_HANGCHECK_PERIOD 500 /* in ms */
 #define DRM_ETNAVIV_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_ETNAVIV_HANGCHECK_PERIOD)
 	struct timer_list hangcheck_timer;
-	uint32_t hangcheck_fence;
-	uint32_t hangcheck_dma_addr;
+	u32 hangcheck_fence;
+	u32 hangcheck_dma_addr;
 	struct work_struct recover_work;
 };
 
@@ -142,13 +142,12 @@ static inline u32 gpu_read(struct etnaviv_gpu *gpu, u32 reg)
 	return etnaviv_readl(gpu->mmio + reg);
 }
 
-static inline bool fence_completed(struct etnaviv_gpu *gpu, uint32_t fence)
+static inline bool fence_completed(struct etnaviv_gpu *gpu, u32 fence)
 {
 	return fence_after_eq(gpu->retired_fence, fence);
 }
 
-int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, uint32_t param,
-	uint64_t *value);
+int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, u32 param, u64 *value);
 
 int etnaviv_gpu_init(struct etnaviv_gpu *gpu);
 
@@ -158,7 +157,7 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
 
 void etnaviv_gpu_retire(struct etnaviv_gpu *gpu);
 int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
-	uint32_t fence, struct timespec *timeout);
+	u32 fence, struct timespec *timeout);
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx);
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu);

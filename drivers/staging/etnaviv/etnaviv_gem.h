@@ -33,14 +33,14 @@ struct etnaviv_vram_mapping {
 	struct list_head obj_head;
 	struct etnaviv_iommu *mmu;
 	struct drm_mm_node vram_node;
-	uint32_t iova;
+	u32 iova;
 };
 
 struct etnaviv_gem_object {
 	struct drm_gem_object base;
 	const struct etnaviv_gem_ops *ops;
 
-	uint32_t flags;
+	u32 flags;
 
 	/* And object is either:
 	 *  inactive - on priv->inactive_list
@@ -52,8 +52,8 @@ struct etnaviv_gem_object {
 	 */
 	struct list_head mm_list;
 	struct etnaviv_gpu *gpu;     /* non-null if active */
-	uint32_t access;
-	uint32_t read_fence, write_fence;
+	u32 access;
+	u32 read_fence, write_fence;
 
 	/* Transiently in the process of submit ioctl, objects associated
 	 * with the submit are on submit->bo_list.. this only lasts for
@@ -108,29 +108,29 @@ static inline bool is_active(struct etnaviv_gem_object *etnaviv_obj)
 struct etnaviv_gem_submit {
 	struct drm_device *dev;
 	struct etnaviv_gpu *gpu;
-	uint32_t exec_state;
+	u32 exec_state;
 	struct list_head bo_list;
 	struct ww_acquire_ctx ticket;
-	uint32_t fence;
+	u32 fence;
 	unsigned int nr_cmds;
 	unsigned int nr_bos;
 	struct {
-		uint32_t type;
-		uint32_t offset; /* in dwords */
-		uint32_t size;  /* in dwords */
+		u32 type;
+		u32 offset; /* in dwords */
+		u32 size;  /* in dwords */
 		struct etnaviv_gem_object *obj;
 	} cmd[MAX_CMDS];
 	struct {
-		uint32_t flags;
+		u32 flags;
 		struct etnaviv_gem_object *obj;
-		uint32_t iova;
+		u32 iova;
 	} bos[0];
 };
 
 struct etnaviv_vram_mapping *
 etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
 			     struct etnaviv_iommu *mmu);
-int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
+int etnaviv_gem_new_private(struct drm_device *dev, size_t size, u32 flags,
 	struct etnaviv_gem_object **res);
 int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj);
 struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *obj);

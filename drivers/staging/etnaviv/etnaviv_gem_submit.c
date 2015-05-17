@@ -139,7 +139,7 @@ static int submit_validate_objects(struct etnaviv_gem_submit *submit)
 retry:
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
-		uint32_t iova;
+		u32 iova;
 
 		if (slow_locked == i)
 			slow_locked = -1;
@@ -201,8 +201,8 @@ fail:
 	return ret;
 }
 
-static int submit_bo(struct etnaviv_gem_submit *submit, uint32_t idx,
-		struct etnaviv_gem_object **obj, uint32_t *iova)
+static int submit_bo(struct etnaviv_gem_submit *submit, u32 idx,
+		struct etnaviv_gem_object **obj, u32 *iova)
 {
 	if (idx >= submit->nr_bos) {
 		DRM_ERROR("invalid buffer index: %u (out of %u)\n",
@@ -220,10 +220,10 @@ static int submit_bo(struct etnaviv_gem_submit *submit, uint32_t idx,
 
 /* process the reloc's and patch up the cmdstream as needed: */
 static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_object *obj,
-		uint32_t offset, uint32_t nr_relocs, uint64_t relocs)
+		u32 offset, u32 nr_relocs, u64 relocs)
 {
-	uint32_t i, last_offset = 0;
-	uint32_t *ptr = obj->vaddr;
+	u32 i, last_offset = 0;
+	u32 *ptr = obj->vaddr;
 	int ret;
 
 	if (offset % 4) {
@@ -236,7 +236,7 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 		struct etnaviv_gem_object *bobj;
 		void __user *userptr =
 			to_user_ptr(relocs + (i * sizeof(submit_reloc)));
-		uint32_t iova, off;
+		u32 iova, off;
 
 		ret = copy_from_user(&submit_reloc, userptr,
 				     sizeof(submit_reloc));
