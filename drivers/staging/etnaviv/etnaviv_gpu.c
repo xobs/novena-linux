@@ -841,8 +841,6 @@ static void retire_worker(struct work_struct *work)
 	struct drm_device *dev = gpu->drm;
 	uint32_t fence = gpu->retired_fence;
 
-	etnaviv_update_fence(gpu->drm, fence);
-
 	mutex_lock(&dev->struct_mutex);
 
 	while (!list_empty(&gpu->active_list)) {
@@ -865,6 +863,8 @@ static void retire_worker(struct work_struct *work)
 	}
 
 	mutex_unlock(&dev->struct_mutex);
+
+	wake_up_all(&gpu->fence_event);
 }
 
 /* call from irq handler to schedule work to retire bo's */
@@ -873,6 +873,45 @@ void etnaviv_gpu_retire(struct etnaviv_gpu *gpu)
 	struct etnaviv_drm_private *priv = gpu->drm->dev_private;
 
 	queue_work(priv->wq, &gpu->retire_work);
+}
+
+int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
+	uint32_t fence, struct timespec *timeout)
+{
+	int ret;
+
+	if (fence_after(fence, gpu->submitted_fence)) {
+		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
+				fence, gpu->submitted_fence);
+		return -EINVAL;
+	}
+
+	if (!timeout) {
+		/* No timeout was requested: just test for completion */
+		ret = fence_completed(gpu, fence) ? 0 : -EBUSY;
+	} else {
+		unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
+		unsigned long start_jiffies = jiffies;
+		unsigned long remaining_jiffies;
+
+		if (time_after(start_jiffies, timeout_jiffies))
+			remaining_jiffies = 0;
+		else
+			remaining_jiffies = timeout_jiffies - start_jiffies;
+
+		ret = wait_event_interruptible_timeout(gpu->fence_event,
+						fence_completed(gpu, fence),
+						remaining_jiffies);
+		if (ret == 0) {
+			DBG("timeout waiting for fence: %u (completed: %u)",
+					fence, gpu->retired_fence);
+			ret = -ETIMEDOUT;
+		} else if (ret != -ERESTARTSYS) {
+			ret = 0;
+		}
+	}
+
+	return ret;
 }
 
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu)
@@ -1125,6 +1164,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	INIT_LIST_HEAD(&gpu->active_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
 	INIT_WORK(&gpu->recover_work, recover_worker);
+	init_waitqueue_head(&gpu->fence_event);
 
 	setup_timer(&gpu->hangcheck_timer, hangcheck_handler,
 			(unsigned long)gpu);
