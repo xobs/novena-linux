@@ -112,7 +112,7 @@ static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
 	u32 size = obj->base.size;
 	u32 *ptr = obj->vaddr + off;
 
-	dev_info(gpu->drm->dev, "virt %p phys 0x%llx free 0x%08x\n",
+	dev_info(gpu->dev, "virt %p phys 0x%llx free 0x%08x\n",
 			ptr, (u64)obj->paddr + off, size - len * 4 - off);
 
 	print_hex_dump(KERN_INFO, "cmd ", DUMP_PREFIX_OFFSET, 16, 4,
