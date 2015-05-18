@@ -26,14 +26,15 @@
 static void etnaviv_gem_scatter_map(struct etnaviv_gem_object *etnaviv_obj)
 {
 	struct drm_device *dev = etnaviv_obj->base.dev;
+	struct sg_table *sgt = etnaviv_obj->sgt;
 
 	/*
 	 * For non-cached buffers, ensure the new pages are clean
 	 * because display controller, GPU, etc. are not coherent.
 	 */
 	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED)) {
-		dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
-			   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
+		dma_map_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
 	} else {
 		struct scatterlist *sg;
 		unsigned int i;
@@ -50,6 +51,7 @@ static void etnaviv_gem_scatter_map(struct etnaviv_gem_object *etnaviv_obj)
 static void etnaviv_gem_scatterlist_unmap(struct etnaviv_gem_object *etnaviv_obj)
 {
 	struct drm_device *dev = etnaviv_obj->base.dev;
+	struct sg_table *sgt = etnaviv_obj->sgt;
 
 	/*
 	 * For non-cached buffers, ensure the new pages are clean
@@ -66,10 +68,10 @@ static void etnaviv_gem_scatterlist_unmap(struct etnaviv_gem_object *etnaviv_obj
 	 * written into the remainder of the region, this can
 	 * discard those writes.
 	 */
-	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED))
-		dma_unmap_sg(dev->dev, etnaviv_obj->sgt->sgl,
-			     etnaviv_obj->sgt->nents,
-			     DMA_BIDIRECTIONAL);
+	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_CACHED)) {
+		dma_map_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
+	}
 }
 
 /* called with dev->struct_mutex held */
