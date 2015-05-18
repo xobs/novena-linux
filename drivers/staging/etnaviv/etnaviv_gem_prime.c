@@ -78,6 +78,7 @@ static void etnaviv_gem_prime_release(struct etnaviv_gem_object *etnaviv_obj)
 }
 
 static const struct etnaviv_gem_ops etnaviv_gem_prime_ops = {
+	/* .get_pages should never be called */
 	.release = etnaviv_gem_prime_release,
 };
 
