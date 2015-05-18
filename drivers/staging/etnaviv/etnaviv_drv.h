@@ -78,9 +78,10 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 int etnaviv_gem_mmap(struct file *filp, struct vm_area_struct *vma);
 int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 uint64_t etnaviv_gem_mmap_offset(struct drm_gem_object *obj);
-int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-		uint32_t *iova);
-int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj, int id, uint32_t *iova);
+int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
+	struct drm_gem_object *obj, uint32_t *iova);
+int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
+	int id, uint32_t *iova);
 struct page **etnaviv_gem_get_pages(struct drm_gem_object *obj);
 void msm_gem_put_pages(struct drm_gem_object *obj);
 void etnaviv_gem_put_iova(struct drm_gem_object *obj);
@@ -112,7 +113,8 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 		struct dma_buf_attachment *attach, struct sg_table *sgt);
 u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
-void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct etnaviv_gem_submit *submit);
+void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
+	struct etnaviv_gem_submit *submit);
 
 #ifdef CONFIG_DEBUG_FS
 void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m);
@@ -147,6 +149,7 @@ static inline bool fence_completed(struct drm_device *dev, uint32_t fence)
 static inline int align_pitch(int width, int bpp)
 {
 	int bytespp = (bpp + 7) / 8;
+
 	/* adreno needs pitch aligned to 32 pixels: */
 	return bytespp * ALIGN(width, 32);
 }

@@ -32,11 +32,12 @@ struct etnaviv_iommu {
 	enum etnaviv_iommu_version version;
 };
 
-int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names, int cnt);
-int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova, struct sg_table *sgt,
-		unsigned len, int prot);
-int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova, struct sg_table *sgt,
-		unsigned len);
+int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
+	int cnt);
+int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova,
+	struct sg_table *sgt, unsigned len, int prot);
+int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
+	struct sg_table *sgt, unsigned len);
 void etnaviv_iommu_destroy(struct etnaviv_iommu *iommu);
 
 struct etnaviv_iommu *etnaviv_iommu_new(struct drm_device *dev,

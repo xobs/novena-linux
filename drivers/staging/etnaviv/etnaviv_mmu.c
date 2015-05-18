@@ -57,6 +57,7 @@ fail:
 
 	for_each_sg(sgt->sgl, sg, i, j) {
 		size_t bytes = sg->length + sg->offset;
+
 		iommu_unmap(domain, da, bytes);
 		da += bytes;
 	}
