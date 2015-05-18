@@ -91,9 +91,7 @@ static int etnaviv_unload(struct drm_device *dev)
 	flush_workqueue(priv->wq);
 	destroy_workqueue(priv->wq);
 
-	mutex_lock(&dev->struct_mutex);
 	component_unbind_all(dev->dev, dev);
-	mutex_unlock(&dev->struct_mutex);
 
 	dev->dev_private = NULL;
 
@@ -144,15 +142,11 @@ static int etnaviv_load(struct drm_device *dev, unsigned long flags)
 
 	platform_set_drvdata(pdev, dev);
 
-	mutex_lock(&dev->struct_mutex);
-
 	err = component_bind_all(dev->dev, dev);
 	if (err < 0)
 		return err;
 
 	load_gpu(dev);
-
-	mutex_unlock(&dev->struct_mutex);
 
 	return 0;
 }
