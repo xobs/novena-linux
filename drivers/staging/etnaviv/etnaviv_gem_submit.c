@@ -259,6 +259,13 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 			return -EINVAL;
 		}
 
+		/* Vivante hardware has no need for shifts or bitwise or-ing */
+		if (submit_reloc.shift || submit_reloc.or) {
+			DRM_ERROR("invalid shift or bitwise or at reloc %u\n",
+				  i);
+			return -EINVAL;
+		}
+
 		ret = submit_bo(submit, submit_reloc.reloc_idx, &bobj, &iova);
 		if (ret)
 			return ret;
@@ -269,14 +276,7 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 			return -EINVAL;
 		}
 
-		iova += submit_reloc.reloc_offset;
-
-		if (submit_reloc.shift < 0)
-			iova >>= -submit_reloc.shift;
-		else
-			iova <<= submit_reloc.shift;
-
-		ptr[off] = iova | submit_reloc.or;
+		ptr[off] = iova + submit_reloc.reloc_offset;
 
 		last_offset = off;
 	}
