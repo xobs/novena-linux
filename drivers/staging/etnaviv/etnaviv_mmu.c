@@ -92,7 +92,7 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 }
 
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
-	struct etnaviv_gem_object *etnaviv_obj)
+	struct etnaviv_gem_object *etnaviv_obj, uint32_t memory_base)
 {
 	struct etnaviv_drm_private *priv = etnaviv_obj->base.dev->dev_private;
 	struct sg_table *sgt = etnaviv_obj->sgt;
@@ -103,7 +103,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	if (sgt->nents == 1) {
 		uint32_t iova;
 
-		iova = sg_dma_address(sgt->sgl);
+		iova = sg_dma_address(sgt->sgl) - memory_base;
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
 			etnaviv_obj->iova = iova;
 			return 0;
