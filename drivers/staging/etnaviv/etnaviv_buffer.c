@@ -30,7 +30,7 @@
 static inline void OUT(struct etnaviv_gem_object *buffer, uint32_t data)
 {
 	u32 *vaddr = (u32 *)buffer->vaddr;
-	BUG_ON(buffer->offset * sizeof(*vaddr) >= buffer->base.size);
+	BUG_ON(buffer->offset >= buffer->base.size / sizeof(*vaddr));
 
 	vaddr[buffer->offset++] = data;
 }
@@ -135,6 +135,12 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 
 	if (drm_debug & DRM_UT_DRIVER)
 		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
+
+	/*
+	 * if we are going to completely overflow the buffer, we need to wrap.
+	 */
+	if (buffer->offset + 6 > buffer->base.size / sizeof(uint32_t))
+		buffer->offset = 0;
 
 	/* save offset back into main buffer */
 	back = buffer->offset;
