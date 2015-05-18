@@ -86,6 +86,8 @@ struct drm_etnaviv_param {
 #define ETNA_BO_CACHED       0x00010000
 #define ETNA_BO_WC           0x00020000
 #define ETNA_BO_UNCACHED     0x00040000
+/* map flags */
+#define ETNA_BO_FORCE_MMU    0x00100000
 
 struct drm_etnaviv_gem_new {
 	uint64_t size;           /* in */
