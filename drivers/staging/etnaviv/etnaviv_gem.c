@@ -537,19 +537,24 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 
 	drm_gem_free_mmap_offset(obj);
 
-	if (etnaviv_obj->ops) {
-		etnaviv_obj->ops->release(etnaviv_obj);
-	} else {
-		if (etnaviv_obj->vaddr)
-			vunmap(etnaviv_obj->vaddr);
-		put_pages(obj);
-	}
+	etnaviv_obj->ops->release(etnaviv_obj);
 
 	if (etnaviv_obj->resv == &etnaviv_obj->_resv)
 		reservation_object_fini(etnaviv_obj->resv);
 
 	drm_gem_object_release(obj);
 }
+
+static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
+{
+	if (etnaviv_obj->vaddr)
+		vunmap(etnaviv_obj->vaddr);
+	put_pages(&etnaviv_obj->base);
+}
+
+static const struct etnaviv_gem_ops etnaviv_gem_shmem_ops = {
+	.release = etnaviv_gem_shmem_release,
+};
 
 void etnaviv_gem_free_object(struct drm_gem_object *obj)
 {
@@ -670,10 +675,12 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 		goto fail;
 
 	ret = 0;
-	if (flags & ETNA_BO_CMDSTREAM)
+	if (flags & ETNA_BO_CMDSTREAM) {
 		drm_gem_private_object_init(dev, obj, size);
-	else
+	} else {
+		to_etnaviv_bo(obj)->ops = &etnaviv_gem_shmem_ops;
 		ret = drm_gem_object_init(dev, obj, size);
+	}
 
 	if (ret)
 		goto fail;
