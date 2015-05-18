@@ -81,6 +81,7 @@ struct etnaviv_chip_identity {
 struct etnaviv_event {
 	bool used;
 	uint32_t fence;
+	uint32_t ring_pos;
 };
 
 struct etnaviv_gpu {
@@ -102,6 +103,7 @@ struct etnaviv_gpu {
 
 	uint32_t submitted_fence;
 	uint32_t retired_fence;
+	uint32_t last_ring_pos;
 
 	/* worker for handling active-list retiring: */
 	struct work_struct retire_work;
