@@ -108,7 +108,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 {
 	phys_addr_t selected_size = 0;
 	phys_addr_t selected_base = 0;
-	phys_addr_t selected_limit = limit;
+	phys_addr_t selected_limit = SZ_1G;
 	bool fixed = false;
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
