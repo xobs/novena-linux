@@ -104,6 +104,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	if (!mapping)
 		return -ENOMEM;
 
+	INIT_LIST_HEAD(&mapping->scan_node);
+	mapping->object = etnaviv_obj;
 	mapping->mmu = mmu;
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
@@ -113,7 +115,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		iova = sg_dma_address(sgt->sgl) - memory_base;
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
 			mapping->iova = iova;
-			list_add_tail(&mapping->obj_head,
+			list_add_tail(&mapping->obj_node,
 				      &etnaviv_obj->vram_list);
 			if (out_mapping)
 				*out_mapping = mapping;
@@ -123,7 +125,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 	node = &mapping->vram_node;
 	while (1) {
-		struct etnaviv_gem_object *o, *n;
+		struct etnaviv_gem_object *o;
+		struct etnaviv_vram_mapping *m, *n;
 		struct list_head list;
 		bool found;
 
@@ -155,13 +158,19 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 				continue;
 
 			/*
+			 * If this vram node has not been used, skip this.
+			 */
+			if (!free->vram_node.mm)
+				continue;
+
+			/*
 			 * If it's on the submit list, then it is part of
 			 * a submission, and we want to keep its entry.
 			 */
 			if (!list_empty(&o->submit_entry))
 				continue;
 
-			list_add(&o->submit_entry, &list);
+			list_add(&free->scan_node, &list);
 			if (drm_mm_scan_add_block(&free->vram_node)) {
 				found = true;
 				break;
@@ -170,8 +179,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 		if (!found) {
 			/* Nothing found, clean up and fail */
-			list_for_each_entry_safe(o, n, &list, submit_entry)
-				BUG_ON(drm_mm_scan_remove_block(&free->vram_node));
+			list_for_each_entry_safe(m, n, &list, scan_node)
+				BUG_ON(drm_mm_scan_remove_block(&m->vram_node));
 			break;
 		}
 
@@ -181,13 +190,13 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		 * If drm_mm_scan_remove_block() returns false, we
 		 * can leave the block pinned.
 		 */
-		list_for_each_entry_safe(o, n, &list, submit_entry)
-			if (!drm_mm_scan_remove_block(&free->vram_node))
-				list_del_init(&o->submit_entry);
+		list_for_each_entry_safe(m, n, &list, scan_node)
+			if (!drm_mm_scan_remove_block(&m->vram_node))
+				list_del_init(&m->scan_node);
 
-		list_for_each_entry_safe(o, n, &list, submit_entry) {
-			list_del_init(&o->submit_entry);
-			etnaviv_iommu_unmap_gem(mmu, o, free);
+		list_for_each_entry_safe(m, n, &list, scan_node) {
+			list_del_init(&m->scan_node);
+			etnaviv_iommu_unmap_gem(mmu, m->object, m);
 		}
 
 		/*
@@ -214,7 +223,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		return ret;
 	}
 
-	list_add_tail(&mapping->obj_head, &etnaviv_obj->vram_list);
+	list_add_tail(&mapping->obj_node, &etnaviv_obj->vram_list);
 	if (out_mapping)
 		*out_mapping = mapping;
 
@@ -233,9 +242,8 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 					    etnaviv_obj->base.size);
 			drm_mm_remove_node(&mapping->vram_node);
 		}
-		list_del(&mapping->obj_head);
+		list_del(&mapping->obj_node);
 		kfree(mapping);
-		mapping = NULL;
 	}
 }
 

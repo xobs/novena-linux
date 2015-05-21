@@ -21,6 +21,7 @@
 #include "etnaviv_drv.h"
 
 struct etnaviv_gem_ops;
+struct etnaviv_gem_object;
 
 struct etnaviv_gem_userptr {
 	uintptr_t ptr;
@@ -30,7 +31,9 @@ struct etnaviv_gem_userptr {
 };
 
 struct etnaviv_vram_mapping {
-	struct list_head obj_head;
+	struct list_head obj_node;
+	struct list_head scan_node;
+	struct etnaviv_gem_object *object;
 	struct etnaviv_iommu *mmu;
 	struct drm_mm_node vram_node;
 	u32 iova;
