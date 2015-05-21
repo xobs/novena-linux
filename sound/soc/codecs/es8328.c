@@ -620,57 +620,6 @@ static struct snd_soc_dai_driver es8328_dai = {
 	.ops = &es8328_dai_ops,
 };
 
-static int es8328_suspend(struct snd_soc_codec *codec)
-{
-	struct es8328_priv *es8328;
-	int ret;
-
-	es8328 = snd_soc_codec_get_drvdata(codec);
-
-	clk_disable_unprepare(es8328->clk);
-
-	ret = regulator_bulk_disable(ARRAY_SIZE(es8328->supplies),
-			es8328->supplies);
-	if (ret) {
-		dev_err(codec->dev, "unable to disable regulators\n");
-		return ret;
-	}
-	return 0;
-}
-
-static int es8328_resume(struct snd_soc_codec *codec)
-{
-	struct regmap *regmap = dev_get_regmap(codec->dev, NULL);
-	struct es8328_priv *es8328;
-	int ret;
-
-	es8328 = snd_soc_codec_get_drvdata(codec);
-
-	ret = clk_prepare_enable(es8328->clk);
-	if (ret) {
-		dev_err(codec->dev, "unable to enable clock\n");
-		return ret;
-	}
-
-	ret = regulator_bulk_enable(ARRAY_SIZE(es8328->supplies),
-					es8328->supplies);
-	if (ret) {
-		dev_err(codec->dev, "unable to enable regulators\n");
-		return ret;
-	}
-
-	regcache_mark_dirty(regmap);
-	ret = regcache_sync(regmap);
-	if (ret) {
-		dev_err(codec->dev, "unable to sync regcache\n");
-		return ret;
-	}
-
-	es8328_set_rates(codec, es8328);
-
-	return 0;
-}
-
 static int es8328_codec_probe(struct snd_soc_codec *codec)
 {
 	struct es8328_priv *es8328;
@@ -733,8 +682,6 @@ EXPORT_SYMBOL_GPL(es8328_regmap_config);
 
 static struct snd_soc_codec_driver es8328_codec_driver = {
 	.probe		  = es8328_codec_probe,
-	.suspend	  = es8328_suspend,
-	.resume		  = es8328_resume,
 	.remove		  = es8328_remove,
 	.set_bias_level	  = es8328_set_bias_level,
 	.suspend_bias_off = true,
