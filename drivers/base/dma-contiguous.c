@@ -107,8 +107,8 @@ static inline __maybe_unused phys_addr_t cma_early_percent_memory(void)
 void __init dma_contiguous_reserve(phys_addr_t limit)
 {
 	phys_addr_t selected_size = 0;
-	phys_addr_t selected_base = 0;
-	phys_addr_t selected_limit = limit;
+	phys_addr_t selected_base = 256 * 1024 * 1024;
+	phys_addr_t selected_limit = 1024 * 1024 * 1024;
 	bool fixed = false;
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
