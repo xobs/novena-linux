@@ -25,7 +25,7 @@
 #include "etnaviv_iommu.h"
 #include "state_hi.xml.h"
 
-#define PT_SIZE		SZ_256K
+#define PT_SIZE		SZ_2M
 #define PT_ENTRIES	(PT_SIZE / sizeof(uint32_t))
 
 #define GPU_MEM_START	0x80000000
@@ -82,7 +82,7 @@ static void pgtable_write(struct etnaviv_iommu_domain_pgtable *pgtable,
 static int etnaviv_iommu_domain_init(struct iommu_domain *domain)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain;
-	uint32_t iova, *p;
+	uint32_t *p;
 	int ret, i;
 
 	etnaviv_domain = kmalloc(sizeof(*etnaviv_domain), GFP_KERNEL);
@@ -108,11 +108,9 @@ static int etnaviv_iommu_domain_init(struct iommu_domain *domain)
 		return ret;
 	}
 
-	for (iova = domain->geometry.aperture_start;
-	     iova < domain->geometry.aperture_end; iova += SZ_4K) {
-		pgtable_write(&etnaviv_domain->pgtable, iova,
-			      etnaviv_domain->bad_page_dma);
-	}
+	for (i = 0; i < PT_ENTRIES; i++)
+		etnaviv_domain->pgtable.pgtable[i] =
+			etnaviv_domain->bad_page_dma;
 
 	spin_lock_init(&etnaviv_domain->map_lock);
 	domain->priv = etnaviv_domain;
