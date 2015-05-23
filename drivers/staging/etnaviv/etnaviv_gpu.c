@@ -307,6 +307,13 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 	etnaviv_hw_specs(gpu);
 }
 
+static void etnaviv_gpu_load_clock(struct etnaviv_gpu *gpu, u32 clock)
+{
+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, clock |
+		  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, clock);
+}
+
 static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 {
 	u32 control, idle;
@@ -328,9 +335,7 @@ static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 			  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
 
 		/* enable clock */
-		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control |
-			  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
-		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
+		etnaviv_gpu_load_clock(gpu, control);
 
 		/* Wait for stable clock.  Vivante's code waited for 1ms */
 		usleep_range(1000, 10000);
@@ -394,9 +399,7 @@ static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 		  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
 
 	/* enable clock */
-	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control |
-		  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
-	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
+	etnaviv_gpu_load_clock(gpu, control);
 
 	return 0;
 }
