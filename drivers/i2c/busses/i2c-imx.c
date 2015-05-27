@@ -983,9 +983,6 @@ fail0:
 	/* Stop I2C transfer */
 	i2c_imx_stop(i2c_imx);
 
-	if (result == -EAGAIN)
-		usleep_range(20000, 100000);
-
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> exit with: %s: %d\n", __func__,
 		(result < 0) ? "error" : "success msg",
 			(result < 0) ? result : num);
