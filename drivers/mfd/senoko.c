@@ -257,10 +257,6 @@ static void senoko_supply_power_off(void)
 		err = senoko_write(senoko, REG_POWER,
 				   REG_POWER_STATE_OFF | REG_POWER_KEY_WRITE);
 		/* Board should be off now */
-		if (err) {
-			dev_err(senoko->dev, "unable to power off: %d\n", err);
-			return;
-		}
 	}
 }
 
