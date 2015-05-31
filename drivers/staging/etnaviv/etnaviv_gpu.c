@@ -743,7 +743,7 @@ static void hangcheck_timer_reset(struct etnaviv_gpu *gpu)
 static void hangcheck_handler(unsigned long data)
 {
 	struct etnaviv_gpu *gpu = (struct etnaviv_gpu *)data;
-	u32 fence = gpu->retired_fence;
+	u32 fence = gpu->completed_fence;
 	bool progress = false;
 
 	if (fence != gpu->hangcheck_fence) {
@@ -837,7 +837,7 @@ static void retire_worker(struct work_struct *work)
 	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
 					       retire_work);
 	struct drm_device *dev = gpu->drm;
-	u32 fence = gpu->retired_fence;
+	u32 fence = gpu->completed_fence;
 
 	mutex_lock(&dev->struct_mutex);
 
@@ -860,9 +860,25 @@ static void retire_worker(struct work_struct *work)
 		}
 	}
 
+	gpu->retired_fence = fence;
+
 	mutex_unlock(&dev->struct_mutex);
 
 	wake_up_all(&gpu->fence_event);
+}
+
+static unsigned long etnaviv_timeout_to_jiffies(struct timespec *timeout)
+{
+	unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
+	unsigned long start_jiffies = jiffies;
+	unsigned long remaining_jiffies;
+
+	if (time_after(start_jiffies, timeout_jiffies))
+		remaining_jiffies = 0;
+	else
+		remaining_jiffies = timeout_jiffies - start_jiffies;
+
+	return remaining_jiffies;
 }
 
 int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
@@ -880,21 +896,15 @@ int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 		/* No timeout was requested: just test for completion */
 		ret = fence_completed(gpu, fence) ? 0 : -EBUSY;
 	} else {
-		unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
-		unsigned long start_jiffies = jiffies;
-		unsigned long remaining_jiffies;
-
-		if (time_after(start_jiffies, timeout_jiffies))
-			remaining_jiffies = 0;
-		else
-			remaining_jiffies = timeout_jiffies - start_jiffies;
+		unsigned long remaining = etnaviv_timeout_to_jiffies(timeout);
 
 		ret = wait_event_interruptible_timeout(gpu->fence_event,
 						fence_completed(gpu, fence),
-						remaining_jiffies);
+						remaining);
 		if (ret == 0) {
-			DBG("timeout waiting for fence: %u (completed: %u)",
-					fence, gpu->retired_fence);
+			DBG("timeout waiting for fence: %u (retired: %u completed: %u)",
+				fence, gpu->retired_fence,
+				gpu->completed_fence);
 			ret = -ETIMEDOUT;
 		} else if (ret != -ERESTARTSYS) {
 			ret = 0;
@@ -902,6 +912,39 @@ int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 	}
 
 	return ret;
+}
+
+/*
+ * Wait for an object to become inactive.  This, on it's own, is not race
+ * free: the object is moved by the retire worker off the active list, and
+ * then the iova is put.  Moreover, the object could be re-submitted just
+ * after we notice that it's become inactive.
+ *
+ * Although the retirement happens under the struct_mutex, we don't want
+ * to hold that lock in this function.  Instead, the caller is responsible
+ * for ensuring that the retire worker has finished (which will happen, eg,
+ * when we unreference the object, an action which takes the struct_mutex.)
+ */
+int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
+	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout)
+{
+	unsigned long remaining;
+	long ret;
+
+	if (!timeout)
+		return !is_active(etnaviv_obj) ? 0 : -EBUSY;
+
+	remaining = etnaviv_timeout_to_jiffies(timeout);
+
+	ret = wait_event_interruptible_timeout(gpu->fence_event,
+					       !is_active(etnaviv_obj),
+					       remaining);
+	if (ret > 0)
+		return 0;
+	else if (ret == -ERESTARTSYS)
+		return -ERESTARTSYS;
+	else
+		return -ETIMEDOUT;
 }
 
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu)
@@ -1022,8 +1065,9 @@ static irqreturn_t irq_handler(int irq, void *data)
 			 * - event 1 and event 0 complete
 			 * we can end up processing event 0 first, then 1.
 			 */
-			if (fence_after(gpu->event[event].fence, gpu->retired_fence))
-				gpu->retired_fence = gpu->event[event].fence;
+			if (fence_after(gpu->event[event].fence,
+					gpu->completed_fence))
+				gpu->completed_fence = gpu->event[event].fence;
 			event_free(gpu, event);
 
 			/*
@@ -1305,7 +1349,7 @@ static int etnaviv_gpu_rpm_suspend(struct device *dev)
 	u32 idle, mask;
 
 	/* If we have outstanding fences, we're not idle */
-	if (gpu->retired_fence != gpu->submitted_fence)
+	if (gpu->completed_fence != gpu->submitted_fence)
 		return -EBUSY;
 
 	/* Check whether the hardware (except FE) is idle */
