@@ -46,6 +46,7 @@ struct etnaviv_gem_object {
 	 */
 	struct list_head mm_list;
 	struct etnaviv_gpu *gpu;     /* non-null if active */
+	uint32_t access;
 	uint32_t read_fence, write_fence;
 
 	/* Transiently in the process of submit ioctl, objects associated
