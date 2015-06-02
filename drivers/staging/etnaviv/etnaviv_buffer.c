@@ -262,7 +262,6 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 
 	/* Save the event and buffer position of the new event trigger */
 	gpu->event[event].fence = submit->fence;
-	gpu->event[event].ring_pos = buffer->offset;
 
 	/* trigger event */
 	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |

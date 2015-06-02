@@ -743,12 +743,10 @@ static void recover_worker(struct work_struct *work)
 		for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
 			if (!gpu->event[i].used)
 				continue;
-			dev_err(gpu->dev, "probable lost event %u at ring pos %u, fence %u\n",
-				i, gpu->event[i].ring_pos, gpu->event[i].fence);
-			if (fence_after(gpu->event[i].fence, gpu->retired_fence)) {
+			dev_err(gpu->dev, "probable lost event %u, fence %u\n",
+				i, gpu->event[i].fence);
+			if (fence_after(gpu->event[i].fence, gpu->retired_fence))
 				gpu->retired_fence = gpu->event[i].fence;
-				gpu->last_ring_pos = gpu->event[i].ring_pos;
-			}
 			gpu->event[i].used = false;
 			complete(&gpu->event_free);
 		}
@@ -1050,10 +1048,8 @@ static irqreturn_t irq_handler(int irq, void *data)
 			 * - event 1 and event 0 complete
 			 * we can end up processing event 0 first, then 1.
 			 */
-			if (fence_after(gpu->event[event].fence, gpu->retired_fence)) {
+			if (fence_after(gpu->event[event].fence, gpu->retired_fence))
 				gpu->retired_fence = gpu->event[event].fence;
-				gpu->last_ring_pos = gpu->event[event].ring_pos;
-			}
 			event_free(gpu, event);
 
 			/*
