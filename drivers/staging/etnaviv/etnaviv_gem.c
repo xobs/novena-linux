@@ -217,8 +217,7 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct drm_gem_object *obj = vma->vm_private_data;
 	struct drm_device *dev = obj->dev;
-	struct page **pages;
-	unsigned long pfn;
+	struct page **pages, *page;
 	pgoff_t pgoff;
 	int ret;
 
@@ -240,12 +239,12 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	pgoff = ((unsigned long)vmf->virtual_address -
 			vma->vm_start) >> PAGE_SHIFT;
 
-	pfn = page_to_pfn(pages[pgoff]);
+	page = pages[pgoff];
 
 	VERB("Inserting %p pfn %lx, pa %lx", vmf->virtual_address,
-			pfn, pfn << PAGE_SHIFT);
+	     page_to_pfn(page), page_to_pfn(page) << PAGE_SHIFT);
 
-	ret = vm_insert_mixed(vma, (unsigned long)vmf->virtual_address, pfn);
+	ret = vm_insert_page(vma, (unsigned long)vmf->virtual_address, page);
 
 out_unlock:
 	mutex_unlock(&dev->struct_mutex);
