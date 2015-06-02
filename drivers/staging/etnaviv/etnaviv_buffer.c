@@ -135,6 +135,17 @@ u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 	return buffer->offset;
 }
 
+void etnaviv_buffer_end(struct etnaviv_gpu *gpu)
+{
+	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
+
+	/* Replace the last WAIT with an END */
+	buffer->offset -= 4;
+
+	CMD_END(buffer);
+	mb();
+}
+
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit)
 {
