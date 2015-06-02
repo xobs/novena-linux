@@ -109,6 +109,7 @@ static inline bool is_active(struct etnaviv_gem_object *etnaviv_obj)
 struct etnaviv_gem_submit {
 	struct drm_device *dev;
 	struct etnaviv_gpu *gpu;
+	uint32_t exec_state;
 	struct list_head bo_list;
 	struct ww_acquire_ctx ticket;
 	uint32_t fence;
