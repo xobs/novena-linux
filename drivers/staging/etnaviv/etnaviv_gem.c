@@ -800,7 +800,6 @@ static void __etnaviv_gem_userptr_get_pages(struct work_struct *_work)
 
 static int etnaviv_gem_userptr_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
-	struct etnaviv_drm_private *priv;
 	struct page **pvec = NULL;
 	struct get_pages_work *work;
 	struct mm_struct *mm;
@@ -859,8 +858,7 @@ static int etnaviv_gem_userptr_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 	etnaviv_obj->userptr.work = &work->work;
 	INIT_WORK(&work->work, __etnaviv_gem_userptr_get_pages);
 
-	priv = etnaviv_obj->base.dev->dev_private;
-	queue_work(priv->wq, &work->work);
+	etnaviv_queue_work(etnaviv_obj->base.dev, &work->work);
 
 	return -EAGAIN;
 }
