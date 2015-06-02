@@ -128,6 +128,11 @@ static int etnaviv_load(struct drm_device *dev, unsigned long flags)
 	dev->dev_private = priv;
 
 	priv->wq = alloc_ordered_workqueue("etnaviv", 0);
+	if (!priv->wq) {
+		err = -ENOMEM;
+		goto err_wq;
+	}
+
 	init_waitqueue_head(&priv->fence_event);
 
 	INIT_LIST_HEAD(&priv->inactive_list);
@@ -137,11 +142,18 @@ static int etnaviv_load(struct drm_device *dev, unsigned long flags)
 
 	err = component_bind_all(dev->dev, dev);
 	if (err < 0)
-		return err;
+		goto err_bind;
 
 	load_gpu(dev);
 
 	return 0;
+
+err_bind:
+	flush_workqueue(priv->wq);
+	destroy_workqueue(priv->wq);
+err_wq:
+	kfree(priv);
+	return err;
 }
 
 static int etnaviv_open(struct drm_device *dev, struct drm_file *file)
