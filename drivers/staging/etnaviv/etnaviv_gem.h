@@ -106,4 +106,7 @@ struct etnaviv_gem_submit {
 	} bos[0];
 };
 
+int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
+	struct etnaviv_gem_object **res);
+
 #endif /* __ETNAVIV_GEM_H__ */
