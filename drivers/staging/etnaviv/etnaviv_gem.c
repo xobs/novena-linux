@@ -457,6 +457,14 @@ int etnaviv_gem_cpu_fini(struct drm_gem_object *obj)
 	return 0;
 }
 
+int etnaviv_gem_wait_bo(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
+	struct timespec *timeout)
+{
+	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+
+	return etnaviv_gpu_wait_obj_inactive(gpu, etnaviv_obj, timeout);
+}
+
 #ifdef CONFIG_DEBUG_FS
 static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {

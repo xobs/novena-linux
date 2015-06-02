@@ -130,6 +130,8 @@ struct etnaviv_gem_submit {
 	} bos[0];
 };
 
+int etnaviv_gem_wait_bo(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
+	struct timespec *timeout);
 struct etnaviv_vram_mapping *
 etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
 			     struct etnaviv_iommu *mmu);
