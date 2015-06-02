@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat
- * Author: Rob Clark <robdclark@gmail.com>
+ * Copyright (C) 2015 Etnaviv Project
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
