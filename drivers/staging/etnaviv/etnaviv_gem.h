@@ -76,7 +76,12 @@ struct etnaviv_gem_object {
 
 	struct etnaviv_gem_userptr userptr;
 };
-#define to_etnaviv_bo(x) container_of(x, struct etnaviv_gem_object, base)
+
+static inline
+struct etnaviv_gem_object *to_etnaviv_bo(struct drm_gem_object *obj)
+{
+	return container_of(obj, struct etnaviv_gem_object, base);
+}
 
 struct etnaviv_gem_ops {
 	int (*get_pages)(struct etnaviv_gem_object *);
