@@ -115,9 +115,6 @@ struct etnaviv_gpu {
 	struct etnaviv_iommu *mmu;
 
 	/* Power Control: */
-#if 0
-	struct regulator *gpu_reg, *gpu_cx;
-#endif
 	struct clk *clk_bus;
 	struct clk *clk_core;
 	struct clk *clk_shader;

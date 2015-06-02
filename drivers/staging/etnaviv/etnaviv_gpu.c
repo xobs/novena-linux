@@ -609,45 +609,6 @@ void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 /*
  * Power Management:
  */
-
-static int enable_pwrrail(struct etnaviv_gpu *gpu)
-{
-#if 0
-	struct drm_device *dev = gpu->drm;
-	int ret = 0;
-
-	if (gpu->gpu_reg) {
-		ret = regulator_enable(gpu->gpu_reg);
-		if (ret) {
-			dev_err(dev->dev, "failed to enable 'gpu_reg': %d\n",
-				ret);
-			return ret;
-		}
-	}
-
-	if (gpu->gpu_cx) {
-		ret = regulator_enable(gpu->gpu_cx);
-		if (ret) {
-			dev_err(dev->dev, "failed to enable 'gpu_cx': %d\n",
-				ret);
-			return ret;
-		}
-	}
-#endif
-	return 0;
-}
-
-static int disable_pwrrail(struct etnaviv_gpu *gpu)
-{
-#if 0
-	if (gpu->gpu_cx)
-		regulator_disable(gpu->gpu_cx);
-	if (gpu->gpu_reg)
-		regulator_disable(gpu->gpu_reg);
-#endif
-	return 0;
-}
-
 static int enable_clk(struct etnaviv_gpu *gpu)
 {
 	if (gpu->clk_core)
@@ -690,10 +651,6 @@ int etnaviv_gpu_pm_resume(struct etnaviv_gpu *gpu)
 
 	DBG("%s", dev_name(gpu->dev));
 
-	ret = enable_pwrrail(gpu);
-	if (ret)
-		return ret;
-
 	ret = enable_clk(gpu);
 	if (ret)
 		return ret;
@@ -716,10 +673,6 @@ int etnaviv_gpu_pm_suspend(struct etnaviv_gpu *gpu)
 		return ret;
 
 	ret = disable_clk(gpu);
-	if (ret)
-		return ret;
-
-	ret = disable_pwrrail(gpu);
 	if (ret)
 		return ret;
 
