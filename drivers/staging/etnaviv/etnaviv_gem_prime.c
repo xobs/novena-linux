@@ -34,12 +34,12 @@ void *etnaviv_gem_prime_vmap(struct drm_gem_object *obj)
 	return etnaviv_gem_vaddr(obj);
 }
 
-void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
+void etnaviv_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
 {
 	/* TODO msm_gem_vunmap() */
 }
 
-int msm_gem_prime_pin(struct drm_gem_object *obj)
+int etnaviv_gem_prime_pin(struct drm_gem_object *obj)
 {
 	if (!obj->import_attach) {
 		struct drm_device *dev = obj->dev;
@@ -51,7 +51,7 @@ int msm_gem_prime_pin(struct drm_gem_object *obj)
 	return 0;
 }
 
-void msm_gem_prime_unpin(struct drm_gem_object *obj)
+void etnaviv_gem_prime_unpin(struct drm_gem_object *obj)
 {
 	if (!obj->import_attach) {
 		struct drm_device *dev = obj->dev;
