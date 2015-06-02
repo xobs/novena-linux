@@ -691,13 +691,24 @@ static void hangcheck_handler(unsigned long data)
 	struct drm_device *dev = gpu->drm;
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	uint32_t fence = gpu->retired_fence;
+	bool progress = false;
 
 	if (fence != gpu->hangcheck_fence) {
-		/* some progress has been made.. ya! */
 		gpu->hangcheck_fence = fence;
-	} else if (fence_after(gpu->submitted_fence, fence)) {
-		/* no progress and not done.. hung! */
-		gpu->hangcheck_fence = fence;
+		progress = true;
+	}
+
+	if (!progress) {
+		uint32_t dma_addr = gpu_read(gpu, VIVS_FE_DMA_ADDRESS);
+		int change = dma_addr - gpu->hangcheck_dma_addr;
+
+		if (change < 0 || change > 16) {
+			gpu->hangcheck_dma_addr = dma_addr;
+			progress = true;
+		}
+	}
+
+	if (!progress && fence_after(gpu->submitted_fence, fence)) {
 		dev_err(gpu->dev, "hangcheck detected gpu lockup!\n");
 		dev_err(gpu->dev, "     completed fence: %u\n", fence);
 		dev_err(gpu->dev, "     submitted fence: %u\n",
