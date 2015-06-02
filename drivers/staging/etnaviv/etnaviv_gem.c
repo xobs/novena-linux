@@ -45,6 +45,7 @@ static struct page **get_pages(struct drm_gem_object *obj)
 		etnaviv_obj->sgt = drm_prime_pages_to_sg(p, npages);
 		if (IS_ERR(etnaviv_obj->sgt)) {
 			dev_err(dev->dev, "failed to allocate sgt\n");
+			drm_gem_put_pages(obj, p, false, false);
 			return ERR_CAST(etnaviv_obj->sgt);
 		}
 
