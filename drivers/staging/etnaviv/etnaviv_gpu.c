@@ -430,11 +430,11 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 		  VIVS_HI_AXI_CONFIG_ARCACHE(2));
 
 	/* set base addresses */
-	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_RA, 0x0);
-	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_FE, 0x0);
-	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_TX, 0x0);
-	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PEZ, 0x0);
-	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PE, 0x0);
+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_RA, gpu->memory_base);
+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_FE, gpu->memory_base);
+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_TX, gpu->memory_base);
+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PEZ, gpu->memory_base);
+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PE, gpu->memory_base);
 
 	/* FIXME: we need to program the GPU table pointer(s) here */
 
@@ -446,7 +446,7 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 
 	gpu_write(gpu, VIVS_HI_INTR_ENBL, ~0U);
 	gpu_write(gpu, VIVS_FE_COMMAND_ADDRESS,
-		  etnaviv_gem_paddr_locked(gpu->buffer));
+		  etnaviv_gem_paddr_locked(gpu->buffer) - gpu->memory_base);
 	gpu_write(gpu, VIVS_FE_COMMAND_CONTROL,
 		  VIVS_FE_COMMAND_CONTROL_ENABLE |
 		  VIVS_FE_COMMAND_CONTROL_PREFETCH(words));
@@ -1169,6 +1169,14 @@ static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
 	}
 
 	gpu->dev = &pdev->dev;
+
+	/*
+	 * Set the GPU base address to the start of physical memory.  This
+	 * ensures that if we have up to 2GB, the v1 MMU can address the
+	 * highest memory.  This is important as command buffers may be
+	 * allocated outside of this limit.
+	 */
+	gpu->memory_base = PHYS_OFFSET;
 
 	/* Map registers: */
 	gpu->mmio = etnaviv_ioremap(pdev, NULL, dev_name(gpu->dev));
