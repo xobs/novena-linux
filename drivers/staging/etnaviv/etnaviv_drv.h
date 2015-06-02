@@ -52,7 +52,6 @@ struct etnaviv_file_private {
 struct etnaviv_drm_private {
 	int num_gpus;
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
-	struct etnaviv_file_private *lastctx;
 
 	uint32_t next_fence, completed_fence;
 	wait_queue_head_t fence_event;
