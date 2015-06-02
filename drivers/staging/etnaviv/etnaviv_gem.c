@@ -509,15 +509,6 @@ void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m)
 }
 #endif
 
-static void etnaviv_free_cmd(struct drm_gem_object *obj)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-
-	drm_gem_free_mmap_offset(obj);
-
-	etnaviv_obj->ops->release(etnaviv_obj);
-}
-
 static void etnaviv_gem_cmd_release(struct etnaviv_gem_object *etnaviv_obj)
 {
 	dma_free_coherent(etnaviv_obj->base.dev->dev, etnaviv_obj->base.size,
@@ -541,10 +532,6 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 		drm_mm_remove_node(etnaviv_obj->gpu_vram_node);
 		kfree(etnaviv_obj->gpu_vram_node);
 	}
-
-	drm_gem_free_mmap_offset(obj);
-
-	etnaviv_obj->ops->release(etnaviv_obj);
 }
 
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
@@ -570,11 +557,11 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 
 	list_del(&etnaviv_obj->mm_list);
 
-	if (etnaviv_obj->flags & ETNA_BO_CMDSTREAM)
-		etnaviv_free_cmd(obj);
-	else
+	if (!(etnaviv_obj->flags & ETNA_BO_CMDSTREAM))
 		etnaviv_free_obj(obj);
 
+	drm_gem_free_mmap_offset(obj);
+	etnaviv_obj->ops->release(etnaviv_obj);
 	reservation_object_fini(&etnaviv_obj->_resv);
 	drm_gem_object_release(obj);
 
