@@ -545,9 +545,6 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 	drm_gem_free_mmap_offset(obj);
 
 	etnaviv_obj->ops->release(etnaviv_obj);
-
-	if (etnaviv_obj->resv == &etnaviv_obj->_resv)
-		reservation_object_fini(etnaviv_obj->resv);
 }
 
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
@@ -578,6 +575,7 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 	else
 		etnaviv_free_obj(obj);
 
+	reservation_object_fini(&etnaviv_obj->_resv);
 	drm_gem_object_release(obj);
 
 	kfree(etnaviv_obj);
@@ -657,7 +655,7 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 	etnaviv_obj->flags = flags;
 
 	etnaviv_obj->resv = &etnaviv_obj->_resv;
-	reservation_object_init(etnaviv_obj->resv);
+	reservation_object_init(&etnaviv_obj->_resv);
 
 	INIT_LIST_HEAD(&etnaviv_obj->submit_entry);
 	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
