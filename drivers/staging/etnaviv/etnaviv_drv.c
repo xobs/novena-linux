@@ -24,11 +24,12 @@
 void etnaviv_register_mmu(struct drm_device *dev, struct etnaviv_iommu *mmu)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
+
 	priv->mmu = mmu;
 }
 
 #ifdef CONFIG_DRM_ETNAVIV_REGISTER_LOGGING
-static bool reglog = false;
+static bool reglog;
 MODULE_PARM_DESC(reglog, "Enable register read/write logging");
 module_param(reglog, bool, 0600);
 #else
@@ -64,14 +65,17 @@ void etnaviv_writel(u32 data, void __iomem *addr)
 {
 	if (reglog)
 		printk(KERN_DEBUG "IO:W %p %08x\n", addr, data);
+
 	writel(data, addr);
 }
 
 u32 etnaviv_readl(const void __iomem *addr)
 {
 	u32 val = readl(addr);
+
 	if (reglog)
 		printk(KERN_DEBUG "IO:R %p %08x\n", addr, val);
+
 	return val;
 }
 
@@ -90,6 +94,7 @@ static int etnaviv_unload(struct drm_device *dev)
 	mutex_lock(&dev->struct_mutex);
 	for (i = 0; i < ETNA_MAX_PIPES; i++) {
 		struct etnaviv_gpu *g = priv->gpu[i];
+
 		if (g)
 			etnaviv_gpu_pm_suspend(g);
 	}
@@ -114,12 +119,15 @@ static void load_gpu(struct drm_device *dev)
 
 	for (i = 0; i < ETNA_MAX_PIPES; i++) {
 		struct etnaviv_gpu *g = priv->gpu[i];
+
 		if (g) {
 			int ret;
+
 			etnaviv_gpu_pm_resume(g);
 			ret = etnaviv_gpu_init(g);
 			if (ret) {
-				dev_err(dev->dev, "%s hw init failed: %d\n", g->name, ret);
+				dev_err(dev->dev, "%s hw init failed: %d\n",
+					g->name, ret);
 				priv->gpu[i] = NULL;
 			}
 		}
@@ -363,11 +371,15 @@ static int etnaviv_ioctl_gem_new(struct drm_device *dev, void *data,
 		struct drm_file *file)
 {
 	struct drm_etnaviv_gem_new *args = data;
+
 	return etnaviv_gem_new_handle(dev, file, args->size,
 			args->flags, &args->handle);
 }
 
-#define TS(t) ((struct timespec){ .tv_sec = (t).tv_sec, .tv_nsec = (t).tv_nsec })
+#define TS(t) ((struct timespec){ \
+	.tv_sec = (t).tv_sec, \
+	.tv_nsec = (t).tv_nsec \
+})
 
 static int etnaviv_ioctl_gem_cpu_prep(struct drm_device *dev, void *data,
 		struct drm_file *file)
@@ -445,13 +457,15 @@ static int etnaviv_ioctl_wait_fence(struct drm_device *dev, void *data,
 }
 
 static const struct drm_ioctl_desc etnaviv_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GET_PARAM,    etnaviv_ioctl_get_param,    DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GEM_NEW,      etnaviv_ioctl_gem_new,      DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GEM_INFO,     etnaviv_ioctl_gem_info,     DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GEM_CPU_PREP, etnaviv_ioctl_gem_cpu_prep, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GEM_CPU_FINI, etnaviv_ioctl_gem_cpu_fini, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_GEM_SUBMIT,   etnaviv_ioctl_gem_submit,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ETNAVIV_WAIT_FENCE,   etnaviv_ioctl_wait_fence,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+#define ETNA_IOCTL(n, func, flags) \
+	DRM_IOCTL_DEF_DRV(ETNAVIV_##n, etnaviv_ioctl_##func, flags)
+	ETNA_IOCTL(GET_PARAM,    get_param,    DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_NEW,      gem_new,      DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_INFO,     gem_info,     DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_CPU_PREP, gem_cpu_prep, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_CPU_FINI, gem_cpu_fini, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_SUBMIT,   gem_submit,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(WAIT_FENCE,   wait_fence,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
 };
 
 static const struct vm_operations_struct vm_ops = {
