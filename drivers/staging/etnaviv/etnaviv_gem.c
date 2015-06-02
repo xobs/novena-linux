@@ -24,39 +24,35 @@
 #include "etnaviv_mmu.h"
 
 /* called with dev->struct_mutex held */
-static struct page **get_pages(struct etnaviv_gem_object *etnaviv_obj)
+static int etnaviv_gem_shmem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
-	if (!etnaviv_obj->pages) {
-		struct drm_device *dev = etnaviv_obj->base.dev;
-		struct page **p;
-		int npages = etnaviv_obj->base.size >> PAGE_SHIFT;
+	struct drm_device *dev = etnaviv_obj->base.dev;
+	struct page **p;
+	int npages = etnaviv_obj->base.size >> PAGE_SHIFT;
 
-		p = drm_gem_get_pages(&etnaviv_obj->base);
-
-		if (IS_ERR(p)) {
-			dev_err(dev->dev, "could not get pages: %ld\n",
-					PTR_ERR(p));
-			return p;
-		}
-
-		etnaviv_obj->sgt = drm_prime_pages_to_sg(p, npages);
-		if (IS_ERR(etnaviv_obj->sgt)) {
-			dev_err(dev->dev, "failed to allocate sgt\n");
-			drm_gem_put_pages(&etnaviv_obj->base, p, false, false);
-			return ERR_CAST(etnaviv_obj->sgt);
-		}
-
-		etnaviv_obj->pages = p;
-
-		/* For non-cached buffers, ensure the new pages are clean
-		 * because display controller, GPU, etc. are not coherent:
-		 */
-		if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_UNCACHED))
-			dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
-				   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
+	p = drm_gem_get_pages(&etnaviv_obj->base);
+	if (IS_ERR(p)) {
+		dev_err(dev->dev, "could not get pages: %ld\n", PTR_ERR(p));
+		return PTR_ERR(p);
 	}
 
-	return etnaviv_obj->pages;
+	etnaviv_obj->sgt = drm_prime_pages_to_sg(p, npages);
+	if (IS_ERR(etnaviv_obj->sgt)) {
+		dev_err(dev->dev, "failed to allocate sgt\n");
+		drm_gem_put_pages(&etnaviv_obj->base, p, false, false);
+		return PTR_ERR(p);
+	}
+
+	etnaviv_obj->pages = p;
+
+	/* For non-cached buffers, ensure the new pages are clean
+	 * because display controller, GPU, etc. are not coherent:
+	 */
+	if (etnaviv_obj->flags & (ETNA_BO_WC|ETNA_BO_UNCACHED))
+		dma_map_sg(dev->dev, etnaviv_obj->sgt->sgl,
+			   etnaviv_obj->sgt->nents, DMA_BIDIRECTIONAL);
+
+	return 0;
 }
 
 static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
@@ -83,7 +79,15 @@ static void put_pages(struct etnaviv_gem_object *etnaviv_obj)
 
 struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *etnaviv_obj)
 {
-	return get_pages(etnaviv_obj);
+	int ret;
+
+	if (!etnaviv_obj->pages) {
+		ret = etnaviv_obj->ops->get_pages(etnaviv_obj);
+		if (ret < 0)
+			return ERR_PTR(ret);
+	}
+
+	return etnaviv_obj->pages;
 }
 
 void etnaviv_gem_put_pages(struct etnaviv_gem_object *etnaviv_obj)
@@ -181,7 +185,7 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		goto out;
 
 	/* make sure we have pages attached now */
-	pages = get_pages(to_etnaviv_bo(obj));
+	pages = etnaviv_gem_get_pages(to_etnaviv_bo(obj));
 	if (IS_ERR(pages)) {
 		ret = PTR_ERR(pages);
 		goto out_unlock;
@@ -265,7 +269,7 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	if (!etnaviv_obj->iova  && !(etnaviv_obj->flags & ETNA_BO_CMDSTREAM)) {
 		struct etnaviv_drm_private *priv = obj->dev->dev_private;
 		struct etnaviv_iommu *mmu = priv->mmu;
-		struct page **pages = get_pages(etnaviv_obj);
+		struct page **pages = etnaviv_gem_get_pages(etnaviv_obj);
 		uint32_t offset;
 		struct drm_mm_node *node = NULL;
 
@@ -367,7 +371,7 @@ void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj)
 	WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
 
 	if (!etnaviv_obj->vaddr) {
-		struct page **pages = get_pages(etnaviv_obj);
+		struct page **pages = etnaviv_gem_get_pages(etnaviv_obj);
 
 		if (IS_ERR(pages))
 			return ERR_CAST(pages);
@@ -533,6 +537,7 @@ static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
 }
 
 static const struct etnaviv_gem_ops etnaviv_gem_shmem_ops = {
+	.get_pages = etnaviv_gem_shmem_get_pages,
 	.release = etnaviv_gem_shmem_release,
 };
 
