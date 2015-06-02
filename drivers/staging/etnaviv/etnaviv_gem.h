@@ -21,8 +21,11 @@
 #include <linux/reservation.h>
 #include "etnaviv_drv.h"
 
+struct etnaviv_gem_ops;
+
 struct etnaviv_gem_object {
 	struct drm_gem_object base;
+	const struct etnaviv_gem_ops *ops;
 
 	uint32_t flags;
 
@@ -64,6 +67,10 @@ struct etnaviv_gem_object {
 	u32 offset;
 };
 #define to_etnaviv_bo(x) container_of(x, struct etnaviv_gem_object, base)
+
+struct etnaviv_gem_ops {
+	void (*release)(struct etnaviv_gem_object *);
+};
 
 static inline bool is_active(struct etnaviv_gem_object *etnaviv_obj)
 {
