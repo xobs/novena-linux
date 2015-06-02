@@ -270,7 +270,7 @@ out:
 }
 
 /* get mmap offset - must be called under struct_mutex */
-int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, uint64_t *offset)
+int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, u64 *offset)
 {
 	int ret;
 
@@ -292,7 +292,7 @@ int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, uint64_t *offset)
  * the refcnt counter needs to be atomic_t.
  */
 int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
-	struct drm_gem_object *obj, uint32_t *iova)
+	struct drm_gem_object *obj, u32 *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct etnaviv_vram_mapping *mapping =
@@ -319,7 +319,7 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 }
 
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-	int id, uint32_t *iova)
+	int id, u32 *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct etnaviv_vram_mapping *mapping =
@@ -393,7 +393,7 @@ dma_addr_t etnaviv_gem_paddr_locked(struct drm_gem_object *obj)
 }
 
 void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
-	struct etnaviv_gpu *gpu, uint32_t access, uint32_t fence)
+	struct etnaviv_gpu *gpu, u32 access, u32 fence)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 
@@ -426,7 +426,7 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
 }
 
-int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op,
+int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 		struct timespec *timeout)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
@@ -434,7 +434,7 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op,
 
 	if (is_active(etnaviv_obj)) {
 		struct etnaviv_gpu *gpu = etnaviv_obj->gpu;
-		uint32_t fence = 0;
+		u32 fence = 0;
 
 		if (op & ETNA_PREP_READ)
 			fence = etnaviv_obj->write_fence;
@@ -462,11 +462,11 @@ static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {
 	struct drm_device *dev = obj->dev;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	uint64_t off = drm_vma_node_start(&obj->vma_node);
+	unsigned long off = drm_vma_node_start(&obj->vma_node);
 
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
-	seq_printf(m, "%08x: %c(r=%u,w=%u) %2d (%2d) %08llx %p %zd\n",
+	seq_printf(m, "%08x: %c(r=%u,w=%u) %2d (%2d) %08lx %p %zd\n",
 			etnaviv_obj->flags, is_active(etnaviv_obj) ? 'A' : 'I',
 			etnaviv_obj->read_fence, etnaviv_obj->write_fence,
 			obj->name, obj->refcount.refcount.counter,
@@ -565,7 +565,7 @@ int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj)
 }
 
 static int etnaviv_gem_new_impl(struct drm_device *dev,
-		uint32_t size, uint32_t flags,
+		u32 size, u32 flags,
 		struct drm_gem_object **obj)
 {
 	struct etnaviv_gem_object *etnaviv_obj;
@@ -623,7 +623,7 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 }
 
 static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
-		uint32_t size, uint32_t flags)
+		u32 size, u32 flags)
 {
 	struct drm_gem_object *obj = NULL;
 	int ret;
@@ -657,7 +657,7 @@ fail:
 
 /* convenience method to construct a GEM buffer object, and userspace handle */
 int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
-		uint32_t size, uint32_t flags, uint32_t *handle)
+		u32 size, u32 flags, u32 *handle)
 {
 	struct drm_gem_object *obj;
 	int ret;
@@ -681,7 +681,7 @@ int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
 }
 
 struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
-		uint32_t size, uint32_t flags)
+		u32 size, u32 flags)
 {
 	struct drm_gem_object *obj;
 	int ret;
@@ -699,7 +699,7 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 	return obj;
 }
 
-int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
+int etnaviv_gem_new_private(struct drm_device *dev, size_t size, u32 flags,
 	struct etnaviv_gem_object **res)
 {
 	struct drm_gem_object *obj;
@@ -885,7 +885,7 @@ static const struct etnaviv_gem_ops etnaviv_gem_userptr_ops = {
 };
 
 int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
-	uintptr_t ptr, uint32_t size, uint32_t flags, uint32_t *handle)
+	uintptr_t ptr, u32 size, u32 flags, u32 *handle)
 {
 	struct etnaviv_gem_object *etnaviv_obj;
 	int ret;
