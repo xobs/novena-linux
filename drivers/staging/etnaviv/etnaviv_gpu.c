@@ -886,6 +886,17 @@ void etnaviv_gpu_retire(struct etnaviv_gpu *gpu)
 	queue_work(priv->wq, &gpu->retire_work);
 }
 
+int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu)
+{
+	return pm_runtime_get_sync(gpu->dev);
+}
+
+void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu)
+{
+	pm_runtime_mark_last_busy(gpu->dev);
+	pm_runtime_put_autosuspend(gpu->dev);
+}
+
 /* add bo's to gpu's ring, and kick gpu: */
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx)
@@ -1263,15 +1274,27 @@ static int etnaviv_gpu_rpm_suspend(struct device *dev)
 static int etnaviv_gpu_rpm_resume(struct device *dev)
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
+	struct drm_device *drm = gpu->drm;
 	int ret;
+
+	/* We must never runtime-PM resume holding struct_mutex */
+	if (drm && WARN_ON_ONCE(mutex_is_locked(&drm->struct_mutex)))
+		return -EDEADLK;
 
 	ret = etnaviv_gpu_resume(gpu);
 	if (ret)
 		return ret;
 
 	/* Re-initialise the basic hardware state */
-	if (gpu->drm && gpu->buffer)
+	if (drm && gpu->buffer) {
+		ret = mutex_lock_killable(&drm->struct_mutex);
+		if (ret) {
+			etnaviv_gpu_suspend(gpu);
+			return ret;
+		}
 		etnaviv_gpu_hw_init(gpu);
+		mutex_unlock(&drm->struct_mutex);
+	}
 
 	return 0;
 }
