@@ -502,17 +502,6 @@ static const struct etnaviv_gem_ops etnaviv_gem_cmd_ops = {
 	.release = etnaviv_gem_cmd_release,
 };
 
-static void etnaviv_free_obj(struct drm_gem_object *obj)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	struct etnaviv_vram_mapping *mapping, *tmp;
-
-	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
-				 obj_node) {
-		etnaviv_iommu_unmap_gem(mapping);
-	}
-}
-
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
 {
 	if (etnaviv_obj->vaddr)
@@ -529,6 +518,7 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 {
 	struct drm_device *dev = obj->dev;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+	struct etnaviv_vram_mapping *mapping, *tmp;
 
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
@@ -537,8 +527,9 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 
 	list_del(&etnaviv_obj->mm_list);
 
-	if (!(etnaviv_obj->flags & ETNA_BO_CMDSTREAM))
-		etnaviv_free_obj(obj);
+	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
+				 obj_node)
+		etnaviv_iommu_unmap_gem(mapping);
 
 	drm_gem_free_mmap_offset(obj);
 	etnaviv_obj->ops->release(etnaviv_obj);
