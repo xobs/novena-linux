@@ -219,11 +219,6 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 	u32 *ptr = obj->vaddr;
 	int ret;
 
-	if (offset % 4) {
-		DRM_ERROR("non-aligned cmdstream buffer: %u\n", offset);
-		return -EINVAL;
-	}
-
 	for (i = 0; i < nr_relocs; i++) {
 		struct drm_etnaviv_gem_submit_reloc submit_reloc;
 		struct etnaviv_gem_object *bobj;
