@@ -166,6 +166,8 @@ struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
 		return NULL;
 
 	domain->ops = &etnaviv_iommu_ops;
+	domain->geometry.aperture_start = GPU_MEM_START;
+	domain->geometry.aperture_end = GPU_MEM_START + PT_ENTRIES * SZ_4K;
 
 	ret = domain->ops->domain_init(domain);
 	if (ret)
