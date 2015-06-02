@@ -54,6 +54,13 @@ static bool etnaviv_validate_load_state(struct etnaviv_gpu *gpu, u32 *buf,
 	return true;
 }
 
+static uint8_t cmd_length[32] = {
+	[FE_OPCODE_DRAW_PRIMITIVES] = 4,
+	[FE_OPCODE_DRAW_INDEXED_PRIMITIVES] = 6,
+	[FE_OPCODE_NOP] = 2,
+	[FE_OPCODE_STALL] = 2,
+};
+
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *obj, unsigned int offset, unsigned int size)
 {
@@ -69,7 +76,7 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 		switch (op) {
 		case FE_OPCODE_LOAD_STATE:
 			n = EXTRACT(cmd, VIV_FE_LOAD_STATE_HEADER_COUNT);
-			len = 1 + n;
+			len = ALIGN(1 + n, 2);
 			if (buf + len > end)
 				break;
 
@@ -89,26 +96,17 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 			len = 2 + n * 2;
 			break;
 
-		case FE_OPCODE_DRAW_PRIMITIVES:
-			len = 4;
-			break;
-
-		case FE_OPCODE_DRAW_INDEXED_PRIMITIVES:
-			len = 6;
-			break;
-
-		case FE_OPCODE_NOP:
-		case FE_OPCODE_STALL:
-			len = 2;
-			break;
-
 		default:
-			dev_err(gpu->dev, "%s: op %u not permitted at offset %tu\n",
-				__func__, op, buf - start);
-			return false;
+			len = cmd_length[op];
+			if (len == 0) {
+				dev_err(gpu->dev, "%s: op %u not permitted at offset %tu\n",
+					__func__, op, buf - start);
+				return false;
+			}
+			break;
 		}
 
-		buf += ALIGN(len, 2);
+		buf += len;
 	}
 
 	if (buf > end) {
