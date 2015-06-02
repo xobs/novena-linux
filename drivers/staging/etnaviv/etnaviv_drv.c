@@ -20,6 +20,7 @@
 
 #include "etnaviv_drv.h"
 #include "etnaviv_gpu.h"
+#include "etnaviv_mmu.h"
 
 void etnaviv_register_mmu(struct drm_device *dev, struct etnaviv_iommu *mmu)
 {
@@ -239,6 +240,23 @@ static int etnaviv_mm_show(struct drm_device *dev, struct seq_file *m)
 	return drm_mm_dump_table(m, &dev->vma_offset_manager->vm_addr_space_mm);
 }
 
+static int etnaviv_mmu_show(struct drm_device *dev, struct seq_file *m)
+{
+	struct etnaviv_drm_private *priv = dev->dev_private;
+	struct etnaviv_gpu *gpu;
+	unsigned int i;
+
+	for (i = 0; i < ETNA_MAX_PIPES; i++) {
+		gpu = priv->gpu[i];
+		if (gpu) {
+			seq_printf(m, "Active Objects (%s):\n",
+				   dev_name(gpu->dev));
+			drm_mm_dump_table(m, &gpu->mmu->mm);
+		}
+	}
+	return 0;
+}
+
 static int show_locked(struct seq_file *m, void *arg)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
@@ -262,6 +280,7 @@ static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gpu", show_locked, 0, etnaviv_gpu_show},
 		{"gem", show_locked, 0, etnaviv_gem_show},
 		{ "mm", show_locked, 0, etnaviv_mm_show },
+		{"mmu", show_locked, 0, etnaviv_mmu_show},
 };
 
 static int etnaviv_debugfs_init(struct drm_minor *minor)
