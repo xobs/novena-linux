@@ -438,7 +438,7 @@ static int etnaviv_ioctl_gem_info(struct drm_device *dev, void *data,
 {
 	struct drm_etnaviv_gem_info *args = data;
 	struct drm_gem_object *obj;
-	int ret = 0;
+	int ret;
 
 	if (args->pad)
 		return -EINVAL;
@@ -447,7 +447,7 @@ static int etnaviv_ioctl_gem_info(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
-	args->offset = etnaviv_gem_mmap_offset(obj);
+	ret = etnaviv_gem_mmap_offset(obj, &args->offset);
 
 	drm_gem_object_unreference_unlocked(obj);
 
