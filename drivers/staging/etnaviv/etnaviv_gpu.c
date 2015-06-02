@@ -436,7 +436,8 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PEZ, gpu->memory_base);
 	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PE, gpu->memory_base);
 
-	/* FIXME: we need to program the GPU table pointer(s) here */
+	/* setup the MMU page table pointers */
+	etnaviv_iommu_domain_restore(gpu, gpu->mmu->domain);
 
 	/* Start command processor */
 	words = etnaviv_buffer_init(gpu);
@@ -464,6 +465,13 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 		return ret;
 
 	etnaviv_hw_identify(gpu);
+
+	if (gpu->identity.model == 0) {
+		dev_err(gpu->dev, "Unknown GPU model\n");
+		pm_runtime_put_autosuspend(gpu->dev);
+		return -ENXIO;
+	}
+
 	ret = etnaviv_hw_reset(gpu);
 	if (ret)
 		goto fail;
