@@ -547,13 +547,21 @@ static void verify_dma(struct etnaviv_gpu *gpu, struct dma_debug *debug)
 	}
 }
 
-void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
+int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 {
 	struct dma_debug debug;
 	u32 dma_lo, dma_hi, axi, idle;
+	int ret;
 
-	if (pm_runtime_get_sync(gpu->dev) < 0)
-		return;
+	seq_printf(m, "%s Status:\n", dev_name(gpu->dev));
+
+	ret = pm_runtime_get_sync(gpu->dev);
+	if (ret < 0)
+		return ret;
+
+	ret = mutex_lock_interruptible(&gpu->drm->struct_mutex);
+	if (ret < 0)
+		goto err_rpm;
 
 	dma_lo = gpu_read(gpu, VIVS_FE_DMA_LOW);
 	dma_hi = gpu_read(gpu, VIVS_FE_DMA_HIGH);
@@ -653,8 +661,15 @@ void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 	seq_printf(m, "\t last fetch 64 bit word: 0x%08x 0x%08x\n",
 		   dma_lo, dma_hi);
 
+	ret = 0;
+
+	mutex_unlock(&gpu->drm->struct_mutex);
+
+err_rpm:
 	pm_runtime_mark_last_busy(gpu->dev);
 	pm_runtime_put_autosuspend(gpu->dev);
+
+	return ret;
 }
 #endif
 
