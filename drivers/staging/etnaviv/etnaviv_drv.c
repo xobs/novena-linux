@@ -507,7 +507,7 @@ static int etnaviv_ioctl_gem_userptr(struct drm_device *dev, void *data,
 static const struct drm_ioctl_desc etnaviv_ioctls[] = {
 #define ETNA_IOCTL(n, func, flags) \
 	DRM_IOCTL_DEF_DRV(ETNAVIV_##n, etnaviv_ioctl_##func, flags)
-	ETNA_IOCTL(GET_PARAM,    get_param,    DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GET_PARAM,    get_param,    DRM_UNLOCKED|DRM_RENDER_ALLOW),
 	ETNA_IOCTL(GEM_NEW,      gem_new,      DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
 	ETNA_IOCTL(GEM_INFO,     gem_info,     DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
 	ETNA_IOCTL(GEM_CPU_PREP, gem_cpu_prep, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
