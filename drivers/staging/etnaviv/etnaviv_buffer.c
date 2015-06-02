@@ -147,13 +147,19 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 
 	/* update offset for every cmd stream */
 	for (i = 0; i < submit->nr_cmds; i++)
-		submit->cmd[i].obj->offset = submit->cmd[i].size;
+		submit->cmd[i].obj->offset = submit->cmd[i].offset +
+					     submit->cmd[i].size;
 
 	/* TODO: inter-connect all cmd buffers */
 
 	/* jump back from last cmd to main buffer */
 	cmd = submit->cmd[submit->nr_cmds - 1].obj;
 	CMD_LINK(cmd, 4, buffer->paddr + (back * 4));
+
+	/* update the size */
+	for (i = 0; i < submit->nr_cmds; i++)
+		submit->cmd[i].size = submit->cmd[i].obj->offset -
+				      submit->cmd[i].offset;
 
 	printk(KERN_ERR "stream link @ 0x%llx\n", (u64)cmd->paddr + ((cmd->offset - 1) * 4));
 	printk(KERN_ERR "stream link @ %p\n", cmd->vaddr + ((cmd->offset - 1) * 4));
@@ -175,7 +181,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 
 	/* Change WAIT into a LINK command; write the address first. */
 	i = VIV_FE_LINK_HEADER_OP_LINK | VIV_FE_LINK_HEADER_PREFETCH(submit->cmd[0].size * 2);
-	*(lw + 1) = submit->cmd[0].obj->paddr;
+	*(lw + 1) = submit->cmd[0].obj->paddr + submit->cmd[0].offset * 4;
 	mb();
 	*(lw)= i;
 	mb();
