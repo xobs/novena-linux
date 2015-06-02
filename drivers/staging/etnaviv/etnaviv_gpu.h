@@ -80,7 +80,6 @@ struct etnaviv_chip_identity {
 struct etnaviv_event {
 	bool used;
 	u32 fence;
-	u32 ring_pos;
 };
 
 struct etnaviv_gpu {
@@ -105,7 +104,6 @@ struct etnaviv_gpu {
 	struct list_head active_list;
 
 	u32 idle_mask;
-	u32 last_ring_pos;
 
 	/* Fencing support */
 	u32 submitted_fence;
