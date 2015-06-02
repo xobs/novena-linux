@@ -53,19 +53,13 @@ struct etnaviv_drm_private {
 	int num_gpus;
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
 
-	uint32_t next_fence, completed_fence;
-	wait_queue_head_t fence_event;
+	uint32_t next_fence;
 
 	/* list of GEM objects: */
 	struct list_head inactive_list;
 
 	struct workqueue_struct *wq;
 };
-
-int etnaviv_wait_fence_interruptable(struct drm_device *dev,
-		struct etnaviv_gpu *gpu, uint32_t fence,
-		struct timespec *timeout);
-void etnaviv_update_fence(struct drm_device *dev, uint32_t fence);
 
 int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		struct drm_file *file);
@@ -129,13 +123,6 @@ static inline bool fence_after(uint32_t a, uint32_t b)
 static inline bool fence_after_eq(uint32_t a, uint32_t b)
 {
 	return (int32_t)(a - b) >= 0;
-}
-
-static inline bool fence_completed(struct drm_device *dev, uint32_t fence)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-
-	return fence_after_eq(priv->completed_fence, fence);
 }
 
 #endif /* __ETNAVIV_DRV_H__ */

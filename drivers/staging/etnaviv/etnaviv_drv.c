@@ -133,8 +133,6 @@ static int etnaviv_load(struct drm_device *dev, unsigned long flags)
 		goto err_wq;
 	}
 
-	init_waitqueue_head(&priv->fence_event);
-
 	INIT_LIST_HEAD(&priv->inactive_list);
 	priv->num_gpus = 0;
 
@@ -310,64 +308,6 @@ static void etnaviv_debugfs_cleanup(struct drm_minor *minor)
 #endif
 
 /*
- * Fences:
- */
-int etnaviv_wait_fence_interruptable(struct drm_device *dev,
-		struct etnaviv_gpu *gpu, uint32_t fence,
-		struct timespec *timeout)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-	int ret;
-
-	if (fence_after(fence, gpu->submitted_fence)) {
-		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
-				fence, gpu->submitted_fence);
-		return -EINVAL;
-	}
-
-	if (!timeout) {
-		/* no-wait: */
-		ret = fence_completed(dev, fence) ? 0 : -EBUSY;
-	} else {
-		unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
-		unsigned long start_jiffies = jiffies;
-		unsigned long remaining_jiffies;
-
-		if (time_after(start_jiffies, timeout_jiffies))
-			remaining_jiffies = 0;
-		else
-			remaining_jiffies = timeout_jiffies - start_jiffies;
-
-		ret = wait_event_interruptible_timeout(priv->fence_event,
-				fence_completed(dev, fence),
-				remaining_jiffies);
-
-		if (ret == 0) {
-			DBG("timeout waiting for fence: %u (completed: %u)",
-					fence, priv->completed_fence);
-			ret = -ETIMEDOUT;
-		} else if (ret != -ERESTARTSYS) {
-			ret = 0;
-		}
-	}
-
-	return ret;
-}
-
-/* called from workqueue */
-void etnaviv_update_fence(struct drm_device *dev, uint32_t fence)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-
-	mutex_lock(&dev->struct_mutex);
-	if (fence_after(fence, priv->completed_fence))
-		priv->completed_fence = fence;
-	mutex_unlock(&dev->struct_mutex);
-
-	wake_up_all(&priv->fence_event);
-}
-
-/*
  * DRM ioctls:
  */
 
@@ -478,8 +418,8 @@ static int etnaviv_ioctl_wait_fence(struct drm_device *dev, void *data,
 	if (!gpu)
 		return -ENXIO;
 
-	return etnaviv_wait_fence_interruptable(dev, gpu,
-		args->fence, &TS(args->timeout));
+	return etnaviv_gpu_wait_fence_interruptible(gpu, args->fence,
+						    &TS(args->timeout));
 }
 
 static int etnaviv_ioctl_gem_userptr(struct drm_device *dev, void *data,
