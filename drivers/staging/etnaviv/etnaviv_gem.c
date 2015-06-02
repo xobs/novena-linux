@@ -368,37 +368,6 @@ void etnaviv_gem_put_iova(struct drm_gem_object *obj)
 	 */
 }
 
-int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
-		struct drm_mode_create_dumb *args)
-{
-	args->pitch = align_pitch(args->width, args->bpp);
-	args->size  = PAGE_ALIGN(args->pitch * args->height);
-	/* TODO: re-check flags */
-	return etnaviv_gem_new_handle(dev, file, args->size,
-			ETNA_BO_WC, &args->handle);
-}
-
-int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
-		uint32_t handle, uint64_t *offset)
-{
-	struct drm_gem_object *obj;
-	int ret = 0;
-
-	/* GEM does all our handle to object mapping */
-	obj = drm_gem_object_lookup(dev, file, handle);
-	if (obj == NULL) {
-		ret = -ENOENT;
-		goto fail;
-	}
-
-	*offset = etnaviv_gem_mmap_offset(obj);
-
-	drm_gem_object_unreference_unlocked(obj);
-
-fail:
-	return ret;
-}
-
 void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);

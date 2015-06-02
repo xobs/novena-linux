@@ -80,10 +80,6 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
 	int id, uint32_t *iova);
 void etnaviv_gem_put_iova(struct drm_gem_object *obj);
-int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
-		struct drm_mode_create_dumb *args);
-int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
-		uint32_t handle, uint64_t *offset);
 struct sg_table *etnaviv_gem_prime_get_sg_table(struct drm_gem_object *obj);
 void *etnaviv_gem_prime_vmap(struct drm_gem_object *obj);
 void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
@@ -142,14 +138,6 @@ static inline bool fence_completed(struct drm_device *dev, uint32_t fence)
 	struct etnaviv_drm_private *priv = dev->dev_private;
 
 	return fence_after_eq(priv->completed_fence, fence);
-}
-
-static inline int align_pitch(int width, int bpp)
-{
-	int bytespp = (bpp + 7) / 8;
-
-	/* adreno needs pitch aligned to 32 pixels: */
-	return bytespp * ALIGN(width, 32);
 }
 
 #endif /* __ETNAVIV_DRV_H__ */
