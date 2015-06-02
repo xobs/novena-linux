@@ -117,10 +117,29 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	if (!node)
 		return -ENOMEM;
 
-	ret = drm_mm_insert_node(&mmu->mm, node, etnaviv_obj->base.size, 0,
-				 DRM_MM_SEARCH_DEFAULT);
+	while (1) {
+		ret = drm_mm_insert_node_in_range(&mmu->mm, node,
+			etnaviv_obj->base.size, 0, mmu->last_iova, ~0UL,
+			DRM_MM_SEARCH_DEFAULT);
+
+		if (ret != -ENOSPC)
+			break;
+
+		/*
+		 * If we did not search from the start of the MMU region,
+		 * try again in case there are free slots.
+		 */
+		if (mmu->last_iova) {
+			mmu->last_iova = 0;
+			mmu->need_flush = true;
+			continue;
+		}
+
+		break;
+	}
 
 	if (!ret) {
+		mmu->last_iova = node->start + etnaviv_obj->base.size;
 		offset = node->start;
 		etnaviv_obj->iova = offset;
 		etnaviv_obj->gpu_vram_node = node;
