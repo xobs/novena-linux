@@ -589,37 +589,26 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 	kfree(etnaviv_obj);
 }
 
-/* convenience method to construct a GEM buffer object, and userspace handle */
-int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
-		uint32_t size, uint32_t flags, uint32_t *handle)
+int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj)
 {
-	struct drm_gem_object *obj;
+	struct etnaviv_drm_private *priv = dev->dev_private;
+	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	int ret;
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
+	ret = mutex_lock_killable(&dev->struct_mutex);
 	if (ret)
 		return ret;
 
-	obj = etnaviv_gem_new(dev, size, flags);
-
+	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
 	mutex_unlock(&dev->struct_mutex);
 
-	if (IS_ERR(obj))
-		return PTR_ERR(obj);
-
-	ret = drm_gem_handle_create(file, obj, handle);
-
-	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_unreference_unlocked(obj);
-
-	return ret;
+	return 0;
 }
 
 static int etnaviv_gem_new_impl(struct drm_device *dev,
 		uint32_t size, uint32_t flags,
 		struct drm_gem_object **obj)
 {
-	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct etnaviv_gem_object *etnaviv_obj;
 	unsigned sz = sizeof(*etnaviv_obj);
 	bool valid = true;
@@ -666,20 +655,18 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 	reservation_object_init(&etnaviv_obj->_resv);
 
 	INIT_LIST_HEAD(&etnaviv_obj->submit_entry);
-	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
+	INIT_LIST_HEAD(&etnaviv_obj->mm_list);
 
 	*obj = &etnaviv_obj->base;
 
 	return 0;
 }
 
-struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
+static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
 		uint32_t size, uint32_t flags)
 {
 	struct drm_gem_object *obj = NULL;
 	int ret;
-
-	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
 	size = PAGE_ALIGN(size);
 
@@ -703,9 +690,53 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 
 fail:
 	if (obj)
-		drm_gem_object_unreference(obj);
+		drm_gem_object_unreference_unlocked(obj);
 
 	return ERR_PTR(ret);
+}
+
+/* convenience method to construct a GEM buffer object, and userspace handle */
+int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
+		uint32_t size, uint32_t flags, uint32_t *handle)
+{
+	struct drm_gem_object *obj;
+	int ret;
+
+	obj = __etnaviv_gem_new(dev, size, flags);
+	if (IS_ERR(obj))
+		return PTR_ERR(obj);
+
+	ret = etnaviv_gem_obj_add(dev, obj);
+	if (ret < 0) {
+		drm_gem_object_unreference_unlocked(obj);
+		return ret;
+	}
+
+	ret = drm_gem_handle_create(file, obj, handle);
+
+	/* drop reference from allocate - handle holds it now */
+	drm_gem_object_unreference_unlocked(obj);
+
+	return ret;
+}
+
+struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
+		uint32_t size, uint32_t flags)
+{
+	struct drm_gem_object *obj;
+	int ret;
+
+	obj = __etnaviv_gem_new(dev, size, flags);
+	if (IS_ERR(obj))
+		return obj;
+
+	ret = etnaviv_gem_obj_add(dev, obj);
+	if (ret < 0) {
+		drm_gem_object_unreference_unlocked(obj);
+		return ERR_PTR(ret);
+	}
+
+	return obj;
 }
 
 int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
@@ -887,22 +918,21 @@ int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 	struct etnaviv_gem_object *etnaviv_obj;
 	int ret;
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret)
-		return ret;
-
 	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_CACHED, &etnaviv_obj);
-	if (ret == 0) {
-		etnaviv_obj->ops = &etnaviv_gem_userptr_ops;
-		etnaviv_obj->userptr.ptr = ptr;
-		etnaviv_obj->userptr.task = current;
-		etnaviv_obj->userptr.ro = !(flags & ETNA_USERPTR_WRITE);
-		get_task_struct(current);
-	}
-	mutex_unlock(&dev->struct_mutex);
-
 	if (ret)
 		return ret;
+
+	etnaviv_obj->ops = &etnaviv_gem_userptr_ops;
+	etnaviv_obj->userptr.ptr = ptr;
+	etnaviv_obj->userptr.task = current;
+	etnaviv_obj->userptr.ro = !(flags & ETNA_USERPTR_WRITE);
+	get_task_struct(current);
+
+	ret = etnaviv_gem_obj_add(dev, &etnaviv_obj->base);
+	if (ret) {
+		drm_gem_object_unreference_unlocked(&etnaviv_obj->base);
+		return ret;
+	}
 
 	ret = drm_gem_handle_create(file, &etnaviv_obj->base, handle);
 
