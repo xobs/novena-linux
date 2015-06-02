@@ -522,8 +522,6 @@ static void etnaviv_gem_cmd_release(struct etnaviv_gem_object *etnaviv_obj)
 {
 	dma_free_coherent(etnaviv_obj->base.dev->dev, etnaviv_obj->base.size,
 		etnaviv_obj->vaddr, etnaviv_obj->paddr);
-
-	drm_gem_object_release(obj);
 }
 
 static const struct etnaviv_gem_ops etnaviv_gem_cmd_ops = {
@@ -550,8 +548,6 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 
 	if (etnaviv_obj->resv == &etnaviv_obj->_resv)
 		reservation_object_fini(etnaviv_obj->resv);
-
-	drm_gem_object_release(obj);
 }
 
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
@@ -581,6 +577,8 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 		etnaviv_free_cmd(obj);
 	else
 		etnaviv_free_obj(obj);
+
+	drm_gem_object_release(obj);
 
 	kfree(etnaviv_obj);
 }
