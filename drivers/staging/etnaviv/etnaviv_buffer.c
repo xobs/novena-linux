@@ -28,7 +28,7 @@
  */
 
 
-static inline void OUT(struct etnaviv_gem_object *buffer, uint32_t data)
+static inline void OUT(struct etnaviv_gem_object *buffer, u32 data)
 {
 	u32 *vaddr = (u32 *)buffer->vaddr;
 
@@ -183,7 +183,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	 * if we are going to completely overflow the buffer, we need to wrap.
 	 */
 	if (buffer->offset + reserve_size >
-	    buffer->base.size / sizeof(uint32_t))
+	    buffer->base.size / sizeof(u32))
 		buffer->offset = 0;
 
 	/* save offset back into main buffer */
@@ -192,7 +192,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	link_size = 6;
 
 	/* Skip over any extra instructions */
-	link_target += extra_size * sizeof(uint32_t);
+	link_target += extra_size * sizeof(u32);
 
 	/* update offset for every cmd stream */
 	for (i = submit->nr_cmds; i--; ) {
@@ -232,8 +232,8 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	}
 
 	if (gpu->mmu->need_flush || gpu->switch_context) {
-		uint32_t new_target = gpu_va(gpu, buffer) + buffer->offset *
-					sizeof(uint32_t);
+		u32 new_target = gpu_va(gpu, buffer) + buffer->offset *
+					sizeof(u32);
 
 		if (gpu->mmu->need_flush) {
 			/* Add the MMU flush */
