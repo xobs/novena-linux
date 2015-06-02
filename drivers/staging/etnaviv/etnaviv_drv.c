@@ -510,7 +510,7 @@ static struct drm_driver etnaviv_drm_driver = {
 	.gem_prime_pin      = msm_gem_prime_pin,
 	.gem_prime_unpin    = msm_gem_prime_unpin,
 	.gem_prime_get_sg_table = etnaviv_gem_prime_get_sg_table,
-	.gem_prime_import_sg_table = msm_gem_prime_import_sg_table,
+	.gem_prime_import_sg_table = etnaviv_gem_prime_import_sg_table,
 	.gem_prime_vmap     = etnaviv_gem_prime_vmap,
 	.gem_prime_vunmap   = msm_gem_prime_vunmap,
 #ifdef CONFIG_DEBUG_FS
