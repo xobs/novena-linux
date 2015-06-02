@@ -269,20 +269,17 @@ out:
 	}
 }
 
-/** get mmap offset */
+/* get mmap offset - must be called under struct_mutex */
 int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, uint64_t *offset)
 {
-	struct drm_device *dev = obj->dev;
 	int ret;
 
-	mutex_lock(&dev->struct_mutex);
 	/* Make it mmapable */
 	ret = drm_gem_create_mmap_offset(obj);
 	if (ret)
-		dev_err(dev->dev, "could not allocate mmap offset\n");
+		dev_err(obj->dev->dev, "could not allocate mmap offset\n");
 	else
 		*offset = drm_vma_node_offset_addr(&obj->vma_node);
-	mutex_unlock(&dev->struct_mutex);
 
 	return ret;
 }
