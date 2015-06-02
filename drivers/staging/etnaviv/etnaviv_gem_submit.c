@@ -25,7 +25,6 @@
 
 #define BO_INVALID_FLAGS ~(ETNA_SUBMIT_BO_READ | ETNA_SUBMIT_BO_WRITE)
 /* make sure these don't conflict w/ MSM_SUBMIT_BO_x */
-#define BO_VALID    0x8000
 #define BO_LOCKED   0x4000
 #define BO_PINNED   0x2000
 
@@ -84,8 +83,6 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 		}
 
 		submit->bos[i].flags = submit_bo.flags;
-		/* in validate_objects() we figure out if this is true: */
-		submit->bos[i].iova  = submit_bo.presumed;
 
 		/* normally use drm_gem_object_lookup(), but for bulk lookup
 		 * all under single table_lock just hit object_idr directly:
@@ -131,9 +128,7 @@ static void submit_unlock_unpin_bo(struct etnaviv_gem_submit *submit, int i)
 	if (submit->bos[i].flags & BO_LOCKED)
 		ww_mutex_unlock(&etnaviv_obj->resv->lock);
 
-	if (!(submit->bos[i].flags & BO_VALID))
-		submit->bos[i].iova = 0;
-
+	submit->bos[i].iova = 0;
 	submit->bos[i].flags &= ~(BO_LOCKED | BO_PINNED);
 }
 
@@ -143,8 +138,6 @@ static int submit_validate_objects(struct etnaviv_gem_submit *submit)
 	int contended, slow_locked = -1, i, ret = 0;
 
 retry:
-	submit->valid = true;
-
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 		uint32_t iova;
@@ -177,14 +170,7 @@ retry:
 			goto fail;
 
 		submit->bos[i].flags |= BO_PINNED;
-
-		if (iova == submit->bos[i].iova) {
-			submit->bos[i].flags |= BO_VALID;
-		} else {
-			submit->bos[i].iova = iova;
-			submit->bos[i].flags &= ~BO_VALID;
-			submit->valid = false;
-		}
+		submit->bos[i].iova = iova;
 	}
 
 	ww_acquire_done(&submit->ticket);
@@ -217,7 +203,7 @@ fail:
 }
 
 static int submit_bo(struct etnaviv_gem_submit *submit, uint32_t idx,
-		struct etnaviv_gem_object **obj, uint32_t *iova, bool *valid)
+		struct etnaviv_gem_object **obj, uint32_t *iova)
 {
 	if (idx >= submit->nr_bos) {
 		DRM_ERROR("invalid buffer index: %u (out of %u)\n",
@@ -229,8 +215,6 @@ static int submit_bo(struct etnaviv_gem_submit *submit, uint32_t idx,
 		*obj = submit->bos[idx].obj;
 	if (iova)
 		*iova = submit->bos[idx].iova;
-	if (valid)
-		*valid = !!(submit->bos[idx].flags & BO_VALID);
 
 	return 0;
 }
@@ -254,7 +238,6 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 		void __user *userptr =
 			to_user_ptr(relocs + (i * sizeof(submit_reloc)));
 		uint32_t iova, off;
-		bool valid;
 
 		ret = copy_from_user(&submit_reloc, userptr,
 				     sizeof(submit_reloc));
@@ -276,13 +259,9 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 			return -EINVAL;
 		}
 
-		ret = submit_bo(submit, submit_reloc.reloc_idx, &bobj,
-				&iova, &valid);
+		ret = submit_bo(submit, submit_reloc.reloc_idx, &bobj, &iova);
 		if (ret)
 			return ret;
-
-		if (valid)
-			continue;
 
 		if (submit_reloc.reloc_offset >=
 		    bobj->base.size - sizeof(*ptr)) {
@@ -371,8 +350,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 			goto out;
 		}
 
-		ret = submit_bo(submit, submit_cmd.submit_idx,
-				&etnaviv_obj, NULL, NULL);
+		ret = submit_bo(submit, submit_cmd.submit_idx, &etnaviv_obj,
+				NULL);
 		if (ret)
 			goto out;
 
@@ -414,9 +393,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		submit->cmd[i].offset = submit_cmd.submit_offset / 4;
 		submit->cmd[i].size = submit_cmd.size / 4;
 		submit->cmd[i].obj = etnaviv_obj;
-
-		if (submit->valid)
-			continue;
 
 		ret = submit_reloc(submit, etnaviv_obj,
 				   submit_cmd.submit_offset,
