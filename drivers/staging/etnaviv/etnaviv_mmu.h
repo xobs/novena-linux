@@ -30,6 +30,8 @@ struct etnaviv_iommu {
 	struct iommu_domain *domain;
 
 	enum etnaviv_iommu_version version;
+
+	bool need_flush;
 };
 
 int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
