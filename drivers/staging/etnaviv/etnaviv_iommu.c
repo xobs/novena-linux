@@ -30,7 +30,7 @@
 #define OLD_IOMMU
 #endif
 
-#define PT_SIZE		SZ_512K
+#define PT_SIZE		SZ_2M
 #define PT_ENTRIES	(PT_SIZE / sizeof(u32))
 
 #define GPU_MEM_START	0x80000000
@@ -93,7 +93,7 @@ static void pgtable_write(struct etnaviv_iommu_domain_pgtable *pgtable,
 
 static int __etnaviv_iommu_init(struct etnaviv_iommu_domain *etnaviv_domain)
 {
-	u32 iova, *p;
+	u32 *p;
 	int ret, i;
 
 	etnaviv_domain->bad_page_cpu = dma_alloc_coherent(etnaviv_domain->dev,
@@ -115,11 +115,9 @@ static int __etnaviv_iommu_init(struct etnaviv_iommu_domain *etnaviv_domain)
 		return ret;
 	}
 
-	for (iova = etnaviv_domain->domain.geometry.aperture_start;
-	     iova < etnaviv_domain->domain.geometry.aperture_end; iova += SZ_4K) {
-		pgtable_write(&etnaviv_domain->pgtable, iova,
-			      etnaviv_domain->bad_page_dma);
-	}
+	for (i = 0; i < PT_ENTRIES; i++)
+		etnaviv_domain->pgtable.pgtable[i] =
+			etnaviv_domain->bad_page_dma;
 
 	spin_lock_init(&etnaviv_domain->map_lock);
 
