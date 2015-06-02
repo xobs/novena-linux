@@ -734,10 +734,39 @@ static void recover_worker(struct work_struct *work)
 	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
 					       recover_work);
 	struct drm_device *dev = gpu->drm;
+	u32 busy;
 
 	dev_err(gpu->dev, "hangcheck recover!\n");
 
 	mutex_lock(&dev->struct_mutex);
+	busy = ~gpu_read(gpu, VIVS_HI_IDLE_STATE) & gpu->idle_mask;
+
+	/*
+	 * If the only unit which is busy is the front end, we have likely
+	 * completed all operations.  We've just missed an interrupt.
+	 */
+	if (busy == VIVS_HI_IDLE_STATE_FE) {
+		unsigned long flags;
+		unsigned int i;
+
+		dev_err(gpu->dev, "missed interrupt?\n");
+
+		spin_lock_irqsave(&gpu->event_spinlock, flags);
+		for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
+			if (!gpu->event[i].used)
+				continue;
+			dev_err(gpu->dev, "probable lost event %u at ring pos %u, fence %u\n",
+				i, gpu->event[i].ring_pos, gpu->event[i].fence);
+			if (fence_after(gpu->event[i].fence, gpu->retired_fence)) {
+				gpu->retired_fence = gpu->event[i].fence;
+				gpu->last_ring_pos = gpu->event[i].ring_pos;
+			}
+			gpu->event[i].used = false;
+			complete(&gpu->event_free);
+		}
+		spin_unlock_irqrestore(&gpu->event_spinlock, flags);
+	}
+
 	/* TODO gpu->funcs->recover(gpu); */
 	mutex_unlock(&dev->struct_mutex);
 
