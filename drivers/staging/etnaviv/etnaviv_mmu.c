@@ -104,7 +104,6 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	if (!mapping)
 		return -ENOMEM;
 
-	INIT_LIST_HEAD(&mapping->obj_head);
 	mapping->mmu = mmu;
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
