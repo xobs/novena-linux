@@ -310,19 +310,25 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	struct drm_gem_object *obj, uint32_t *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+	struct etnaviv_vram_mapping *mapping =
+			etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
 	int ret = 0;
 
-	if (!etnaviv_obj->iova && !(etnaviv_obj->flags & ETNA_BO_CMDSTREAM)) {
+	if (etnaviv_obj->flags & ETNA_BO_CMDSTREAM) {
+		*iova = etnaviv_obj->paddr;
+		return 0;
+	}
+
+	if (!mapping) {
 		struct page **pages = etnaviv_gem_get_pages(etnaviv_obj);
 		if (IS_ERR(pages))
 			return PTR_ERR(pages);
-
 		ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj,
-				gpu->memory_base);
+				gpu->memory_base, &mapping);
 	}
 
 	if (!ret)
-		*iova = etnaviv_obj->iova;
+		*iova = mapping->iova;
 
 	return ret;
 }
@@ -331,13 +337,15 @@ int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
 	int id, uint32_t *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+	struct etnaviv_vram_mapping *mapping =
+			etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
 	int ret;
 
 	/* this is safe right now because we don't unmap until the
 	 * bo is deleted:
 	 */
-	if (etnaviv_obj->iova) {
-		*iova = etnaviv_obj->iova;
+	if (mapping) {
+		*iova = mapping->iova;
 		return 0;
 	}
 
@@ -546,11 +554,12 @@ static const struct etnaviv_gem_ops etnaviv_gem_cmd_ops = {
 static void etnaviv_free_obj(struct drm_gem_object *obj)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	struct etnaviv_drm_private *priv = obj->dev->dev_private;
-	struct etnaviv_iommu *mmu = priv->mmu;
+	struct etnaviv_vram_mapping *mapping, *tmp;
 
-	if (mmu)
-		etnaviv_iommu_unmap_gem(mmu, etnaviv_obj);
+	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
+				 obj_head) {
+		etnaviv_iommu_unmap_gem(mapping->mmu, etnaviv_obj, mapping);
+	}
 }
 
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
@@ -655,6 +664,7 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 
 	INIT_LIST_HEAD(&etnaviv_obj->submit_entry);
 	INIT_LIST_HEAD(&etnaviv_obj->mm_list);
+	INIT_LIST_HEAD(&etnaviv_obj->vram_list);
 
 	*obj = &etnaviv_obj->base;
 
@@ -753,6 +763,20 @@ int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
 	*res = to_etnaviv_bo(obj);
 
 	return 0;
+}
+
+struct etnaviv_vram_mapping *
+etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
+			     struct etnaviv_iommu *mmu)
+{
+	struct etnaviv_vram_mapping *mapping;
+
+	list_for_each_entry(mapping, &obj->vram_list, obj_head) {
+		if (mapping->mmu == mmu)
+			return mapping;
+	}
+
+	return NULL;
 }
 
 struct get_pages_work {
