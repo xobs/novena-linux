@@ -39,8 +39,8 @@ int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova,
 		return -EINVAL;
 
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-		u32 pa = sg_phys(sg) - sg->offset;
-		size_t bytes = sg->length + sg->offset;
+		u32 pa = sg_dma_address(sg) - sg->offset;
+		size_t bytes = sg_dma_len(sg) + sg->offset;
 
 		VERB("map[%d]: %08x %08x(%zx)", i, iova, pa, bytes);
 
@@ -57,7 +57,7 @@ fail:
 	da = iova;
 
 	for_each_sg(sgt->sgl, sg, i, j) {
-		size_t bytes = sg->length + sg->offset;
+		size_t bytes = sg_dma_len(sg) + sg->offset;
 
 		iommu_unmap(domain, da, bytes);
 		da += bytes;
@@ -74,7 +74,7 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 	int i;
 
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-		size_t bytes = sg->length + sg->offset;
+		size_t bytes = sg_dma_len(sg) + sg->offset;
 		size_t unmapped;
 
 		unmapped = iommu_unmap(domain, da, bytes);
@@ -104,9 +104,6 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		uint32_t iova;
 
 		iova = sg_dma_address(sgt->sgl);
-		if (!iova)
-			iova = sg_phys(sgt->sgl) - sgt->sgl->offset;
-
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
 			etnaviv_obj->iova = iova;
 			return 0;
