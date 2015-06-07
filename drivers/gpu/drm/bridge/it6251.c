@@ -276,7 +276,7 @@ static void it6251_init(struct work_struct *work)
 	it6251_lvds_write(priv, 0x3c, 0x08);  // something with SSC PLL
 	it6251_lvds_write(priv, 0x0b, 0x88);  // don't swap links, but writing reserved registers
 
-	it6251_lvds_write(priv, 0x2c, 0x01);  // JEIDA, 8-bit depth  0x11   // orig 0x42
+	it6251_lvds_write(priv, 0x2c, 0x01);  // JEIDA, 8-bit depth, DeSSC enabled
 	it6251_lvds_write(priv, 0x32, 0x04);  // "reserved"
 	it6251_lvds_write(priv, 0x35, 0xe0);  // "reserved"
 	it6251_lvds_write(priv, 0x2b, 0x24);  // "reserved" + clock delay
