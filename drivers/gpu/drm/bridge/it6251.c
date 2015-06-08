@@ -185,12 +185,21 @@ static int it6251_is_stable(struct it6251_bridge *priv)
 	int rpclkcnt;
 	int clkcnt;
 	int refstate;
+	int reg;
 
 	status = it6251_read(priv, IT6251_SYSTEM_STATUS);
 	dev_info(&priv->client->dev, "System status: 0x%02x\n", status);
 
 	if (!(status & IT6251_SYSTEM_STATUS_RVIDEOSTABLE))
 		return 0;
+
+	/* Reset counter first */
+	reg = it6251_read(priv, 0x12);
+	reg |= 0x80;
+	it6251_write(priv, 0x12, reg);
+	usleep_range(1000, 2000);
+	reg &= 0x7f;
+	it6251_write(priv, 0x12, reg);
 
 	rpclkcnt = ((it6251_read(priv, 0x13) & 0xff)
 		| ((it6251_read(priv, 0x14) << 8) & 0x0f00));
@@ -248,6 +257,8 @@ static void it6251_init(struct work_struct *work)
 		return;
 	}
 
+	/* Reset DP */
+	it6251_write(priv, 0x05, 0xff);
 	it6251_write(priv, 0x05, 0x00);
 	udelay(1000);
 
@@ -267,7 +278,7 @@ static void it6251_init(struct work_struct *work)
 	it6251_lvds_write(priv, 0x3c, 0x0f);  // Enable DeSSC on LVDS port
 	it6251_lvds_write(priv, 0x0b, 0x88);  // don't swap links, but writing reserved registers
 
-	it6251_lvds_write(priv, 0x2c, 0x41);  // JEIDA, 8-bit depth, DeSSC enabled
+	it6251_lvds_write(priv, 0x2c, 0x01);  // JEIDA, 8-bit depth, DeSSC enabled
 	it6251_lvds_write(priv, 0x32, 0x04);  // "reserved"
 	it6251_lvds_write(priv, 0x35, 0xe0);  // "reserved"
 	it6251_lvds_write(priv, 0x2b, 0x24);  // "reserved" + clock delay
@@ -322,15 +333,34 @@ static void it6251_init(struct work_struct *work)
 
 	
 	for (tries = 0; tries < 100; tries++) {
-		reg = it6251_read(priv, 0x17);
-		if (reg == 0xe0) {
-			reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
-			if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
-				break;
+		/* Check interrupt state and clear if set */
+		reg = it6251_read(priv, 0x06);
+		if (reg !=0 ) {
+			dev_dbg(&priv->client->dev, "Intr(0x06) state: %02x\n",reg);
+			it6251_write(priv, 0x06, reg);
+		}
+
+		reg = it6251_read(priv, IT6251_REF_STATE);
+		if ((reg & 0x1f) == 0x10) {
+			reg = it6251_read(priv, 0x17);
+			if ((reg & 0xe0) != 0xe0) {
+				reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
+				if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
+					break;
+			} else {
+				/* Unexpected Link state */
+				dev_dbg(&priv->client->dev, "Link 0x17 state: %02x\n",reg);
+			}
+		} else {
+			/* wait for Link training */
+			dev_dbg(&priv->client->dev, "REF_STATE fail: %02x\n",reg);
+			it6251_write(priv, 0x05, 0x00);
+			it6251_write(priv, 0x17, 0x04);
+			it6251_write(priv, 0x17, 0x01); // start link training
 		}
 		udelay(2000);
 	}
-	
+
 	/*
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
