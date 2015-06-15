@@ -74,17 +74,23 @@
 #endif
 #else
 #ifdef __LITTLE_ENDIAN
-#define wr_reg32(reg, data) __raw_writel(data, reg)
-#define rd_reg32(reg) __raw_readl(reg)
+#define wr_reg32(reg, data) writel(data, reg)
+#define rd_reg32(reg) readl(reg)
 #ifdef CONFIG_64BIT
-#define wr_reg64(reg, data) __raw_writeq(data, reg)
-#define rd_reg64(reg) __raw_readq(reg)
+#define wr_reg64(reg, data) writeq(data, reg)
+#define rd_reg64(reg) readq(reg)
 #endif
 #endif
 #endif
 
+#ifdef CONFIG_ARM
+/* These are common macros for Power, put here for ARM */
+#define setbits32(_addr, _v) writel((readl(_addr) | (_v)), (_addr))
+#define clrbits32(_addr, _v) writel((readl(_addr) & ~(_v)), (_addr))
+#endif
+
 #ifndef CONFIG_64BIT
-#ifdef __BIG_ENDIAN
+#if defined(__BIG_ENDIAN) || defined(CONFIG_ARCH_MXC)
 static inline void wr_reg64(u64 __iomem *reg, u64 data)
 {
 	wr_reg32((u32 __iomem *)reg, (data & 0xffffffff00000000ull) >> 32);
