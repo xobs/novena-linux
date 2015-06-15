@@ -98,6 +98,7 @@ static int dma_map_sg_chained(struct device *dev, struct scatterlist *sg,
 	} else {
 		dma_map_sg(dev, sg, nents, dir);
 	}
+
 	return nents;
 }
 
