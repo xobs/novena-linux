@@ -2234,6 +2234,11 @@ static void aead_decrypt_done(struct device *jrdev, u32 *desc, u32 err,
 	edesc = (struct aead_edesc *)((char *)desc -
 		 offsetof(struct aead_edesc, hw_desc));
 
+	if (err)
+		caam_jr_strstatus(jrdev, err);
+
+	aead_unmap(jrdev, edesc, req);
+
 #ifdef DEBUG
 	print_hex_dump(KERN_ERR, "dstiv  @"__stringify(__LINE__)": ",
 		       DUMP_PREFIX_ADDRESS, 16, 4, req->iv,
@@ -2242,11 +2247,6 @@ static void aead_decrypt_done(struct device *jrdev, u32 *desc, u32 err,
 		       DUMP_PREFIX_ADDRESS, 16, 4, sg_virt(req->dst),
 		       req->cryptlen - ctx->authsize, 1);
 #endif
-
-	if (err)
-		caam_jr_strstatus(jrdev, err);
-
-	aead_unmap(jrdev, edesc, req);
 
 	/*
 	 * verify hw auth check passed else return -EBADMSG
@@ -2292,6 +2292,8 @@ static void ablkcipher_encrypt_done(struct device *jrdev, u32 *desc, u32 err,
 	if (err)
 		caam_jr_strstatus(jrdev, err);
 
+	ablkcipher_unmap(jrdev, edesc, req);
+
 #ifdef DEBUG
 	print_hex_dump(KERN_ERR, "dstiv  @"__stringify(__LINE__)": ",
 		       DUMP_PREFIX_ADDRESS, 16, 4, req->info,
@@ -2301,7 +2303,6 @@ static void ablkcipher_encrypt_done(struct device *jrdev, u32 *desc, u32 err,
 		       edesc->dst_nents > 1 ? 100 : req->nbytes, 1);
 #endif
 
-	ablkcipher_unmap(jrdev, edesc, req);
 	kfree(edesc);
 
 	ablkcipher_request_complete(req, err);
@@ -2324,6 +2325,8 @@ static void ablkcipher_decrypt_done(struct device *jrdev, u32 *desc, u32 err,
 	if (err)
 		caam_jr_strstatus(jrdev, err);
 
+	ablkcipher_unmap(jrdev, edesc, req);
+
 #ifdef DEBUG
 	print_hex_dump(KERN_ERR, "dstiv  @"__stringify(__LINE__)": ",
 		       DUMP_PREFIX_ADDRESS, 16, 4, req->info,
@@ -2333,7 +2336,6 @@ static void ablkcipher_decrypt_done(struct device *jrdev, u32 *desc, u32 err,
 		       edesc->dst_nents > 1 ? 100 : req->nbytes, 1);
 #endif
 
-	ablkcipher_unmap(jrdev, edesc, req);
 	kfree(edesc);
 
 	ablkcipher_request_complete(req, err);
