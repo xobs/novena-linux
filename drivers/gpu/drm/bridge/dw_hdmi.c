@@ -144,6 +144,14 @@ struct dw_hdmi {
 	u8 (*read)(struct dw_hdmi *hdmi, int offset);
 };
 
+#define HDMI_IH_PHY_STAT0_RX_SENSE \
+	(HDMI_IH_PHY_STAT0_RX_SENSE0 | HDMI_IH_PHY_STAT0_RX_SENSE1 | \
+	 HDMI_IH_PHY_STAT0_RX_SENSE2 | HDMI_IH_PHY_STAT0_RX_SENSE3)
+
+#define HDMI_PHY_RX_SENSE \
+	(HDMI_PHY_RX_SENSE0 | HDMI_PHY_RX_SENSE1 | \
+	 HDMI_PHY_RX_SENSE2 | HDMI_PHY_RX_SENSE3)
+
 static void dw_hdmi_writel(struct dw_hdmi *hdmi, u8 val, int offset)
 {
 	writel(val, hdmi->regs + (offset << 2));
@@ -1319,10 +1327,12 @@ static int dw_hdmi_fb_registered(struct dw_hdmi *hdmi)
 		    HDMI_PHY_I2CM_CTLINT_ADDR);
 
 	/* enable cable hot plug irq */
-	hdmi_writeb(hdmi, (u8)~HDMI_PHY_HPD, HDMI_PHY_MASK0);
+	hdmi_writeb(hdmi, (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE),
+		    HDMI_PHY_MASK0);
 
 	/* Clear Hotplug interrupts */
-	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
+	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE,
+		    HDMI_IH_PHY_STAT0);
 
 	return 0;
 }
@@ -1538,33 +1548,61 @@ static irqreturn_t dw_hdmi_hardirq(int irq, void *dev_id)
 static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
 {
 	struct dw_hdmi *hdmi = dev_id;
-	u8 intr_stat;
-	u8 phy_int_pol;
+	u8 intr_stat, phy_int_pol, phy_pol_mask;
 
 	intr_stat = hdmi_readb(hdmi, HDMI_IH_PHY_STAT0);
 
 	phy_int_pol = hdmi_readb(hdmi, HDMI_PHY_POL0);
 
-	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-		hdmi_modb(hdmi, ~phy_int_pol, HDMI_PHY_HPD, HDMI_PHY_POL0);
+	phy_pol_mask = 0;
+	if (intr_stat & HDMI_IH_PHY_STAT0_HPD)
+		phy_pol_mask |= HDMI_PHY_HPD;
+	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE0)
+		phy_pol_mask |= HDMI_PHY_RX_SENSE0;
+	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE1)
+		phy_pol_mask |= HDMI_PHY_RX_SENSE1;
+	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE2)
+		phy_pol_mask |= HDMI_PHY_RX_SENSE2;
+	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE3)
+		phy_pol_mask |= HDMI_PHY_RX_SENSE3;
+
+	if (phy_pol_mask)
+		hdmi_modb(hdmi, ~phy_int_pol, phy_pol_mask, HDMI_PHY_POL0);
+
+	/*
+	 * RX sense tells us whether the TDMS transmitters are detecting
+	 * load - in other words, there's something listening on the
+	 * other end of the link.  Use this to decide whether we should
+	 * power on the phy as HPD may be toggled by the sink to merely
+	 * ask the source to re-read the EDID.
+	 */
+	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE) {
 		mutex_lock(&hdmi->mutex);
-		if (phy_int_pol & HDMI_PHY_HPD) {
-			dev_dbg(hdmi->dev, "EVENT=plugin\n");
+		if (!hdmi->disabled) {
+			u8 phy_stat0 = hdmi_readb(hdmi, HDMI_PHY_STAT0);
 
-			if (!hdmi->disabled)
+			/*
+			 * If the status indicates that all signals are
+			 * connected, power on the phy.
+			 */
+			if ((phy_stat0 & HDMI_PHY_RX_SENSE) ==
+			    HDMI_PHY_RX_SENSE)
 				dw_hdmi_poweron(hdmi);
-		} else {
-			dev_dbg(hdmi->dev, "EVENT=plugout\n");
-
-			if (!hdmi->disabled)
+			else
 				dw_hdmi_poweroff(hdmi);
 		}
 		mutex_unlock(&hdmi->mutex);
+	}
+
+	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+		dev_dbg(hdmi->dev, "EVENT=%s\n",
+			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
 		drm_helper_hpd_irq_event(hdmi->bridge->dev);
 	}
 
 	hdmi_writeb(hdmi, intr_stat, HDMI_IH_PHY_STAT0);
-	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+	hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE),
+		    HDMI_IH_MUTE_PHY_STAT0);
 
 	return IRQ_HANDLED;
 }
@@ -1743,10 +1781,11 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 	 * Configure registers related to HDMI interrupt
 	 * generation before registering IRQ.
 	 */
-	hdmi_writeb(hdmi, HDMI_PHY_HPD, HDMI_PHY_POL0);
+	hdmi_writeb(hdmi, HDMI_PHY_HPD | HDMI_PHY_RX_SENSE, HDMI_PHY_POL0);
 
 	/* Clear Hotplug interrupts */
-	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
+	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE,
+		    HDMI_IH_PHY_STAT0);
 
 	ret = dw_hdmi_fb_registered(hdmi);
 	if (ret)
@@ -1757,7 +1796,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 		goto err_iahb;
 
 	/* Unmute interrupts */
-	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+	hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE),
+		    HDMI_IH_MUTE_PHY_STAT0);
 
 	memset(&pdevinfo, 0, sizeof(pdevinfo));
 	pdevinfo.parent = dev;
