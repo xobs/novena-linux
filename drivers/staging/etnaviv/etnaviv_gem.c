@@ -270,33 +270,21 @@ out:
 }
 
 /** get mmap offset */
-static uint64_t mmap_offset(struct drm_gem_object *obj)
+int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, uint64_t *offset)
 {
 	struct drm_device *dev = obj->dev;
 	int ret;
 
-	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
-
+	mutex_lock(&dev->struct_mutex);
 	/* Make it mmapable */
 	ret = drm_gem_create_mmap_offset(obj);
-
-	if (ret) {
+	if (ret)
 		dev_err(dev->dev, "could not allocate mmap offset\n");
-		return 0;
-	}
+	else
+		*offset = drm_vma_node_offset_addr(&obj->vma_node);
+	mutex_unlock(&dev->struct_mutex);
 
-	return drm_vma_node_offset_addr(&obj->vma_node);
-}
-
-uint64_t etnaviv_gem_mmap_offset(struct drm_gem_object *obj)
-{
-	uint64_t offset;
-
-	mutex_lock(&obj->dev->struct_mutex);
-	offset = mmap_offset(obj);
-	mutex_unlock(&obj->dev->struct_mutex);
-
-	return offset;
+	return ret;
 }
 
 /* should be called under struct_mutex.. although it can be called
