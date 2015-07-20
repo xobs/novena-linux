@@ -508,7 +508,7 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 	struct etnaviv_vram_mapping *mapping, *tmp;
 
 	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
-				 obj_head) {
+				 obj_node) {
 		etnaviv_iommu_unmap_gem(mapping->mmu, etnaviv_obj, mapping);
 	}
 }
@@ -722,7 +722,7 @@ etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
 {
 	struct etnaviv_vram_mapping *mapping;
 
-	list_for_each_entry(mapping, &obj->vram_list, obj_head) {
+	list_for_each_entry(mapping, &obj->vram_list, obj_node) {
 		if (mapping->mmu == mmu)
 			return mapping;
 	}
