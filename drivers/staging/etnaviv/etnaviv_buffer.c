@@ -133,7 +133,8 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 	u32 back;
 	u32 i;
 
-	etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
+	if (drm_debug & DRM_UT_DRIVER)
+		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
 
 	/* save offset back into main buffer */
 	back = buffer->offset;
@@ -161,24 +162,25 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 		submit->cmd[i].size = submit->cmd[i].obj->offset -
 				      submit->cmd[i].offset;
 
-	printk(KERN_ERR "stream link @ 0x%llx\n", (u64)cmd->paddr + ((cmd->offset - 1) * 4));
-	printk(KERN_ERR "stream link @ %p\n", cmd->vaddr + ((cmd->offset - 1) * 4));
+	if (drm_debug & DRM_UT_DRIVER) {
+		pr_info("stream link @ 0x%llx\n",
+			(u64)cmd->paddr + ((cmd->offset - 1) * 4));
+		pr_info("stream link @ %p\n",
+			cmd->vaddr + ((cmd->offset - 1) * 4));
 
-	for (i = 0; i < submit->nr_cmds; i++) {
-		struct etnaviv_gem_object *obj = submit->cmd[i].obj;
+		for (i = 0; i < submit->nr_cmds; i++) {
+			struct etnaviv_gem_object *obj = submit->cmd[i].obj;
 
-		/* TODO: remove later */
-		if (unlikely(drm_debug & DRM_UT_CORE))
-			etnaviv_buffer_dump(gpu, obj, submit->cmd[i].offset * 4,
-					    submit->cmd[i].size);
+			etnaviv_buffer_dump(gpu, obj, submit->cmd[i].offset,
+					submit->cmd[i].size);
+		}
+
+		pr_info("link op: %p\n", lw);
+		pr_info("link addr: %p\n", lw + 1);
+		pr_info("addr: 0x%llx\n", (u64)submit->cmd[0].obj->paddr);
+		pr_info("back: 0x%llx\n", (u64)buffer->paddr + (back * 4));
+		pr_info("event: %d\n", event);
 	}
-
-	/* change ll to NOP */
-	printk(KERN_ERR "link op: %p\n", lw);
-	printk(KERN_ERR "link addr: %p\n", lw + 1);
-	printk(KERN_ERR "addr: 0x%llx\n", (u64)submit->cmd[0].obj->paddr);
-	printk(KERN_ERR "back: 0x%llx\n", (u64)buffer->paddr + (back * 4));
-	printk(KERN_ERR "event: %d\n", event);
 
 	/* Change WAIT into a LINK command; write the address first. */
 	i = VIV_FE_LINK_HEADER_OP_LINK | VIV_FE_LINK_HEADER_PREFETCH(submit->cmd[0].size * 2);
@@ -187,5 +189,6 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event, struct et
 	*(lw)= i;
 	mb();
 
-	etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
+	if (drm_debug & DRM_UT_DRIVER)
+		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
 }
