@@ -8,14 +8,14 @@ http://0x04.net/cgit/index.cgi/rules-ng-ng
 git clone git://0x04.net/rules-ng-ng
 
 The rules-ng-ng source files this header was generated from are:
-- /home/orion/projects/etna_viv/rnndb/state.xml    (  18526 bytes, from 2013-09-11 16:52:32)
-- /home/orion/projects/etna_viv/rnndb/common.xml   (  18379 bytes, from 2014-01-27 15:58:05)
-- /home/orion/projects/etna_viv/rnndb/state_hi.xml (  22236 bytes, from 2014-01-27 15:56:46)
-- /home/orion/projects/etna_viv/rnndb/state_2d.xml (  51191 bytes, from 2013-10-04 06:36:55)
-- /home/orion/projects/etna_viv/rnndb/state_3d.xml (  54570 bytes, from 2013-10-12 15:25:03)
-- /home/orion/projects/etna_viv/rnndb/state_vg.xml (   5942 bytes, from 2013-09-01 10:53:22)
+- state.xml    (  18882 bytes, from 2015-03-25 11:42:32)
+- common.xml   (  18437 bytes, from 2015-03-25 11:27:41)
+- state_hi.xml (  23420 bytes, from 2015-03-25 11:47:21)
+- state_2d.xml (  51549 bytes, from 2015-03-25 11:25:06)
+- state_3d.xml (  54600 bytes, from 2015-03-25 11:25:19)
+- state_vg.xml (   5973 bytes, from 2015-03-25 11:26:01)
 
-Copyright (C) 2013
+Copyright (C) 2015
 */
 
 
@@ -210,7 +210,10 @@ Copyright (C) 2013
 
 #define VIVS_GL_FLUSH_MMU					0x00003810
 #define VIVS_GL_FLUSH_MMU_FLUSH_FEMMU				0x00000001
-#define VIVS_GL_FLUSH_MMU_FLUSH_PEMMU				0x00000002
+#define VIVS_GL_FLUSH_MMU_FLUSH_UNK1				0x00000002
+#define VIVS_GL_FLUSH_MMU_FLUSH_UNK2				0x00000004
+#define VIVS_GL_FLUSH_MMU_FLUSH_PEMMU				0x00000008
+#define VIVS_GL_FLUSH_MMU_FLUSH_UNK4				0x00000010
 
 #define VIVS_GL_VERTEX_ELEMENT_CONFIG				0x00003814
 
