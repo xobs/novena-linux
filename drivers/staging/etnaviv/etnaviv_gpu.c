@@ -167,7 +167,12 @@ static void etnaviv_hw_specs(struct etnaviv_gpu *gpu)
 
 	switch (gpu->identity.instruction_count) {
 	case 0:
-		gpu->identity.instruction_count = 256;
+		if ((gpu->identity.model == 0x2000 &&
+		     gpu->identity.revision == 0x5108) ||
+		    gpu->identity.model == 0x880)
+			gpu->identity.instruction_count = 512;
+		else
+			gpu->identity.instruction_count = 256;
 		break;
 
 	case 1:
