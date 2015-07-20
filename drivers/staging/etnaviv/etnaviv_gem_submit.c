@@ -92,7 +92,8 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 		 */
 		obj = idr_find(&file->object_idr, submit_bo.handle);
 		if (!obj) {
-			DRM_ERROR("invalid handle %u at index %u\n", submit_bo.handle, i);
+			DRM_ERROR("invalid handle %u at index %u\n",
+				  submit_bo.handle, i);
 			ret = -EINVAL;
 			goto out_unlock;
 		}
@@ -101,7 +102,7 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 
 		if (!list_empty(&etnaviv_obj->submit_entry)) {
 			DRM_ERROR("handle %u at index %u already on submit list\n",
-					submit_bo.handle, i);
+				  submit_bo.handle, i);
 			ret = -EINVAL;
 			goto out_unlock;
 		}
@@ -163,7 +164,8 @@ retry:
 
 
 		/* if locking succeeded, pin bo: */
-		ret = etnaviv_gem_get_iova_locked(submit->gpu, &etnaviv_obj->base, &iova);
+		ret = etnaviv_gem_get_iova_locked(submit->gpu,
+						  &etnaviv_obj->base, &iova);
 
 		/* this would break the logic in the fail path.. there is no
 		 * reason for this to happen, but just to be on the safe side
@@ -197,7 +199,10 @@ fail:
 		submit_unlock_unpin_bo(submit, slow_locked);
 
 	if (ret == -EDEADLK) {
-		struct etnaviv_gem_object *etnaviv_obj = submit->bos[contended].obj;
+		struct etnaviv_gem_object *etnaviv_obj;
+
+		etnaviv_obj = submit->bos[contended].obj;
+
 		/* we lost out in a seqno race, lock and retry.. */
 		ret = ww_mutex_lock_slow_interruptible(&etnaviv_obj->resv->lock,
 				&submit->ticket);
@@ -251,7 +256,8 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 		uint32_t iova, off;
 		bool valid;
 
-		ret = copy_from_user(&submit_reloc, userptr, sizeof(submit_reloc));
+		ret = copy_from_user(&submit_reloc, userptr,
+				     sizeof(submit_reloc));
 		if (ret)
 			return -EFAULT;
 
@@ -305,6 +311,7 @@ static void submit_cleanup(struct etnaviv_gem_submit *submit, bool fail)
 
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
+
 		submit_unlock_unpin_bo(submit, i);
 		list_del_init(&etnaviv_obj->submit_entry);
 		drm_gem_object_unreference(&etnaviv_obj->base);
@@ -397,7 +404,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 		if (submit_cmd.size > max_size ||
 		    submit_cmd.submit_offset > max_size - submit_cmd.size) {
-			DRM_ERROR("invalid cmdstream size: %u\n", submit_cmd.size);
+			DRM_ERROR("invalid cmdstream size: %u\n",
+				  submit_cmd.size);
 			ret = -EINVAL;
 			goto out;
 		}
@@ -410,8 +418,9 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		if (submit->valid)
 			continue;
 
-		ret = submit_reloc(submit, etnaviv_obj, submit_cmd.submit_offset,
-				submit_cmd.nr_relocs, submit_cmd.relocs);
+		ret = submit_reloc(submit, etnaviv_obj,
+				   submit_cmd.submit_offset,
+				   submit_cmd.nr_relocs, submit_cmd.relocs);
 		if (ret)
 			goto out;
 	}
