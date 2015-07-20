@@ -290,6 +290,20 @@ static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
 	dev_info(gpu->dev, "minor_features3: %x\n",
 		 gpu->identity.minor_features3);
 
+	/* GC600 idle register reports zero bits where modules aren't present */
+	if (gpu->identity.model == chipModel_GC600) {
+		gpu->idle_mask = VIVS_HI_IDLE_STATE_TX |
+				 VIVS_HI_IDLE_STATE_RA |
+				 VIVS_HI_IDLE_STATE_SE |
+				 VIVS_HI_IDLE_STATE_PA |
+				 VIVS_HI_IDLE_STATE_SH |
+				 VIVS_HI_IDLE_STATE_PE |
+				 VIVS_HI_IDLE_STATE_DE |
+				 VIVS_HI_IDLE_STATE_FE;
+	} else {
+		gpu->idle_mask = ~VIVS_HI_IDLE_STATE_AXI_LP;
+	}
+
 	etnaviv_hw_specs(gpu);
 }
 
@@ -533,6 +547,7 @@ void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 
 	seq_printf(m, "\taxi: 0x%08x\n", axi);
 	seq_printf(m, "\tidle: 0x%08x\n", idle);
+	idle |= ~gpu->idle_mask & ~VIVS_HI_IDLE_STATE_AXI_LP;
 	if ((idle & VIVS_HI_IDLE_STATE_FE) == 0)
 		seq_puts(m, "\t FE is not idle\n");
 	if ((idle & VIVS_HI_IDLE_STATE_DE) == 0)
