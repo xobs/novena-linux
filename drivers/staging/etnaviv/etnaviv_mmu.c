@@ -94,6 +94,7 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj)
 {
+	struct etnaviv_drm_private *priv = etnaviv_obj->base.dev->dev_private;
 	struct sg_table *sgt = etnaviv_obj->sgt;
 	struct drm_mm_node *node;
 	int ret;
@@ -117,6 +118,10 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		return -ENOMEM;
 
 	while (1) {
+		struct etnaviv_gem_object *o, *n;
+		struct list_head list;
+		bool found;
+
 		ret = drm_mm_insert_node_in_range(&mmu->mm, node,
 			etnaviv_obj->base.size, 0, mmu->last_iova, ~0UL,
 			DRM_MM_SEARCH_DEFAULT);
@@ -134,7 +139,58 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 			continue;
 		}
 
-		break;
+		/* Try to retire some entries */
+		drm_mm_init_scan(&mmu->mm, etnaviv_obj->base.size, 0, 0);
+
+		found = 0;
+		INIT_LIST_HEAD(&list);
+		list_for_each_entry(o, &priv->inactive_list, mm_list) {
+			if (!o->gpu_vram_node ||
+			    o->gpu_vram_node->mm != &mmu->mm)
+				continue;
+
+			/*
+			 * If it's on the submit list, then it is part of
+			 * a submission, and we want to keep its entry.
+			 */
+			if (!list_empty(&o->submit_entry))
+				continue;
+
+			list_add(&o->submit_entry, &list);
+			if (drm_mm_scan_add_block(o->gpu_vram_node)) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			/* Nothing found, clean up and fail */
+			list_for_each_entry_safe(o, n, &list, submit_entry)
+				BUG_ON(drm_mm_scan_remove_block(o->gpu_vram_node));
+			break;
+		}
+
+		/*
+		 * drm_mm does not allow any other operations while
+		 * scanning, so we have to remove all blocks first.
+		 * If drm_mm_scan_remove_block() returns false, we
+		 * can leave the block pinned.
+		 */
+		list_for_each_entry_safe(o, n, &list, submit_entry)
+			if (!drm_mm_scan_remove_block(o->gpu_vram_node))
+				list_del_init(&o->submit_entry);
+
+		list_for_each_entry_safe(o, n, &list, submit_entry) {
+			list_del_init(&o->submit_entry);
+			etnaviv_iommu_unmap_gem(mmu, o);
+		}
+
+		/*
+		 * We removed enough mappings so that the new allocation will
+		 * succeed.  Ensure that the MMU will be flushed and retry
+		 * the allocation one more time.
+		 */
+		mmu->need_flush = true;
 	}
 
 	if (ret < 0) {
@@ -169,6 +225,9 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 				    etnaviv_obj->base.size);
 		drm_mm_remove_node(etnaviv_obj->gpu_vram_node);
 		kfree(etnaviv_obj->gpu_vram_node);
+
+		etnaviv_obj->gpu_vram_node = NULL;
+		etnaviv_obj->iova = 0;
 	}
 }
 
