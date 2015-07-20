@@ -24,7 +24,7 @@
  */
 
 #define BO_INVALID_FLAGS ~(ETNA_SUBMIT_BO_READ | ETNA_SUBMIT_BO_WRITE)
-/* make sure these don't conflict w/ MSM_SUBMIT_BO_x */
+/* make sure these don't conflict w/ ETNAVIV_SUBMIT_BO_x */
 #define BO_LOCKED   0x4000
 #define BO_PINNED   0x2000
 
