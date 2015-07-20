@@ -568,24 +568,6 @@ static int etnaviv_compare(struct device *dev, void *data)
 	return dev->of_node == np;
 }
 
-static int etnaviv_add_components(struct device *master, struct master *m)
-{
-	struct device_node *child_np;
-	int ret = 0;
-
-	for_each_available_child_of_node(master->of_node, child_np) {
-		DRM_INFO("add child %s\n", child_np->name);
-
-		ret = component_master_add_child(m, etnaviv_compare, child_np);
-		if (ret) {
-			of_node_put(child_np);
-			break;
-		}
-	}
-
-	return ret;
-}
-
 static int etnaviv_bind(struct device *dev)
 {
 	return drm_platform_init(&etnaviv_drm_driver, to_platform_device(dev));
@@ -597,21 +579,43 @@ static void etnaviv_unbind(struct device *dev)
 }
 
 static const struct component_master_ops etnaviv_master_ops = {
-	.add_components = etnaviv_add_components,
 	.bind = etnaviv_bind,
 	.unbind = etnaviv_unbind,
 };
+
+static int compare_str(struct device *dev, void *data)
+{
+	return !strcmp(dev_name(dev), data);
+}
 
 static int etnaviv_pdev_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
-
-	of_platform_populate(node, NULL, NULL, dev);
+	struct component_match *match = NULL;
 
 	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 
-	return component_master_add(&pdev->dev, &etnaviv_master_ops);
+	if (node) {
+		struct device_node *child_np;
+
+		of_platform_populate(node, NULL, NULL, dev);
+
+		for_each_available_child_of_node(node, child_np) {
+			DRM_INFO("add child %s\n", child_np->name);
+
+			component_match_add(dev, &match, etnaviv_compare,
+					    child_np);
+		}
+	} else if (dev->platform_data) {
+		char **names = dev->platform_data;
+		unsigned i;
+
+		for (i = 0; names[i]; i++)
+			component_match_add(dev, &match, compare_str, names[i]);
+	}
+
+	return component_master_add_with_match(dev, &etnaviv_master_ops, match);
 }
 
 static int etnaviv_pdev_remove(struct platform_device *pdev)
@@ -663,3 +667,5 @@ module_exit(etnaviv_exit);
 MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
 MODULE_DESCRIPTION("etnaviv DRM Driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:vivante");
+MODULE_DEVICE_TABLE(of, dt_match);
