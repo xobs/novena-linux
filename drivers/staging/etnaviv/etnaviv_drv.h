@@ -53,7 +53,7 @@ struct etnaviv_drm_private {
 	int num_gpus;
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
 
-	uint32_t next_fence;
+	u32 next_fence;
 
 	/* list of GEM objects: */
 	struct list_head inactive_list;
@@ -61,9 +61,10 @@ struct etnaviv_drm_private {
 	struct workqueue_struct *wq;
 };
 
-static void etnaviv_queue_work(struct drm_device *dev, struct work_struct *w)
+static inline void etnaviv_queue_work(struct drm_device *dev,
+	struct work_struct *w)
 {
-	struct etnaviv_drm_private *priv = drm->dev_private;
+	struct etnaviv_drm_private *priv = dev->dev_private;
 
 	queue_work(priv->wq, w);
 }
@@ -73,11 +74,11 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 int etnaviv_gem_mmap(struct file *filp, struct vm_area_struct *vma);
 int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
-int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, uint64_t *offset);
+int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, u64 *offset);
 int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
-	struct drm_gem_object *obj, uint32_t *iova);
+	struct drm_gem_object *obj, u32 *iova);
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-	int id, uint32_t *iova);
+	int id, u32 *iova);
 void etnaviv_gem_put_iova(struct drm_gem_object *obj);
 struct sg_table *etnaviv_gem_prime_get_sg_table(struct drm_gem_object *obj);
 void *etnaviv_gem_prime_vmap(struct drm_gem_object *obj);
@@ -90,18 +91,18 @@ void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj);
 void *etnaviv_gem_vaddr(struct drm_gem_object *obj);
 dma_addr_t etnaviv_gem_paddr_locked(struct drm_gem_object *obj);
 void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
-		struct etnaviv_gpu *gpu, uint32_t access, uint32_t fence);
+		struct etnaviv_gpu *gpu, u32 access, u32 fence);
 void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj);
-int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op,
+int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 		struct timespec *timeout);
 int etnaviv_gem_cpu_fini(struct drm_gem_object *obj);
 void etnaviv_gem_free_object(struct drm_gem_object *obj);
 int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
-		uint32_t size, uint32_t flags, uint32_t *handle);
+		u32 size, u32 flags, u32 *handle);
 struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
-		uint32_t size, uint32_t flags);
+		u32 size, u32 flags);
 int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
-	uintptr_t ptr, uint32_t size, uint32_t flags, uint32_t *handle);
+	uintptr_t ptr, u32 size, u32 flags, u32 *handle);
 u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
@@ -122,14 +123,14 @@ u32 etnaviv_readl(const void __iomem *addr);
 #define VERB(fmt, ...) if (0) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 
 /* returns true if fence a comes after fence b */
-static inline bool fence_after(uint32_t a, uint32_t b)
+static inline bool fence_after(u32 a, u32 b)
 {
-	return (int32_t)(a - b) > 0;
+	return (s32)(a - b) > 0;
 }
 
-static inline bool fence_after_eq(uint32_t a, uint32_t b)
+static inline bool fence_after_eq(u32 a, u32 b)
 {
-	return (int32_t)(a - b) >= 0;
+	return (s32)(a - b) >= 0;
 }
 
 #endif /* __ETNAVIV_DRV_H__ */

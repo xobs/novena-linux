@@ -25,7 +25,7 @@ static int etnaviv_fault_handler(struct iommu_domain *iommu, struct device *dev,
 	return 0;
 }
 
-int etnaviv_iommu_map(struct etnaviv_iommu *iommu, uint32_t iova,
+int etnaviv_iommu_map(struct etnaviv_iommu *iommu, u32 iova,
 		struct sg_table *sgt, unsigned len, int prot)
 {
 	struct iommu_domain *domain = iommu->domain;
@@ -64,7 +64,7 @@ fail:
 	return ret;
 }
 
-int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
+int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, u32 iova,
 		struct sg_table *sgt, unsigned len)
 {
 	struct iommu_domain *domain = iommu->domain;
@@ -91,7 +91,7 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, uint32_t iova,
 }
 
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
-	struct etnaviv_gem_object *etnaviv_obj, uint32_t memory_base,
+	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
 	struct etnaviv_vram_mapping **out_mapping)
 {
 	struct etnaviv_drm_private *priv = etnaviv_obj->base.dev->dev_private;
@@ -109,7 +109,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
 	if (sgt->nents == 1 && !(etnaviv_obj->flags & ETNA_BO_FORCE_MMU)) {
-		uint32_t iova;
+		u32 iova;
 
 		iova = sg_dma_address(sgt->sgl) - memory_base;
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
@@ -227,7 +227,7 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 			     struct etnaviv_vram_mapping *mapping)
 {
 	if (mapping) {
-		uint32_t offset = mapping->vram_node.start;
+		u32 offset = mapping->vram_node.start;
 
 		if (mapping->iova >= 0x80000000) {
 			etnaviv_iommu_unmap(mmu, offset, etnaviv_obj->sgt,

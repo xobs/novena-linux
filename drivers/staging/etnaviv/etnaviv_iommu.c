@@ -31,12 +31,12 @@
 #endif
 
 #define PT_SIZE		SZ_512K
-#define PT_ENTRIES	(PT_SIZE / sizeof(uint32_t))
+#define PT_ENTRIES	(PT_SIZE / sizeof(u32))
 
 #define GPU_MEM_START	0x80000000
 
 struct etnaviv_iommu_domain_pgtable {
-	uint32_t *pgtable;
+	u32 *pgtable;
 	dma_addr_t paddr;
 };
 
@@ -70,7 +70,7 @@ static void pgtable_free(struct etnaviv_iommu_domain_pgtable *pgtable,
 	dma_free_coherent(NULL, size, pgtable->pgtable, pgtable->paddr);
 }
 
-static uint32_t pgtable_read(struct etnaviv_iommu_domain_pgtable *pgtable,
+static u32 pgtable_read(struct etnaviv_iommu_domain_pgtable *pgtable,
 			   unsigned long iova)
 {
 	/* calcuate index into page table */
@@ -93,7 +93,7 @@ static void pgtable_write(struct etnaviv_iommu_domain_pgtable *pgtable,
 
 static int __etnaviv_iommu_init(struct etnaviv_iommu_domain *etnaviv_domain)
 {
-	uint32_t iova, *p;
+	u32 iova, *p;
 	int ret, i;
 
 	etnaviv_domain->bad_page_cpu = dma_alloc_coherent(etnaviv_domain->dev,
@@ -208,10 +208,10 @@ void etnaviv_iommu_domain_restore(struct etnaviv_gpu *gpu,
 	struct iommu_domain *domain)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
-	uint32_t pgtable;
+	u32 pgtable;
 
 	/* set page table address in MC */
-	pgtable = (uint32_t)etnaviv_domain->pgtable.paddr;
+	pgtable = (u32)etnaviv_domain->pgtable.paddr;
 
 	gpu_write(gpu, VIVS_MC_MMU_FE_PAGE_TABLE, pgtable);
 	gpu_write(gpu, VIVS_MC_MMU_TX_PAGE_TABLE, pgtable);
