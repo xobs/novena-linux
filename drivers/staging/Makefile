@@ -48,3 +48,4 @@ obj-$(CONFIG_COMMON_CLK_XLNX_CLKWZRD)	+= clocking-wizard/
 obj-$(CONFIG_FB_TFT)		+= fbtft/
 obj-$(CONFIG_I2O)		+= i2o/
 obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
+obj-$(CONFIG_DRM_ETNAVIV)	+= etnaviv/

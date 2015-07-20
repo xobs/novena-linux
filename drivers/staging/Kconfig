@@ -112,4 +112,6 @@ source "drivers/staging/i2o/Kconfig"
 
 source "drivers/staging/fsl-mc/Kconfig"
 
+source "drivers/staging/etnaviv/Kconfig"
+
 endif # STAGING
