@@ -92,8 +92,8 @@ int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 struct sg_table *etnaviv_gem_prime_get_sg_table(struct drm_gem_object *obj);
 void *etnaviv_gem_prime_vmap(struct drm_gem_object *obj);
 void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
-struct drm_gem_object *msm_gem_prime_import_sg_table(struct drm_device *dev,
-		struct dma_buf_attachment *attach, struct sg_table *sg);
+struct drm_gem_object *etnaviv_gem_prime_import_sg_table(struct drm_device *dev,
+	struct dma_buf_attachment *attach, struct sg_table *sg);
 int msm_gem_prime_pin(struct drm_gem_object *obj);
 void msm_gem_prime_unpin(struct drm_gem_object *obj);
 void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj);
@@ -110,8 +110,6 @@ int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
 		uint32_t size, uint32_t flags, uint32_t *handle);
 struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 		uint32_t size, uint32_t flags);
-struct drm_gem_object *msm_gem_import(struct drm_device *dev,
-		struct dma_buf_attachment *attach, struct sg_table *sgt);
 u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);
