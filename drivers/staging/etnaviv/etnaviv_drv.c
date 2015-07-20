@@ -22,13 +22,6 @@
 #include "etnaviv_gpu.h"
 #include "etnaviv_mmu.h"
 
-void etnaviv_register_mmu(struct drm_device *dev, struct etnaviv_iommu *mmu)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-
-	priv->mmu = mmu;
-}
-
 #ifdef CONFIG_DRM_ETNAVIV_REGISTER_LOGGING
 static bool reglog;
 MODULE_PARM_DESC(reglog, "Enable register read/write logging");
