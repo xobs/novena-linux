@@ -146,7 +146,7 @@ int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, uint32_t param,
 int etnaviv_gpu_init(struct etnaviv_gpu *gpu);
 
 #ifdef CONFIG_DEBUG_FS
-void etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
+int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
 #endif
 
 void etnaviv_gpu_retire(struct etnaviv_gpu *gpu);
