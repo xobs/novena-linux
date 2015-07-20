@@ -221,8 +221,10 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	pgoff_t pgoff;
 	int ret;
 
-	/* Make sure we don't parallel update on a fault, nor move or remove
-	 * something from beneath our feet
+	/*
+	 * Make sure we don't parallel update on a fault, nor move or remove
+	 * something from beneath our feet.  Note that vm_insert_page() is
+	 * specifically coded to take care of this, so we don't have to.
 	 */
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
@@ -230,9 +232,11 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	/* make sure we have pages attached now */
 	pages = etnaviv_gem_get_pages(to_etnaviv_bo(obj));
+	mutex_unlock(&dev->struct_mutex);
+
 	if (IS_ERR(pages)) {
 		ret = PTR_ERR(pages);
-		goto out_unlock;
+		goto out;
 	}
 
 	/* We don't use vmf->pgoff since that has the fake offset: */
@@ -246,8 +250,6 @@ int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	ret = vm_insert_page(vma, (unsigned long)vmf->virtual_address, page);
 
-out_unlock:
-	mutex_unlock(&dev->struct_mutex);
 out:
 	switch (ret) {
 	case -EAGAIN:
