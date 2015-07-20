@@ -173,10 +173,15 @@ static void etnaviv_preclose(struct drm_device *dev, struct drm_file *file)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct etnaviv_file_private *ctx = file->driver_priv;
+	unsigned int i;
 
 	mutex_lock(&dev->struct_mutex);
-	if (ctx == priv->lastctx)
-		priv->lastctx = NULL;
+	for (i = 0; i < ETNA_MAX_PIPES; i++) {
+		struct etnaviv_gpu *gpu = priv->gpu[i];
+
+		if (gpu && gpu->lastctx == ctx)
+			gpu->lastctx = NULL;
+	}
 	mutex_unlock(&dev->struct_mutex);
 
 	kfree(ctx);
