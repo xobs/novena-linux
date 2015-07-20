@@ -25,6 +25,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder_slave.h>
+#include <drm/drm_ddc_connector.h>
 #include <drm/bridge/dw_hdmi.h>
 
 #include "dw_hdmi.h"
@@ -103,7 +104,7 @@ struct hdmi_data_info {
 };
 
 struct dw_hdmi {
-	struct drm_connector connector;
+	struct drm_ddc_connector *ddc_conn;
 	struct drm_encoder *encoder;
 	struct drm_bridge *bridge;
 
@@ -126,7 +127,6 @@ struct dw_hdmi {
 	bool phy_enabled;
 	struct drm_display_mode previous_mode;
 
-	struct i2c_adapter *ddc;
 	void __iomem *regs;
 	struct mutex mutex;
 	/* this indicates whether DRM has disabled our bridge */
@@ -1500,8 +1500,7 @@ static void dw_hdmi_bridge_nop(struct drm_bridge *bridge)
 static enum drm_connector_status
 dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 {
-	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-					     connector);
+	struct dw_hdmi *hdmi = drm_ddc_private(connector);
 
 	mutex_lock(&hdmi->mutex);
 	hdmi->force = 0;
@@ -1513,39 +1512,11 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 		connector_status_connected : connector_status_disconnected;
 }
 
-static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
-{
-	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-					     connector);
-	struct edid *edid;
-	int ret;
-
-	if (!hdmi->ddc)
-		return 0;
-
-	edid = drm_get_edid(connector, hdmi->ddc);
-	if (edid) {
-		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
-			edid->width_cm, edid->height_cm);
-
-		drm_mode_connector_update_edid_property(connector, edid);
-		ret = drm_add_edid_modes(connector, edid);
-		/* Store the ELD */
-		drm_edid_to_eld(connector, edid);
-		kfree(edid);
-	} else {
-		dev_dbg(hdmi->dev, "failed to get edid\n");
-	}
-
-	return 0;
-}
-
 static enum drm_mode_status
 dw_hdmi_connector_mode_valid(struct drm_connector *connector,
 			     struct drm_display_mode *mode)
 {
-	struct dw_hdmi *hdmi = container_of(connector,
-					   struct dw_hdmi, connector);
+	struct dw_hdmi *hdmi = drm_ddc_private(connector);
 	enum drm_mode_status mode_status = MODE_OK;
 
 	if (hdmi->plat_data->mode_valid)
@@ -1557,22 +1528,14 @@ dw_hdmi_connector_mode_valid(struct drm_connector *connector,
 static struct drm_encoder *dw_hdmi_connector_best_encoder(struct drm_connector
 							   *connector)
 {
-	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-					     connector);
+	struct dw_hdmi *hdmi = drm_ddc_private(connector);
 
 	return hdmi->encoder;
 }
 
-static void dw_hdmi_connector_destroy(struct drm_connector *connector)
-{
-	drm_connector_unregister(connector);
-	drm_connector_cleanup(connector);
-}
-
 static void dw_hdmi_connector_force(struct drm_connector *connector)
 {
-	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-					     connector);
+	struct dw_hdmi *hdmi = drm_ddc_private(connector);
 
 	mutex_lock(&hdmi->mutex);
 	hdmi->force = connector->force;
@@ -1585,12 +1548,12 @@ static struct drm_connector_funcs dw_hdmi_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = dw_hdmi_connector_detect,
-	.destroy = dw_hdmi_connector_destroy,
+	.destroy = drm_ddc_connector_destroy,
 	.force = dw_hdmi_connector_force,
 };
 
 static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
-	.get_modes = dw_hdmi_connector_get_modes,
+	.get_modes = drm_ddc_connector_get_modes,
 	.mode_valid = dw_hdmi_connector_mode_valid,
 	.best_encoder = dw_hdmi_connector_best_encoder,
 };
@@ -1700,16 +1663,14 @@ static int dw_hdmi_register(struct drm_device *drm, struct dw_hdmi *hdmi)
 	}
 
 	encoder->bridge = bridge;
-	hdmi->connector.polled = DRM_CONNECTOR_POLL_HPD;
+	hdmi->ddc_conn->connector.polled = DRM_CONNECTOR_POLL_HPD;
 
-	drm_connector_helper_add(&hdmi->connector,
+	drm_connector_helper_add(&hdmi->ddc_conn->connector,
 				 &dw_hdmi_connector_helper_funcs);
-	drm_connector_init(drm, &hdmi->connector, &dw_hdmi_connector_funcs,
-			   DRM_MODE_CONNECTOR_HDMIA);
+	drm_ddc_connector_add(drm, hdmi->ddc_conn, &dw_hdmi_connector_funcs,
+			      DRM_MODE_CONNECTOR_HDMIA);
 
-	hdmi->connector.encoder = encoder;
-
-	drm_mode_connector_attach_encoder(&hdmi->connector, encoder);
+	drm_mode_connector_attach_encoder(&hdmi->ddc_conn->connector, encoder);
 
 	return 0;
 }
@@ -1743,7 +1704,6 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 	struct drm_device *drm = data;
 	struct device_node *np = dev->of_node;
 	struct platform_device_info pdevinfo;
-	struct device_node *ddc_node;
 	struct dw_hdmi_audio_data audio;
 	struct dw_hdmi_cec_data cec;
 	struct dw_hdmi *hdmi;
@@ -1753,6 +1713,10 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 	hdmi = devm_kzalloc(dev, sizeof(*hdmi), GFP_KERNEL);
 	if (!hdmi)
 		return -ENOMEM;
+
+	hdmi->ddc_conn = drm_ddc_connector_create(drm, np, hdmi);
+	if (IS_ERR(hdmi->ddc_conn))
+		return PTR_ERR(hdmi->ddc_conn);
 
 	hdmi->plat_data = plat_data;
 	hdmi->dev = dev;
@@ -1782,19 +1746,6 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 	default:
 		dev_err(dev, "reg-io-width must be 1 or 4\n");
 		return -EINVAL;
-	}
-
-	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
-	if (ddc_node) {
-		hdmi->ddc = of_find_i2c_adapter_by_node(ddc_node);
-		of_node_put(ddc_node);
-		if (!hdmi->ddc) {
-			dev_dbg(hdmi->dev, "failed to read ddc node\n");
-			return -EPROBE_DEFER;
-		}
-
-	} else {
-		dev_dbg(hdmi->dev, "no ddc property found\n");
 	}
 
 	hdmi->regs = devm_ioremap_resource(dev, iores);
@@ -1880,7 +1831,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 		audio.base = hdmi->regs;
 		audio.irq = irq;
 		audio.hdmi = hdmi;
-		audio.eld = hdmi->connector.eld;
+		audio.eld = hdmi->ddc_conn->connector.eld;
 
 		pdevinfo.name = "dw-hdmi-ahb-audio";
 		pdevinfo.data = &audio;
@@ -1926,12 +1877,10 @@ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
 	/* Disable all interrupts */
 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
 
-	hdmi->connector.funcs->destroy(&hdmi->connector);
 	hdmi->encoder->funcs->destroy(hdmi->encoder);
 
 	clk_disable_unprepare(hdmi->iahb_clk);
 	clk_disable_unprepare(hdmi->isfr_clk);
-	i2c_put_adapter(hdmi->ddc);
 }
 EXPORT_SYMBOL_GPL(dw_hdmi_unbind);
 

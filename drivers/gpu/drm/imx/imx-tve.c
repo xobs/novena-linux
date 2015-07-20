@@ -17,7 +17,6 @@
 #include <linux/clk-provider.h>
 #include <linux/component.h>
 #include <linux/module.h>
-#include <linux/i2c.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spinlock.h>
@@ -25,6 +24,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_ddc_connector.h>
 #include <video/imx-ipu-v3.h>
 
 #include "imx-drm.h"
@@ -106,7 +106,7 @@ enum {
 };
 
 struct imx_tve {
-	struct drm_connector connector;
+	struct drm_ddc_connector *ddc_conn;
 	struct drm_encoder encoder;
 	struct device *dev;
 	spinlock_t lock;	/* register lock */
@@ -115,7 +115,6 @@ struct imx_tve {
 
 	struct regmap *regmap;
 	struct regulator *dac_reg;
-	struct i2c_adapter *ddc;
 	struct clk *clk;
 	struct clk *di_sel_clk;
 	struct clk_hw clk_hw_di;
@@ -220,35 +219,10 @@ static int tve_setup_vga(struct imx_tve *tve)
 				 TVE_TVDAC_TEST_MODE_MASK, 1);
 }
 
-static enum drm_connector_status imx_tve_connector_detect(
-				struct drm_connector *connector, bool force)
-{
-	return connector_status_connected;
-}
-
-static int imx_tve_connector_get_modes(struct drm_connector *connector)
-{
-	struct imx_tve *tve = con_to_tve(connector);
-	struct edid *edid;
-	int ret = 0;
-
-	if (!tve->ddc)
-		return 0;
-
-	edid = drm_get_edid(connector, tve->ddc);
-	if (edid) {
-		drm_mode_connector_update_edid_property(connector, edid);
-		ret = drm_add_edid_modes(connector, edid);
-		kfree(edid);
-	}
-
-	return ret;
-}
-
 static int imx_tve_connector_mode_valid(struct drm_connector *connector,
 					struct drm_display_mode *mode)
 {
-	struct imx_tve *tve = con_to_tve(connector);
+	struct imx_tve *tve = to_ddc_conn(connector)->private;
 	unsigned long rate;
 
 	/* pixel clock with 2x oversampling */
@@ -270,7 +244,7 @@ static int imx_tve_connector_mode_valid(struct drm_connector *connector,
 static struct drm_encoder *imx_tve_connector_best_encoder(
 		struct drm_connector *connector)
 {
-	struct imx_tve *tve = con_to_tve(connector);
+	struct imx_tve *tve = drm_ddc_private(connector);
 
 	return &tve->encoder;
 }
@@ -363,12 +337,12 @@ static void imx_tve_encoder_disable(struct drm_encoder *encoder)
 static struct drm_connector_funcs imx_tve_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
-	.detect = imx_tve_connector_detect,
-	.destroy = imx_drm_connector_destroy,
+	.detect = drm_ddc_connector_always_connected,
+	.destroy = drm_ddc_connector_destroy,
 };
 
 static struct drm_connector_helper_funcs imx_tve_connector_helper_funcs = {
-	.get_modes = imx_tve_connector_get_modes,
+	.get_modes = drm_ddc_connector_get_modes,
 	.best_encoder = imx_tve_connector_best_encoder,
 	.mode_valid = imx_tve_connector_mode_valid,
 };
@@ -510,12 +484,13 @@ static int imx_tve_register(struct drm_device *drm, struct imx_tve *tve)
 	drm_encoder_init(drm, &tve->encoder, &imx_tve_encoder_funcs,
 			 encoder_type);
 
-	drm_connector_helper_add(&tve->connector,
+	drm_connector_helper_add(&tve->ddc_conn->connector,
 			&imx_tve_connector_helper_funcs);
-	drm_connector_init(drm, &tve->connector, &imx_tve_connector_funcs,
-			   DRM_MODE_CONNECTOR_VGA);
+	drm_ddc_connector_add(drm, tve->ddc_conn, &imx_tve_connector_funcs,
+			      DRM_MODE_CONNECTOR_VGA);
 
-	drm_mode_connector_attach_encoder(&tve->connector, &tve->encoder);
+	drm_mode_connector_attach_encoder(&tve->ddc_conn->connector,
+					  &tve->encoder);
 
 	return 0;
 }
@@ -564,7 +539,6 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct drm_device *drm = data;
 	struct device_node *np = dev->of_node;
-	struct device_node *ddc_node;
 	struct imx_tve *tve;
 	struct resource *res;
 	void __iomem *base;
@@ -576,14 +550,12 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
 	if (!tve)
 		return -ENOMEM;
 
+	tve->ddc_conn = drm_ddc_connector_create(drm, np, tve);
+	if (IS_ERR(tve->ddc_conn))
+		return PTR_ERR(tve->ddc_conn);
+
 	tve->dev = dev;
 	spin_lock_init(&tve->lock);
-
-	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
-	if (ddc_node) {
-		tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
-		of_node_put(ddc_node);
-	}
 
 	tve->mode = of_get_tve_mode(np);
 	if (tve->mode != TVE_MODE_VGA) {
@@ -694,7 +666,6 @@ static void imx_tve_unbind(struct device *dev, struct device *master,
 {
 	struct imx_tve *tve = dev_get_drvdata(dev);
 
-	tve->connector.funcs->destroy(&tve->connector);
 	tve->encoder.funcs->destroy(&tve->encoder);
 
 	if (!IS_ERR(tve->dac_reg))
