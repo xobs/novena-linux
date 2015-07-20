@@ -88,6 +88,7 @@ struct etnaviv_gem_submit {
 	unsigned int nr_bos;
 	struct {
 		uint32_t type;
+		uint32_t offset; /* in dwords */
 		uint32_t size;  /* in dwords */
 		struct etnaviv_gem_object *obj;
 	} cmd[MAX_CMDS];
