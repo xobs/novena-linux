@@ -973,6 +973,35 @@ static int etnaviv_gpu_suspend(struct etnaviv_gpu *gpu)
 {
 	int ret;
 
+	if (gpu->buffer) {
+		unsigned long timeout;
+
+		/* Replace the last WAIT with END */
+		etnaviv_buffer_end(gpu);
+
+		/*
+		 * We know that only the FE is busy here, this should
+		 * happen quickly (as the WAIT is only 200 cycles).  If
+		 * we fail, just warn and continue.
+		 */
+		timeout = jiffies + msecs_to_jiffies(100);
+		do {
+			u32 idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
+
+			if ((idle & gpu->idle_mask) == gpu->idle_mask)
+				break;
+
+			if (time_is_before_jiffies(timeout)) {
+				dev_warn(gpu->dev,
+					 "timed out waiting for idle: idle=0x%x\n",
+					 idle);
+				break;
+			}
+
+			udelay(5);
+		} while (1);
+	}
+
 	ret = disable_axi(gpu);
 	if (ret)
 		return ret;
