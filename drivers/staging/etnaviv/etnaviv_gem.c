@@ -539,18 +539,6 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 
 	if (etnaviv_obj->ops) {
 		etnaviv_obj->ops->release(etnaviv_obj);
-	} else if (obj->import_attach) {
-		if (etnaviv_obj->vaddr)
-			dma_buf_vunmap(obj->import_attach->dmabuf,
-				       etnaviv_obj->vaddr);
-
-		/* Don't drop the pages for imported dmabuf, as they are not
-		 * ours, just free the array we allocated:
-		 */
-		if (etnaviv_obj->pages)
-			drm_free_large(etnaviv_obj->pages);
-
-		drm_prime_gem_destroy(obj, etnaviv_obj->sgt);
 	} else {
 		if (etnaviv_obj->vaddr)
 			vunmap(etnaviv_obj->vaddr);
@@ -699,6 +687,25 @@ fail:
 	return ERR_PTR(ret);
 }
 
+static void etnaviv_gem_prime_release(struct etnaviv_gem_object *etnaviv_obj)
+{
+	if (etnaviv_obj->vaddr)
+		dma_buf_vunmap(etnaviv_obj->base.import_attach->dmabuf,
+			       etnaviv_obj->vaddr);
+
+	/* Don't drop the pages for imported dmabuf, as they are not
+	 * ours, just free the array we allocated:
+	 */
+	if (etnaviv_obj->pages)
+		drm_free_large(etnaviv_obj->pages);
+
+	drm_prime_gem_destroy(&etnaviv_obj->base, etnaviv_obj->sgt);
+}
+
+static const struct etnaviv_gem_ops etnaviv_gem_prime_ops = {
+	.release = etnaviv_gem_prime_release,
+};
+
 struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 		struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
@@ -716,6 +723,7 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	npages = size / PAGE_SIZE;
 
 	etnaviv_obj = to_etnaviv_bo(obj);
+	etnaviv_obj->ops = &etnaviv_gem_prime_ops;
 	etnaviv_obj->sgt = sgt;
 	etnaviv_obj->pages = drm_malloc_ab(npages, sizeof(struct page *));
 	if (!etnaviv_obj->pages) {
