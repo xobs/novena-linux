@@ -456,6 +456,35 @@ static int etnaviv_ioctl_wait_fence(struct drm_device *dev, void *data,
 		args->fence, &TS(args->timeout));
 }
 
+static int etnaviv_ioctl_gem_userptr(struct drm_device *dev, void *data,
+	struct drm_file *file)
+{
+	struct drm_etnaviv_gem_userptr *args = data;
+	int access;
+
+	if (args->flags & ~(ETNA_USERPTR_READ|ETNA_USERPTR_WRITE) ||
+	    args->flags == 0)
+		return -EINVAL;
+
+	if (offset_in_page(args->user_ptr | args->user_size) ||
+	    (uintptr_t)args->user_ptr != args->user_ptr ||
+	    (uint32_t)args->user_size != args->user_size)
+		return -EINVAL;
+
+	if (args->flags & ETNA_USERPTR_WRITE)
+		access = VERIFY_WRITE;
+	else
+		access = VERIFY_READ;
+
+	if (!access_ok(access, (void __user *)(unsigned long)args->user_ptr,
+		       args->user_size))
+		return -EFAULT;
+
+	return etnaviv_gem_new_userptr(dev, file, args->user_ptr,
+				       args->user_size, args->flags,
+				       &args->handle);
+}
+
 static const struct drm_ioctl_desc etnaviv_ioctls[] = {
 #define ETNA_IOCTL(n, func, flags) \
 	DRM_IOCTL_DEF_DRV(ETNAVIV_##n, etnaviv_ioctl_##func, flags)
@@ -466,6 +495,7 @@ static const struct drm_ioctl_desc etnaviv_ioctls[] = {
 	ETNA_IOCTL(GEM_CPU_FINI, gem_cpu_fini, DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
 	ETNA_IOCTL(GEM_SUBMIT,   gem_submit,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
 	ETNA_IOCTL(WAIT_FENCE,   wait_fence,   DRM_UNLOCKED|DRM_AUTH|DRM_RENDER_ALLOW),
+	ETNA_IOCTL(GEM_USERPTR,  gem_userptr,  DRM_UNLOCKED|DRM_RENDER_ALLOW),
 };
 
 static const struct vm_operations_struct vm_ops = {
