@@ -34,12 +34,6 @@
  *     fields.. so that has to be somehow ok.
  */
 
-#define ETNA_PIPE_3D      0x00
-#define ETNA_PIPE_2D      0x01
-#define ETNA_PIPE_VG      0x02
-
-#define ETNA_MAX_PIPES    3
-
 /* timeouts are specified in clock-monotonic absolute times (to simplify
  * restarting interrupted ioctls).  The following struct is logically the
  * same as 'struct timespec' but 32/64b ABI safe.
@@ -70,8 +64,10 @@ struct drm_etnaviv_timespec {
 
 /* #define MSM_PARAM_GMEM_SIZE  0x02 */
 
+#define ETNA_MAX_PIPES 4
+
 struct drm_etnaviv_param {
-	uint32_t pipe;           /* in, ETNA_PIPE_x */
+	uint32_t pipe;           /* in */
 	uint32_t param;          /* in, ETNAVIV_PARAM_x */
 	uint64_t value;          /* out (get_param) or in (set_param) */
 };
@@ -182,11 +178,16 @@ struct drm_etnaviv_gem_submit_bo {
  * one or more cmdstream buffers.  This allows for conditional execution
  * (context-restore), and IB buffers needed for per tile/bin draw cmds.
  */
+#define ETNA_PIPE_3D      0x00
+#define ETNA_PIPE_2D      0x01
+#define ETNA_PIPE_VG      0x02
 struct drm_etnaviv_gem_submit {
-	uint32_t pipe;           /* in, ETNA_PIPE_x */
+	uint32_t pipe;           /* in */
+	uint32_t exec_state;     /* in, initial execution state (ETNA_PIPE_x) */
 	uint32_t fence;          /* out */
 	uint32_t nr_bos;         /* in, number of submit_bo's */
 	uint32_t nr_cmds;        /* in, number of submit_cmd's */
+	uint32_t pad;
 	uint64_t bos;            /* in, ptr to array of submit_bo's */
 	uint64_t cmds;           /* in, ptr to array of submit_cmd's */
 };
@@ -199,7 +200,7 @@ struct drm_etnaviv_gem_submit {
  * APIs without requiring a dummy bo to synchronize on.
  */
 struct drm_etnaviv_wait_fence {
-	uint32_t pipe;           /* in, ETNA_PIPE_x */
+	uint32_t pipe;           /* in */
 	uint32_t fence;          /* in */
 	struct drm_etnaviv_timespec timeout;   /* in */
 };

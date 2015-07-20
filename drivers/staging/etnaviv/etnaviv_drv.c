@@ -132,6 +132,7 @@ static int etnaviv_load(struct drm_device *dev, unsigned long flags)
 	init_waitqueue_head(&priv->fence_event);
 
 	INIT_LIST_HEAD(&priv->inactive_list);
+	priv->num_gpus = 0;
 
 	platform_set_drvdata(pdev, dev);
 
