@@ -131,6 +131,11 @@ struct dw_hdmi {
 	struct mutex mutex;
 	/* this indicates whether DRM has disabled our bridge */
 	bool disabled;
+	bool is_on;
+	/* a copy of the connectors force mode, updated beneath our mutex */
+	enum drm_connector_force force;
+	/* desired phy interrupt mask settings */
+	u8 phy_mask;
 
 	spinlock_t audio_lock;
 	struct mutex audio_mutex;
@@ -1327,8 +1332,7 @@ static int dw_hdmi_fb_registered(struct dw_hdmi *hdmi)
 		    HDMI_PHY_I2CM_CTLINT_ADDR);
 
 	/* enable cable hot plug irq */
-	hdmi_writeb(hdmi, (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE),
-		    HDMI_PHY_MASK0);
+	hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
 
 	/* Clear Hotplug interrupts */
 	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE,
@@ -1391,12 +1395,58 @@ static void initialize_hdmi_ih_mutes(struct dw_hdmi *hdmi)
 
 static void dw_hdmi_poweron(struct dw_hdmi *hdmi)
 {
+	hdmi->is_on = true;
 	dw_hdmi_setup(hdmi, &hdmi->previous_mode);
 }
 
 static void dw_hdmi_poweroff(struct dw_hdmi *hdmi)
 {
 	dw_hdmi_phy_disable(hdmi);
+	hdmi->is_on = false;
+}
+
+static void dw_hdmi_update_power(struct dw_hdmi *hdmi)
+{
+	if (hdmi->disabled)
+		return;
+
+	switch (hdmi->force) {
+	case DRM_FORCE_UNSPECIFIED:
+		if ((hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_RX_SENSE) !=
+		    HDMI_PHY_RX_SENSE)
+			break;
+	case DRM_FORCE_ON:
+	case DRM_FORCE_ON_DIGITAL:
+		if (!hdmi->is_on)
+			dw_hdmi_poweron(hdmi);
+		break;
+	case DRM_FORCE_OFF:
+		if (hdmi->is_on)
+			dw_hdmi_poweroff(hdmi);
+		break;
+	}
+}
+
+/*
+ * Adjust the detection of RXSENSE according to whether we have a forced
+ * connection mode enabled, or whether we have been disabled.  There is
+ * no point processing RXSENSE interrupts if we have a forced connection
+ * state, or DRM has us disabled.
+ *
+ * Note: we still need to listen for HPD interrupts even when DRM has us
+ * disabled so that we can detect a connect event.
+ */
+static void dw_hdmi_update_phy_mask(struct dw_hdmi *hdmi)
+{
+	u8 old_mask = hdmi->phy_mask;
+
+	if (hdmi->force || hdmi->disabled)
+		hdmi->phy_mask |= HDMI_PHY_RX_SENSE;
+	else
+		hdmi->phy_mask &= ~HDMI_PHY_RX_SENSE;
+
+	if (old_mask != hdmi->phy_mask)
+		hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
 }
 
 static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
@@ -1427,6 +1477,7 @@ static void dw_hdmi_bridge_disable(struct drm_bridge *bridge)
 	mutex_lock(&hdmi->mutex);
 	hdmi->disabled = true;
 	dw_hdmi_poweroff(hdmi);
+	dw_hdmi_update_phy_mask(hdmi);
 	mutex_unlock(&hdmi->mutex);
 }
 
@@ -1435,8 +1486,9 @@ static void dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 	struct dw_hdmi *hdmi = bridge->driver_private;
 
 	mutex_lock(&hdmi->mutex);
-	dw_hdmi_poweron(hdmi);
 	hdmi->disabled = false;
+	dw_hdmi_update_power(hdmi);
+	dw_hdmi_update_phy_mask(hdmi);
 	mutex_unlock(&hdmi->mutex);
 }
 
@@ -1450,6 +1502,12 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 {
 	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
 					     connector);
+
+	mutex_lock(&hdmi->mutex);
+	hdmi->force = 0;
+	dw_hdmi_update_power(hdmi);
+	dw_hdmi_update_phy_mask(hdmi);
+	mutex_unlock(&hdmi->mutex);
 
 	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
 		connector_status_connected : connector_status_disconnected;
@@ -1511,11 +1569,24 @@ static void dw_hdmi_connector_destroy(struct drm_connector *connector)
 	drm_connector_cleanup(connector);
 }
 
+static void dw_hdmi_connector_force(struct drm_connector *connector)
+{
+	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+					     connector);
+
+	mutex_lock(&hdmi->mutex);
+	hdmi->force = connector->force;
+	dw_hdmi_update_power(hdmi);
+	dw_hdmi_update_phy_mask(hdmi);
+	mutex_unlock(&hdmi->mutex);
+}
+
 static struct drm_connector_funcs dw_hdmi_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = dw_hdmi_connector_detect,
 	.destroy = dw_hdmi_connector_destroy,
+	.force = dw_hdmi_connector_force,
 };
 
 static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
@@ -1578,7 +1649,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
 	 */
 	if (intr_stat & HDMI_IH_PHY_STAT0_RX_SENSE) {
 		mutex_lock(&hdmi->mutex);
-		if (!hdmi->disabled) {
+		if (!hdmi->disabled && !hdmi->force) {
 			u8 phy_stat0 = hdmi_readb(hdmi, HDMI_PHY_STAT0);
 
 			/*
@@ -1691,6 +1762,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
 	hdmi->encoder = encoder;
 	hdmi->mc_clkdis = 0x7f;
 	hdmi->disabled = true;
+	hdmi->phy_mask = (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE);
 
 	mutex_init(&hdmi->mutex);
 	mutex_init(&hdmi->audio_mutex);
