@@ -1107,7 +1107,7 @@ static int etnaviv_gpu_clk_disable(struct etnaviv_gpu *gpu)
 	return 0;
 }
 
-static int etnaviv_gpu_suspend(struct etnaviv_gpu *gpu)
+static int etnaviv_gpu_hw_suspend(struct etnaviv_gpu *gpu)
 {
 	if (gpu->buffer) {
 		unsigned long timeout;
@@ -1139,6 +1139,29 @@ static int etnaviv_gpu_suspend(struct etnaviv_gpu *gpu)
 	}
 
 	return etnaviv_gpu_clk_disable(gpu);
+}
+
+static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
+{
+	struct drm_device *drm = gpu->drm;
+	u32 clock;
+	int ret;
+
+	ret = mutex_lock_killable(&drm->struct_mutex);
+	if (ret)
+		return ret;
+
+	clock = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
+		VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
+
+	etnaviv_gpu_load_clock(gpu, clock);
+	etnaviv_gpu_hw_init(gpu);
+
+	gpu->switch_context = true;
+
+	mutex_unlock(&drm->struct_mutex);
+
+	return 0;
 }
 
 static int etnaviv_gpu_bind(struct device *dev, struct device *master,
@@ -1190,7 +1213,7 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 	pm_runtime_get_sync(gpu->dev);
 	pm_runtime_put_sync_suspend(gpu->dev);
 #else
-	etnaviv_gpu_suspend(gpu);
+	etnaviv_gpu_hw_suspend(gpu);
 #endif
 
 	if (gpu->buffer) {
@@ -1321,17 +1344,16 @@ static int etnaviv_gpu_rpm_suspend(struct device *dev)
 	if (idle != mask)
 		return -EBUSY;
 
-	return etnaviv_gpu_suspend(gpu);
+	return etnaviv_gpu_hw_suspend(gpu);
 }
 
 static int etnaviv_gpu_rpm_resume(struct device *dev)
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-	struct drm_device *drm = gpu->drm;
 	int ret;
 
 	/* We must never runtime-PM resume holding struct_mutex */
-	if (drm && WARN_ON_ONCE(mutex_is_locked(&drm->struct_mutex)))
+	if (gpu->drm && WARN_ON_ONCE(mutex_is_locked(&gpu->drm->struct_mutex)))
 		return -EDEADLK;
 
 	ret = etnaviv_gpu_clk_enable(gpu);
@@ -1339,14 +1361,12 @@ static int etnaviv_gpu_rpm_resume(struct device *dev)
 		return ret;
 
 	/* Re-initialise the basic hardware state */
-	if (drm && gpu->buffer) {
-		ret = mutex_lock_killable(&drm->struct_mutex);
+	if (gpu->drm && gpu->buffer) {
+		ret = etnaviv_gpu_hw_resume(gpu);
 		if (ret) {
 			etnaviv_gpu_clk_disable(gpu);
 			return ret;
 		}
-		etnaviv_gpu_hw_init(gpu);
-		mutex_unlock(&drm->struct_mutex);
 	}
 
 	return 0;
