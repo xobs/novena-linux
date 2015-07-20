@@ -4,6 +4,7 @@ ifeq (, $(findstring -W,$(EXTRA_CFLAGS)))
 endif
 
 etnaviv-y := \
+	etnaviv_cmd_parser.o \
 	etnaviv_drv.o \
 	etnaviv_gem.o \
 	etnaviv_gem_prime.o \
