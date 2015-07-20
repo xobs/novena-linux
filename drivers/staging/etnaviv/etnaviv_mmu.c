@@ -95,8 +95,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj)
 {
 	struct sg_table *sgt = etnaviv_obj->sgt;
-	uint32_t offset;
-	struct drm_mm_node *node = NULL;
+	struct drm_mm_node *node;
 	int ret;
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
@@ -138,17 +137,24 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		break;
 	}
 
-	if (!ret) {
-		mmu->last_iova = node->start + etnaviv_obj->base.size;
-		offset = node->start;
-		etnaviv_obj->iova = offset;
-		etnaviv_obj->gpu_vram_node = node;
-
-		ret = etnaviv_iommu_map(mmu, offset, sgt,
-					etnaviv_obj->base.size,
-					IOMMU_READ | IOMMU_WRITE);
-	} else
+	if (ret < 0) {
 		kfree(node);
+		return ret;
+	}
+
+	mmu->last_iova = node->start + etnaviv_obj->base.size;
+	etnaviv_obj->iova = node->start;
+	etnaviv_obj->gpu_vram_node = node;
+	ret = etnaviv_iommu_map(mmu, node->start, sgt, etnaviv_obj->base.size,
+				IOMMU_READ | IOMMU_WRITE);
+
+	if (ret < 0) {
+		drm_mm_remove_node(node);
+		kfree(node);
+
+		etnaviv_obj->iova = 0;
+		etnaviv_obj->gpu_vram_node = NULL;
+	}
 
 	return ret;
 }
