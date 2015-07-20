@@ -14,6 +14,15 @@ config DRM_DW_HDMI_AHB_AUDIO
 	  Designware HDMI block.  This is used in conjunction with
 	  the i.MX6 HDMI driver.
 
+config DRM_DW_HDMI_CEC
+	tristate "Synopsis Designware CEC interface"
+	depends on DRM_DW_HDMI != n
+	select HDMI_CEC_CORE
+	help
+	  Support the CEC interface which is part of the Synposis
+	  Designware HDMI block.  This is used in conjunction with
+	  the Synopsis Designware HDMI driver.
+
 config DRM_PTN3460
 	tristate "PTN3460 DP/LVDS bridge"
 	depends on DRM
