@@ -181,6 +181,8 @@ static ssize_t status_store(struct device *device,
 
 	old_status = connector->status;
 
+	ret = count;
+
 	if (sysfs_streq(buf, "detect")) {
 		connector->force = 0;
 		connector->status = connector->funcs->detect(connector, true);
@@ -193,7 +195,7 @@ static ssize_t status_store(struct device *device,
 	} else
 		ret = -EINVAL;
 
-	if (ret == 0 && connector->force) {
+	if (ret >= 0 && connector->force) {
 		if (connector->force == DRM_FORCE_ON ||
 		    connector->force == DRM_FORCE_ON_DIGITAL)
 			connector->status = connector_status_connected;
