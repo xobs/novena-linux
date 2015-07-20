@@ -234,7 +234,10 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		/* Add the MMU flush */
 		CMD_LOAD_STATE(buffer, VIVS_GL_FLUSH_MMU,
 			       VIVS_GL_FLUSH_MMU_FLUSH_FEMMU |
-			       VIVS_GL_FLUSH_MMU_FLUSH_PEMMU);
+			       VIVS_GL_FLUSH_MMU_FLUSH_UNK1 |
+			       VIVS_GL_FLUSH_MMU_FLUSH_UNK2 |
+			       VIVS_GL_FLUSH_MMU_FLUSH_PEMMU |
+			       VIVS_GL_FLUSH_MMU_FLUSH_UNK4);
 
 		/* And the link to the first buffer */
 		CMD_LINK(buffer, link_size, link_target);
