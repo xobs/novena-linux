@@ -108,5 +108,7 @@ struct etnaviv_gem_submit {
 
 int etnaviv_gem_new_private(struct drm_device *dev, size_t size, uint32_t flags,
 	struct etnaviv_gem_object **res);
+struct page **etnaviv_gem_get_pages(struct etnaviv_gem_object *obj);
+void etnaviv_gem_put_pages(struct etnaviv_gem_object *obj);
 
 #endif /* __ETNAVIV_GEM_H__ */

@@ -41,15 +41,25 @@ void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
 
 int msm_gem_prime_pin(struct drm_gem_object *obj)
 {
-	if (!obj->import_attach)
-		etnaviv_gem_get_pages(obj);
+	if (!obj->import_attach) {
+		struct drm_device *dev = obj->dev;
+
+		mutex_lock(&dev->struct_mutex);
+		etnaviv_gem_get_pages(to_etnaviv_bo(obj));
+		mutex_unlock(&dev->struct_mutex);
+	}
 	return 0;
 }
 
 void msm_gem_prime_unpin(struct drm_gem_object *obj)
 {
-	if (!obj->import_attach)
-		msm_gem_put_pages(obj);
+	if (!obj->import_attach) {
+		struct drm_device *dev = obj->dev;
+
+		mutex_lock(&dev->struct_mutex);
+		etnaviv_gem_put_pages(to_etnaviv_bo(obj));
+		mutex_unlock(&dev->struct_mutex);
+	}
 }
 
 static void etnaviv_gem_prime_release(struct etnaviv_gem_object *etnaviv_obj)

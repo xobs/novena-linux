@@ -82,8 +82,6 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	struct drm_gem_object *obj, uint32_t *iova);
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
 	int id, uint32_t *iova);
-struct page **etnaviv_gem_get_pages(struct drm_gem_object *obj);
-void msm_gem_put_pages(struct drm_gem_object *obj);
 void etnaviv_gem_put_iova(struct drm_gem_object *obj);
 int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 		struct drm_mode_create_dumb *args);
