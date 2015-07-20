@@ -537,7 +537,9 @@ static void etnaviv_free_obj(struct drm_gem_object *obj)
 
 	drm_gem_free_mmap_offset(obj);
 
-	if (obj->import_attach) {
+	if (etnaviv_obj->ops) {
+		etnaviv_obj->ops->release(etnaviv_obj);
+	} else if (obj->import_attach) {
 		if (etnaviv_obj->vaddr)
 			dma_buf_vunmap(obj->import_attach->dmabuf,
 				       etnaviv_obj->vaddr);
