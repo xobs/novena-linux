@@ -138,11 +138,7 @@ static void __etnaviv_iommu_free(struct etnaviv_iommu_domain *etnaviv_domain)
 #ifdef OLD_IOMMU
 static void etnaviv_iommu_domain_destroy(struct iommu_domain *domain)
 {
-	struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-
-	__etnaviv_iommu_free(etnaviv_domain);
-
-	domain->priv = NULL;
+	__etnaviv_iommu_free(to_etnaviv_domain(domain));
 }
 #else
 static void etnaviv_domain_free(struct iommu_domain *domain)
