@@ -230,6 +230,10 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
 	platform_set_drvdata(pdev, hdmi);
 
 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+
+	/* Hack: Only use IPU2 */
+	encoder->possible_crtcs &= 0x0c;
+
 	/*
 	 * If we failed to find the CRTC(s) which this encoder is
 	 * supposed to be connected to, it's because the CRTC has
