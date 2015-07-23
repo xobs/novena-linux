@@ -321,7 +321,7 @@ static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
 
 	_imx6q_pm_pu_power_off(genpd);
 
-	if (pu->reg)
+	if (pu->reg && regulator_is_enabled(pu->reg))
 		regulator_disable(pu->reg);
 
 	return 0;
