@@ -94,7 +94,9 @@ static struct thermal_soc_data thermal_imx6sx_data = {
 
 struct imx_thermal_data {
 	struct thermal_zone_device *tz;
+	struct thermal_zone_device *tzof;
 	struct thermal_cooling_device *cdev;
+	struct device *dev;
 	enum thermal_device_mode mode;
 	struct regmap *tempmon;
 	u32 c1, c2; /* See formula in imx_get_sensor_data() */
@@ -133,9 +135,8 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
 			TEMPSENSE0_ALARM_VALUE_SHIFT);
 }
 
-static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+static int __imx_get_temp(struct imx_thermal_data *data, unsigned long *temp)
 {
-	struct imx_thermal_data *data = tz->devdata;
 	struct regmap *map = data->tempmon;
 	unsigned int n_meas;
 	bool wait;
@@ -172,7 +173,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 	}
 
 	if ((val & TEMPSENSE0_FINISHED) == 0) {
-		dev_dbg(&tz->device, "temp measurement never finished\n");
+		dev_dbg(data->dev, "temp measurement never finished\n");
 		return -EAGAIN;
 	}
 
@@ -189,13 +190,13 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 		if (data->alarm_temp == data->temp_critical &&
 			*temp < data->temp_passive) {
 			imx_set_alarm_temp(data, data->temp_passive);
-			dev_dbg(&tz->device, "thermal alarm off: T < %lu\n",
+			dev_dbg(data->dev, "thermal alarm off: T < %lu\n",
 				data->alarm_temp / 1000);
 		}
 	}
 
 	if (*temp != data->last_temp) {
-		dev_dbg(&tz->device, "millicelsius: %ld\n", *temp);
+		dev_dbg(data->dev, "millicelsius: %ld\n", *temp);
 		data->last_temp = *temp;
 	}
 
@@ -206,6 +207,15 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
 	}
 
 	return 0;
+}
+
+static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp) {
+	struct imx_thermal_data *data = tz->devdata;
+	return __imx_get_temp(data, temp);
+}
+
+static int imx_of_read_temp(void *data, long *temp) {
+	return __imx_get_temp(data, temp);
 }
 
 static int imx_get_mode(struct thermal_zone_device *tz,
@@ -345,6 +355,10 @@ static struct thermal_zone_device_ops imx_tz_ops = {
 	.set_trip_temp = imx_set_trip_temp,
 };
 
+static const struct thermal_zone_of_device_ops imx_of_thermal_ops = {
+	.get_temp = imx_of_read_temp,
+};
+
 static int imx_get_sensor_data(struct platform_device *pdev)
 {
 	struct imx_thermal_data *data = platform_get_drvdata(pdev);
@@ -461,6 +475,8 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
+	data->dev = &pdev->dev;
+
 	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "fsl,tempmon");
 	if (IS_ERR(map)) {
 		ret = PTR_ERR(map);
@@ -496,6 +512,7 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, data);
+	dev_set_drvdata(&pdev->dev, data);
 
 	ret = imx_get_sensor_data(pdev);
 	if (ret) {
@@ -574,6 +591,13 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	data->irq_enabled = true;
 	data->mode = THERMAL_DEVICE_ENABLED;
 
+	data->tzof = thermal_zone_of_sensor_register(&pdev->dev, 0,
+						     data,
+						     &imx_of_thermal_ops);
+	if (IS_ERR(data->tzof))
+		data->tzof = NULL;
+
+
 	return 0;
 }
 
@@ -581,6 +605,8 @@ static int imx_thermal_remove(struct platform_device *pdev)
 {
 	struct imx_thermal_data *data = platform_get_drvdata(pdev);
 	struct regmap *map = data->tempmon;
+
+	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzof);
 
 	/* Disable measurements */
 	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_POWER_DOWN);
