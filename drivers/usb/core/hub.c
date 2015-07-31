@@ -1239,6 +1239,9 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
  init3:
 	hub->quiescing = 0;
 
+	if (unlikely(hub->disconnected))
+		return;
+
 	status = usb_submit_urb(hub->urb, GFP_NOIO);
 	if (status < 0)
 		dev_err(hub->intfdev, "activate --> %d\n", status);
