@@ -123,6 +123,7 @@ struct etnaviv_gpu {
 	struct clk *clk_bus;
 	struct clk *clk_core;
 	struct clk *clk_shader;
+	bool hw_is_idle;
 
 	/* Hang Detction: */
 #define DRM_ETNAVIV_HANGCHECK_PERIOD 500 /* in ms */

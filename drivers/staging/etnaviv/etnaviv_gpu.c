@@ -1150,6 +1150,11 @@ static int etnaviv_gpu_clk_disable(struct etnaviv_gpu *gpu)
 
 static int etnaviv_gpu_hw_suspend(struct etnaviv_gpu *gpu)
 {
+	int ret;
+
+	if (gpu->hw_is_idle)
+		return 0;
+
 	if (gpu->buffer) {
 		unsigned long timeout;
 
@@ -1179,7 +1184,13 @@ static int etnaviv_gpu_hw_suspend(struct etnaviv_gpu *gpu)
 		} while (1);
 	}
 
-	return etnaviv_gpu_clk_disable(gpu);
+	ret = etnaviv_gpu_clk_disable(gpu);
+	if (ret)
+		return ret;
+
+	gpu->hw_is_idle = true;
+
+	return 0;
 }
 
 static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
@@ -1187,6 +1198,9 @@ static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
 	struct drm_device *drm = gpu->drm;
 	u32 clock;
 	int ret;
+
+	if (!gpu->hw_is_idle)
+		return 0;
 
 	ret = mutex_lock_killable(&drm->struct_mutex);
 	if (ret)
@@ -1199,6 +1213,7 @@ static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
 	etnaviv_gpu_hw_init(gpu);
 
 	gpu->switch_context = true;
+	gpu->hw_is_idle = false;
 
 	mutex_unlock(&drm->struct_mutex);
 
@@ -1369,8 +1384,7 @@ static int etnaviv_gpu_platform_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int etnaviv_gpu_rpm_suspend(struct device *dev)
+static int __maybe_unused etnaviv_gpu_rpm_suspend(struct device *dev)
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 	u32 idle, mask;
@@ -1388,7 +1402,7 @@ static int etnaviv_gpu_rpm_suspend(struct device *dev)
 	return etnaviv_gpu_hw_suspend(gpu);
 }
 
-static int etnaviv_gpu_rpm_resume(struct device *dev)
+static int __maybe_unused etnaviv_gpu_rpm_resume(struct device *dev)
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 	int ret;
@@ -1412,11 +1426,32 @@ static int etnaviv_gpu_rpm_resume(struct device *dev)
 
 	return 0;
 }
-#endif
+
+static int __maybe_unused etnaviv_gpu_suspend(struct device *dev)
+{
+	int ret;
+	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
+
+	pm_runtime_get(dev);
+
+	//ret = etnaviv_gpu_rpm_suspend(dev);
+	ret = etnaviv_gpu_hw_suspend(gpu);
+	if (ret)
+		pm_runtime_put(dev);
+	return ret;
+}
+
+static int __maybe_unused etnaviv_gpu_resume(struct device *dev)
+{
+	int ret = etnaviv_gpu_rpm_resume(dev);
+	pm_runtime_put(dev);
+	return ret;
+}
 
 static const struct dev_pm_ops etnaviv_gpu_pm_ops = {
 	SET_RUNTIME_PM_OPS(etnaviv_gpu_rpm_suspend, etnaviv_gpu_rpm_resume,
 			   NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(etnaviv_gpu_suspend, etnaviv_gpu_resume)
 };
 
 struct platform_driver etnaviv_gpu_driver = {
