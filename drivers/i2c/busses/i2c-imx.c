@@ -201,7 +201,7 @@ struct imx_i2c_struct {
 	void __iomem		*base;
 	wait_queue_head_t	queue;
 	unsigned long		i2csr;
-	unsigned int 		disable_delay;
+	unsigned int		disable_delay;
 	int			stopped;
 	unsigned int		ifdr; /* IMX_I2C_IFDR */
 	unsigned int		cur_clk;
@@ -295,7 +295,6 @@ static void i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
 	dma->chan_tx = dma_request_slave_channel(dev, "tx");
 	if (!dma->chan_tx) {
 		dev_dbg(dev, "can't request DMA tx channel\n");
-		ret = -ENODEV;
 		goto fail_al;
 	}
 
@@ -313,7 +312,6 @@ static void i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
 	dma->chan_rx = dma_request_slave_channel(dev, "rx");
 	if (!dma->chan_rx) {
 		dev_dbg(dev, "can't request DMA rx channel\n");
-		ret = -ENODEV;
 		goto fail_tx;
 	}
 
@@ -465,7 +463,7 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 
 	if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
-		return -ETIMEDOUT;
+		return -EAGAIN;
 	}
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> TRX complete\n", __func__);
 	i2c_imx->i2csr = 0;
@@ -474,8 +472,24 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 
 static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
 {
-	if (imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR) & I2SR_RXAK) {
+	unsigned int sr;
+
+	sr = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+	if (sr & I2SR_RXAK) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
+
+		dev_dbg(&i2c_imx->adapter.dev,
+				"<%s> CONTROL: 0x%08x\n", __func__,
+				imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR));
+		dev_dbg(&i2c_imx->adapter.dev,
+				"<%s> STATUS: 0x%08x\n", __func__, sr);
+
+		/* check for arbitration lost */
+		if ((sr & I2SR_IAL) || (sr & I2SR_IBB)) {
+			sr &= ~I2SR_IAL;
+			imx_i2c_write_reg(sr, i2c_imx, IMX_I2C_I2SR);
+			return -EAGAIN;
+		}
 		return -EIO;  /* No ACK */
 	}
 
@@ -494,8 +508,8 @@ static void i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx)
 	i2c_clk_rate = clk_get_rate(i2c_imx->clk);
 	if (i2c_imx->cur_clk == i2c_clk_rate)
 		return;
-	else
-		i2c_imx->cur_clk = i2c_clk_rate;
+
+	i2c_imx->cur_clk = i2c_clk_rate;
 
 	div = (i2c_clk_rate + i2c_imx->bitrate - 1) / i2c_imx->bitrate;
 	if (div < i2c_clk_div[0].div)
@@ -503,7 +517,8 @@ static void i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx)
 	else if (div > i2c_clk_div[i2c_imx->hwdata->ndivs - 1].div)
 		i = i2c_imx->hwdata->ndivs - 1;
 	else
-		for (i = 0; i2c_clk_div[i].div < div; i++);
+		for (i = 0; i2c_clk_div[i].div < div; i++)
+			;
 
 	/* Store divider value */
 	i2c_imx->ifdr = i2c_clk_div[i].val;
@@ -638,6 +653,7 @@ static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
 					struct i2c_msg *msgs)
 {
 	int result;
+	unsigned long time_left;
 	unsigned int temp = 0;
 	unsigned long orig_jiffies = jiffies;
 	struct imx_i2c_dma *dma = i2c_imx->dma;
@@ -661,12 +677,12 @@ static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
 	 */
 	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
 	reinit_completion(&i2c_imx->dma->cmd_complete);
-	result = wait_for_completion_timeout(
+	time_left = wait_for_completion_timeout(
 				&i2c_imx->dma->cmd_complete,
 				msecs_to_jiffies(DMA_TIMEOUT));
-	if (result <= 0) {
+	if (time_left == 0) {
 		dmaengine_terminate_all(dma->chan_using);
-		return result ?: -ETIMEDOUT;
+		return -ETIMEDOUT;
 	}
 
 	/* Waiting for transfer complete. */
@@ -700,6 +716,7 @@ static int i2c_imx_dma_read(struct imx_i2c_struct *i2c_imx,
 			struct i2c_msg *msgs, bool is_lastmsg)
 {
 	int result;
+	unsigned long time_left;
 	unsigned int temp;
 	unsigned long orig_jiffies = jiffies;
 	struct imx_i2c_dma *dma = i2c_imx->dma;
@@ -719,12 +736,12 @@ static int i2c_imx_dma_read(struct imx_i2c_struct *i2c_imx,
 		return result;
 
 	reinit_completion(&i2c_imx->dma->cmd_complete);
-	result = wait_for_completion_timeout(
+	time_left = wait_for_completion_timeout(
 				&i2c_imx->dma->cmd_complete,
 				msecs_to_jiffies(DMA_TIMEOUT));
-	if (result <= 0) {
+	if (time_left == 0) {
 		dmaengine_terminate_all(dma->chan_using);
-		return result ?: -ETIMEDOUT;
+		return -ETIMEDOUT;
 	}
 
 	/* waiting for transfer complete. */
@@ -797,7 +814,7 @@ static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
 		return result;
 	result = i2c_imx_acked(i2c_imx);
 	if (result)
-		return -EAGAIN;
+		return result;
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
 
 	/* write data */
@@ -833,7 +850,7 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs, bo
 		return result;
 	result = i2c_imx_acked(i2c_imx);
 	if (result)
-		return -EAGAIN;
+		return result;
 
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> setup bus\n", __func__);
 
@@ -858,6 +875,7 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs, bo
 	/* read data */
 	for (i = 0; i < msgs->len; i++) {
 		u8 len = 0;
+
 		result = i2c_imx_trx_complete(i2c_imx);
 		if (result)
 			return result;
@@ -953,15 +971,16 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 		/* write/read data */
 #ifdef CONFIG_I2C_DEBUG_BUS
 		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-		dev_dbg(&i2c_imx->adapter.dev, "<%s> CONTROL: IEN=%d, IIEN=%d, "
-			"MSTA=%d, MTX=%d, TXAK=%d, RSTA=%d\n", __func__,
+		dev_dbg(&i2c_imx->adapter.dev,
+			"<%s> CONTROL: IEN=%d, IIEN=%d, MSTA=%d, MTX=%d, TXAK=%d, RSTA=%d\n",
+			__func__,
 			(temp & I2CR_IEN ? 1 : 0), (temp & I2CR_IIEN ? 1 : 0),
 			(temp & I2CR_MSTA ? 1 : 0), (temp & I2CR_MTX ? 1 : 0),
 			(temp & I2CR_TXAK ? 1 : 0), (temp & I2CR_RSTA ? 1 : 0));
 		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
 		dev_dbg(&i2c_imx->adapter.dev,
-			"<%s> STATUS: ICF=%d, IAAS=%d, IBB=%d, "
-			"IAL=%d, SRW=%d, IIF=%d, RXAK=%d\n", __func__,
+			"<%s> STATUS: ICF=%d, IAAS=%d, IBB=%d, IAL=%d, SRW=%d, IIF=%d, RXAK=%d\n",
+			__func__,
 			(temp & I2SR_ICF ? 1 : 0), (temp & I2SR_IAAS ? 1 : 0),
 			(temp & I2SR_IBB ? 1 : 0), (temp & I2SR_IAL ? 1 : 0),
 			(temp & I2SR_SRW ? 1 : 0), (temp & I2SR_IIF ? 1 : 0),
@@ -982,6 +1001,9 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 fail0:
 	/* Stop I2C transfer */
 	i2c_imx_stop(i2c_imx);
+
+	if (result == -EAGAIN)
+		schedule();
 
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> exit with: %s: %d\n", __func__,
 		(result < 0) ? "error" : "success msg",
@@ -1040,8 +1062,8 @@ static int i2c_imx_probe(struct platform_device *pdev)
 	i2c_imx->adapter.owner		= THIS_MODULE;
 	i2c_imx->adapter.algo		= &i2c_imx_algo;
 	i2c_imx->adapter.dev.parent	= &pdev->dev;
-	i2c_imx->adapter.nr 		= pdev->id;
-	i2c_imx->adapter.retries	= 500;
+	i2c_imx->adapter.nr		= pdev->id;
+	i2c_imx->adapter.retries	= 15;
 	i2c_imx->adapter.timeout	= msecs_to_jiffies(2000);
 	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
 	i2c_imx->base			= base;
@@ -1101,7 +1123,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		i2c_imx->adapter.name);
 	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
 
-	/* Init DMA config if support*/
+	/* Init DMA config if supported */
 	i2c_imx_dma_request(i2c_imx, phy_addr);
 
 	return 0;   /* Return OK */
