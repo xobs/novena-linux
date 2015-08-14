@@ -21,14 +21,6 @@
 	model = "Kosagi Novena Dual/Quad";
 	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
 
-	cpus {
-		cpu0: cpu@0 {
-			cooling-min-level = <0>;
-			cooling-max-level = <4>;
-			#cooling-cells = <2>; /* min followed by max */
-		};
-	};
-
 	memory {
 		reg = <0x10000000 0xefffffff>;
 	};
@@ -209,7 +201,7 @@
 	thermal-zones {
 		cpu_thermal: cpu-thermal {
 			polling-delay-passive = <250>; /* milliseconds */
-			polling-delay = <1000>; /* milliseconds */
+			polling-delay = <500>; /* milliseconds */
 
 			thermal-sensors = <&tempmon 0>;
 
@@ -220,13 +212,23 @@
 					type = "active";
 				};
 				cpu_alert1: cpu-alert1 {
+					temperature = <80000>; /* millicelsius */
+					hysteresis = <5000>; /* millicelsius */
+					type = "passive";
+				};
+				cpu_alert2: cpu-alert2 {
 					temperature = <85000>; /* millicelsius */
-					hysteresis = <8000>; /* millicelsius */
+					hysteresis = <5000>; /* millicelsius */
+					type = "passive";
+				};
+				cpu_alert3: cpu-alert3 {
+					temperature = <90000>; /* millicelsius */
+					hysteresis = <5000>; /* millicelsius */
 					type = "passive";
 				};
 				cpu_crit: cpu-crit {
 					temperature = <105000>; /* millicelsius */
-					hysteresis = <5000>; /* millicelsius */
+					hysteresis = <8000>; /* millicelsius */
 					type = "critical";
 				};
 			};
@@ -238,7 +240,15 @@
 				};
 				map1 {
 					trip = <&cpu_alert1>;
-					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+					cooling-device = <&cpu0 1 1>;
+				};
+				map2 {
+					trip = <&cpu_alert2>;
+					cooling-device = <&cpu0 2 2>;
+				};
+				map3 {
+					trip = <&cpu_alert3>;
+					cooling-device = <&cpu0 3 3>;
 				};
 				map4 {
 					trip = <&cpu_crit>;
