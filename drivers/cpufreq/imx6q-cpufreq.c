@@ -8,6 +8,7 @@
 
 #include <linux/clk.h>
 #include <linux/cpu.h>
+#include <linux/cpu_cooling.h>
 #include <linux/cpufreq.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -15,6 +16,7 @@
 #include <linux/pm_opp.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/thermal.h>
 
 #define PU_SOC_VOLTAGE_NORMAL	1250000
 #define PU_SOC_VOLTAGE_HIGH	1275000
@@ -31,6 +33,7 @@ static struct clk *step_clk;
 static struct clk *pll2_pfd2_396m_clk;
 
 static struct device *cpu_dev;
+struct thermal_cooling_device *cdev;
 static bool free_opp;
 static struct cpufreq_frequency_table *freq_table;
 static unsigned int transition_latency;
@@ -142,12 +145,39 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
 	return cpufreq_generic_init(policy, freq_table, transition_latency);
 }
 
+static void imx6q_cpufreq_ready(struct cpufreq_policy *policy)
+{
+	struct device_node *np = of_node_get(cpu_dev->of_node);
+
+	if (WARN_ON(!np))
+		return;
+
+	/*
+	 * For now, just loading the cooling device;
+	 * thermal DT code takes care of matching them.
+	 */
+	if (of_find_property(np, "#cooling-cells", NULL)) {
+		cdev = of_cpufreq_cooling_register(np,
+						   policy->related_cpus);
+		if (IS_ERR(cdev)) {
+			dev_err(cpu_dev,
+				"running cpufreq without cooling device: %ld\n",
+				PTR_ERR(cdev));
+
+			cdev = NULL;
+		}
+	}
+
+	of_node_put(np);
+}
+
 static struct cpufreq_driver imx6q_cpufreq_driver = {
 	.flags = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.verify = cpufreq_generic_frequency_table_verify,
 	.target_index = imx6q_set_target,
 	.get = cpufreq_generic_get,
 	.init = imx6q_cpufreq_init,
+	.ready = imx6q_cpufreq_ready,
 	.name = "imx6q-cpufreq",
 	.attr = cpufreq_generic_attr,
 };
@@ -341,6 +371,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
 	if (free_opp)
 		of_free_opp_table(cpu_dev);
+	if (cdev)
+		cpufreq_cooling_unregister(cdev);
 	regulator_put(arm_reg);
 	if (!IS_ERR(pu_reg))
 		regulator_put(pu_reg);
