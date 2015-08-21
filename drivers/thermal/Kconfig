@@ -71,6 +71,15 @@ config THERMAL_DEFAULT_GOV_USER_SPACE
 	  Select this if you want to let the user space manage the
 	  platform thermals.
 
+config THERMAL_DEFAULT_GOV_BANG_BANG
+	bool "bang_bang"
+	select THERMAL_GOV_BANG_BANG
+	help
+	  Use the bang_bang governor as default. This is similar to
+	  step_wise, but allows for the use of hysteresis. If you use
+	  this governor, make sure the cpu throttling cooling devices
+	  have one step each.
+
 endchoice
 
 config THERMAL_GOV_FAIR_SHARE
