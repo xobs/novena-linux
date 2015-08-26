@@ -78,6 +78,7 @@
 		regulator-name = "lcd-lvds-power";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
+		parent-supply = <&reg_display>;
 		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		regulator-boot-on;
@@ -89,7 +90,6 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		startup-delay-us = <200000>;
-		parent-supply = <&reg_audio_codec>;
 		gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		regulator-boot-on;
