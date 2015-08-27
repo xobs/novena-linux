@@ -1237,6 +1237,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 		return ret;
 
 	gpu->drm = drm;
+	gpu->hw_is_idle = true;
 
 	INIT_LIST_HEAD(&gpu->active_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
