@@ -1403,7 +1403,7 @@ static int __maybe_unused etnaviv_gpu_rpm_suspend(struct device *dev)
 	return etnaviv_gpu_hw_suspend(gpu);
 }
 
-static int __maybe_unused etnaviv_gpu_rpm_resume(struct device *dev)
+static int __maybe_unused etnaviv_gpu_resume(struct device *dev)
 {
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
 	int ret;
@@ -1428,7 +1428,12 @@ static int __maybe_unused etnaviv_gpu_rpm_resume(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused etnaviv_gpu_suspend(struct device *dev)
+static int __maybe_unused etnaviv_gpu_rpm_resume(struct device *dev)
+{
+	return etnaviv_gpu_resume(dev);
+}
+
+static int __maybe_unused etnaviv_gpu_sys_suspend(struct device *dev)
 {
 	int ret;
 	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
@@ -1442,9 +1447,9 @@ static int __maybe_unused etnaviv_gpu_suspend(struct device *dev)
 	return ret;
 }
 
-static int __maybe_unused etnaviv_gpu_resume(struct device *dev)
+static int __maybe_unused etnaviv_gpu_sys_resume(struct device *dev)
 {
-	int ret = etnaviv_gpu_rpm_resume(dev);
+	int ret = etnaviv_gpu_resume(dev);
 	pm_runtime_put(dev);
 	return ret;
 }
@@ -1452,7 +1457,7 @@ static int __maybe_unused etnaviv_gpu_resume(struct device *dev)
 static const struct dev_pm_ops etnaviv_gpu_pm_ops = {
 	SET_RUNTIME_PM_OPS(etnaviv_gpu_rpm_suspend, etnaviv_gpu_rpm_resume,
 			   NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(etnaviv_gpu_suspend, etnaviv_gpu_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(etnaviv_gpu_sys_suspend, etnaviv_gpu_sys_resume)
 };
 
 struct platform_driver etnaviv_gpu_driver = {
