@@ -207,9 +207,9 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
 		BM_USBPHY_CTRL_ENUTMILEVEL3,
 	       base + HW_USBPHY_CTRL_SET);
 
-	/* Set DISCONADJ to 0.58125V */
+	/* Set DISCONADJ to 0.58750V */
 	ret = readl(base + HW_USBPHY_RX) & ~BM_USBPHY_RX_DISCONADJ_MASK;
-	ret |= BM_USBPHY_RX_DISCONADJ_0P58125V;
+	ret |= BM_USBPHY_RX_DISCONADJ_0P58750V;
 	writel(ret, base + HW_USBPHY_RX);
 
 	if (mxs_phy->data->flags & MXS_PHY_NEED_IP_FIX)
