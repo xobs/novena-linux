@@ -3202,7 +3202,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	hibernate=	[HIBERNATION]
 		noresume	Don't check if there's a hibernation image
 				present during boot.
-		nocompress	Don't compress/decompress hibernation images.
+		compress	Compress/decompress hibernation images.
 		no		Disable hibernation and resume.
 
 	retain_initrd	[RAM] Keep initrd memory after extraction
