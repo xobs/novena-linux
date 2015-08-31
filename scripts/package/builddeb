@@ -76,6 +76,12 @@ if [ -n "$KDEB_PKGVERSION" ]; then
 else
 	packageversion=$version-$revision
 fi
+if [ -n "$KDEB_SOURCENAME" ]; then
+	sourcename=$KDEB_SOURCENAME
+else
+	sourcename=linux-upstream
+fi
+tmpdir="$objtree/debian/tmp"
 tmpdir="$objtree/debian/tmp"
 fwdir="$objtree/debian/fwtmp"
 kernel_headers_dir="$objtree/debian/hdrtmp"
@@ -247,7 +253,7 @@ maintainer="$name <$email>"
 
 # Generate a simple changelog template
 cat <<EOF > debian/changelog
-linux-upstream ($packageversion) unstable; urgency=low
+$sourcename ($packageversion) unstable; urgency=low
 
   * Custom built Linux kernel.
 
@@ -274,12 +280,16 @@ On Debian GNU/Linux systems, the complete text of the GNU General Public
 License version 2 can be found in \`/usr/share/common-licenses/GPL-2'.
 EOF
 
+
+build_depends="bc, kmod, cpio "
+
 # Generate a control file
 cat <<EOF > debian/control
-Source: linux-upstream
+Source: $sourcename
 Section: kernel
 Priority: optional
 Maintainer: $maintainer
+Build-Depends: $build_depends
 Standards-Version: 3.8.4
 Homepage: http://www.kernel.org/
 EOF
@@ -398,6 +408,38 @@ Description: Linux kernel debugging symbols for $version
 EOF
 
 	create_package "$dbg_packagename" "$dbg_dir"
+fi
+
+if [ "x$1" = "xdeb-pkg" ]
+then
+    cat <<EOF > debian/rules
+#!/usr/bin/make -f
+
+build:
+	cp debian/config .config
+	\$(MAKE) oldconfig
+
+binary-arch:
+	\$(MAKE) KDEB_SOURCENAME=${sourcename} KDEB_PKGVERSION=${packageversion} bindeb-pkg
+
+clean:
+	\$(MAKE) clean
+
+binary: binary-arch
+EOF
+
+	if [ -n "$KBUILD_DEBARCH" ] ; then
+		debarch="$KBUILD_DEBARCH"
+	fi
+	(cd $KBUILD_SRC; git archive --prefix=${sourcename}-${version}/ HEAD)|gzip -9 > ../${sourcename}_${version}.orig.tar.gz
+	cp $KCONFIG_CONFIG debian/config
+	tar caf ../${sourcename}_${packageversion}.debian.tar.gz debian/{config,copyright,rules,changelog,control}
+	dpkg-source -cdebian/control -ldebian/changelog --format="3.0 (custom)" --target-format="3.0 (quilt)" \
+		-b / ../${sourcename}_${version}.orig.tar.gz  ../${sourcename}_${packageversion}.debian.tar.gz
+	mv ${sourcename}_${packageversion}*dsc ..
+	dpkg-genchanges > ../${sourcename}_${packageversion}_${debarch}.changes
+else
+	dpkg-genchanges -b > ../${sourcename}_${packageversion}_${debarch}.changes
 fi
 
 exit 0

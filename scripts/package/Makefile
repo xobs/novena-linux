@@ -84,11 +84,15 @@ quiet_cmd_builddeb = BUILDDEB
 	} && \
 	\
 	$$KBUILD_PKG_ROOTCMD $(CONFIG_SHELL) \
-		$(srctree)/scripts/package/builddeb
+		$(srctree)/scripts/package/builddeb $@
 
 deb-pkg: FORCE
 	$(MAKE) KBUILD_SRC=
-	$(call cmd,builddeb)
+	+$(call cmd,builddeb)
+
+bindeb-pkg: FORCE
+	$(MAKE) KBUILD_SRC=
+	+$(call cmd,builddeb)
 
 clean-dirs += $(objtree)/debian/
 
@@ -133,8 +137,9 @@ perf-%pkg: FORCE
 # ---------------------------------------------------------------------------
 help: FORCE
 	@echo '  rpm-pkg             - Build both source and binary RPM kernel packages'
-	@echo '  binrpm-pkg          - Build only the binary kernel package'
-	@echo '  deb-pkg             - Build the kernel as a deb package'
+	@echo '  binrpm-pkg          - Build only the binary kernel RPM package'
+	@echo '  deb-pkg             - Build both source and binary deb kernel packages'
+	@echo '  bindeb-pkg          - Build only the binary kernel deb package'
 	@echo '  tar-pkg             - Build the kernel as an uncompressed tarball'
 	@echo '  targz-pkg           - Build the kernel as a gzip compressed tarball'
 	@echo '  tarbz2-pkg          - Build the kernel as a bzip2 compressed tarball'
