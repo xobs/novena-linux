@@ -20,7 +20,6 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -466,12 +465,6 @@ static int ath3k_probe(struct usb_interface *intf,
 	int ret;
 
 	BT_DBG("intf %p id %p", intf, id);
-
-	/* Make sure we're not resuming from hibernation */
-	ret = usermodehelper_read_trylock();
-	if (ret)
-		return ret;
-	usermodehelper_read_unlock();
 
 	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
