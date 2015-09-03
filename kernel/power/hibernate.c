@@ -34,7 +34,7 @@
 #include "power.h"
 
 
-static int nocompress = 1;
+static int nocompress;
 static int noresume;
 static int nohibernate;
 static int resume_wait;
@@ -1114,8 +1114,8 @@ static int __init hibernate_setup(char *str)
 {
 	if (!strncmp(str, "noresume", 8))
 		noresume = 1;
-	else if (!strncmp(str, "compress", 10))
-		nocompress = 0;
+	else if (!strncmp(str, "nocompress", 10))
+		nocompress = 1;
 	else if (!strncmp(str, "no", 2)) {
 		noresume = 1;
 		nohibernate = 1;
