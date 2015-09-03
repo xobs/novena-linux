@@ -2670,8 +2670,10 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	 * over allocated.
 	 */
 	if (IS_ENABLED(CONFIG_NUMA) &&
-	    (gfp_mask & GFP_THISNODE) == GFP_THISNODE)
+	    (gfp_mask & GFP_THISNODE) == GFP_THISNODE) {
+		pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 		goto nopage;
+	}
 
 retry:
 	if (!(gfp_mask & __GFP_NO_KSWAPD))
@@ -2728,16 +2730,21 @@ retry:
 		 * type of allocation to fail.
 		 */
 		WARN_ON_ONCE(gfp_mask & __GFP_NOFAIL);
+		pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 		goto nopage;
 	}
 
 	/* Avoid recursion of direct reclaim */
-	if (current->flags & PF_MEMALLOC)
+	if (current->flags & PF_MEMALLOC) {
+		pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 		goto nopage;
+	}
 
 	/* Avoid allocations with no watermarks from looping endlessly */
-	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
+	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL)) {
+		pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 		goto nopage;
+	}
 
 	/*
 	 * Try direct compaction. The first pass is asynchronous. Subsequent
@@ -2761,8 +2768,10 @@ retry:
 		 * to heavily disrupt the system, so we fail the allocation
 		 * instead of entering direct reclaim.
 		 */
-		if (deferred_compaction)
+		if (deferred_compaction) {
+			pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 			goto nopage;
+		}
 
 		/*
 		 * In all zones where compaction was attempted (and not
@@ -2770,8 +2779,10 @@ retry:
 		 * For THP allocation we do not want to disrupt the others
 		 * so we fallback to base pages instead.
 		 */
-		if (contended_compaction == COMPACT_CONTENDED_LOCK)
+		if (contended_compaction == COMPACT_CONTENDED_LOCK) {
+			pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 			goto nopage;
+		}
 
 		/*
 		 * If compaction was aborted due to need_resched(), we do not
@@ -2779,8 +2790,10 @@ retry:
 		 * khugepaged trying to collapse.
 		 */
 		if (contended_compaction == COMPACT_CONTENDED_SCHED
-			&& !(current->flags & PF_KTHREAD))
+			&& !(current->flags & PF_KTHREAD)) {
+			pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 			goto nopage;
+		}
 	}
 
 	/*
@@ -2818,8 +2831,10 @@ retry:
 						migratetype,&did_some_progress);
 			if (page)
 				goto got_pg;
-			if (!did_some_progress)
+			if (!did_some_progress) {
+				pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 				goto nopage;
+			}
 		}
 		/* Wait for some write requests to complete then retry */
 		wait_iff_congested(preferred_zone, BLK_RW_ASYNC, HZ/50);
@@ -2839,6 +2854,7 @@ retry:
 		if (page)
 			goto got_pg;
 	}
+	pr_err("%s:%d failed to allocate\n", __FILE__, __LINE__);
 
 nopage:
 	warn_alloc_failed(gfp_mask, order, NULL);
