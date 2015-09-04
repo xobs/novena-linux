@@ -1536,6 +1536,9 @@ static int imx_hdmi_register(struct drm_device *drm, struct imx_hdmi *hdmi)
 	if (ret)
 		return ret;
 
+	/* Hack: Only use IPU2 for HDMI */
+	hdmi->encoder.possible_crtcs &= 0x0c;
+
 	hdmi->ddc_conn->connector.polled = DRM_CONNECTOR_POLL_HPD;
 
 	drm_encoder_helper_add(&hdmi->encoder, &imx_hdmi_encoder_helper_funcs);
