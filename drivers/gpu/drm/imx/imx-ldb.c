@@ -366,6 +366,9 @@ static int imx_ldb_register(struct drm_device *drm,
 	if (ret)
 		return ret;
 
+	/* Hack: Only allow these devices to use IPU1 */
+	imx_ldb_ch->encoder.possible_crtcs &= 0x03;
+
 	ret = imx_ldb_get_clk(ldb, imx_ldb_ch->chno);
 	if (ret)
 		return ret;
