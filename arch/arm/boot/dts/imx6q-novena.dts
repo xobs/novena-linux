@@ -29,11 +29,6 @@
 		stdout-path = &uart2;
 	};
 
-	display-subsystem {
-		/* Hack to get ipu2 assigned to ldb, and ipu1 to hdmi */
-		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu2_di1>, <&ipu1_di1>;
-	};
-
 	reg_2p5v: 2p5v {
 		compatible = "regulator-fixed";
 		regulator-name = "2P5V";
