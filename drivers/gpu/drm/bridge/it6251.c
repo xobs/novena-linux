@@ -81,7 +81,7 @@ struct it6251_bridge {
 #define INIT_RETRY_DELAY_START msecs_to_jiffies(350)
 #define INIT_RETRY_DELAY_MAX msecs_to_jiffies(3000)
 #define INIT_RETRY_DELAY_INC msecs_to_jiffies(50)
-#define INIT_RETRY_MAX_TRIES 20
+#define INIT_RETRY_MAX_TRIES 4
 
 #define it6251_lvds_write(priv, addr, val) \
 	do { \
@@ -264,16 +264,19 @@ static void it6251_init(struct work_struct *work)
 		return;
 	}
 
+	/* Reset DisplayPort half (setting bit 2 causes it to not respond
+	 * over i2c, which is considered "normal".  This write will report
+	 * failure, but will actually succeed. */
+	it6251_write(priv, 0x05, 0xff);
 	it6251_write(priv, 0x05, 0x00);
-	udelay(1000);
 
+	/* Configure LVDS receiver */
 	it6251_write(priv, IT6251_REG_LVDS_PORT_ADDR,
 			LVDS_ADDR << 1);
 	it6251_write(priv, IT6251_REG_LVDS_PORT_CTRL,
 			IT6251_REG_LVDS_PORT_CTRL_EN);
 
 	// LVDSRX
-	/* This write always fails, because the chip goes into reset */
 	it6251_lvds_write(priv, 0x05, 0xff);   // reset LVDSRX
 	it6251_lvds_write(priv, 0x05, 0x00);
 
@@ -336,16 +339,25 @@ static void it6251_init(struct work_struct *work)
 	it6251_write(priv, 0x17, 0x01); // start link training
 
 	
-	for (tries = 0; tries < 100; tries++) {
-		reg = it6251_read(priv, 0x17);
-		if (reg == 0xe0) {
-			reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
-			if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
-				break;
+	for (tries = 0; tries < 5; tries++) {
+		int stable_delays;
+		for (stable_delays = 0; stable_delays < 100; stable_delays++) {
+			reg = it6251_read(priv, 0x0e);
+			if ((reg & 0x1f) == 0x10) {
+				reg = it6251_read(priv, IT6251_SYSTEM_STATUS);
+				if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
+					goto video_maybe_stable;
+			}
+			udelay(2000);
 		}
-		udelay(2000);
+
+		dev_info(&priv->client->dev, "panel not stable, retraining\n");
+		it6251_write(priv, 0x05, 0x00);
+		it6251_write(priv, 0x17, 0x04);
+		it6251_write(priv, 0x17, 0x01);
 	}
-	
+
+video_maybe_stable:
 	/*
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
