@@ -430,7 +430,7 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 
 	gpu_write(gpu, VIVS_HI_INTR_ENBL, ~0U);
 	gpu_write(gpu, VIVS_FE_COMMAND_ADDRESS,
-		  etnaviv_gem_paddr_locked(gpu->buffer) - gpu->memory_base);
+		  gpu->buffer->paddr - gpu->memory_base);
 	gpu_write(gpu, VIVS_FE_COMMAND_CONTROL,
 		  VIVS_FE_COMMAND_CONTROL_ENABLE |
 		  VIVS_FE_COMMAND_CONTROL_PREFETCH(prefetch));
@@ -488,11 +488,10 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 	}
 
 	/* Create buffer: */
-	gpu->buffer = etnaviv_gem_new(gpu->drm, PAGE_SIZE, ETNA_BO_CMDSTREAM);
-	if (IS_ERR(gpu->buffer)) {
-		ret = PTR_ERR(gpu->buffer);
-		gpu->buffer = NULL;
-		dev_err(gpu->dev, "could not create buffer: %d\n", ret);
+	gpu->buffer = etnaviv_gpu_cmdbuf_new(gpu, PAGE_SIZE);
+	if (!gpu->buffer) {
+		ret = -ENOMEM;
+		dev_err(gpu->dev, "could not create command buffer\n");
 		goto fail;
 	}
 
@@ -1268,7 +1267,7 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 #endif
 
 	if (gpu->buffer) {
-		drm_gem_object_unreference_unlocked(gpu->buffer);
+		etnaviv_gpu_cmdbuf_free(gpu->buffer);
 		gpu->buffer = NULL;
 	}
 

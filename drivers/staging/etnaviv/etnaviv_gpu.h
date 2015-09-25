@@ -82,6 +82,8 @@ struct etnaviv_event {
 	u32 fence;
 };
 
+struct etnaviv_cmdbuf;
+
 struct etnaviv_gpu {
 	struct drm_device *drm;
 	struct device *dev;
@@ -90,7 +92,7 @@ struct etnaviv_gpu {
 	bool switch_context;
 
 	/* 'ring'-buffer: */
-	struct drm_gem_object *buffer;
+	struct etnaviv_cmdbuf *buffer;
 
 	/* bus base address of memory  */
 	u32 memory_base;
