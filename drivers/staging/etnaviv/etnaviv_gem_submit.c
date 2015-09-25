@@ -45,7 +45,7 @@ static struct etnaviv_gem_submit *submit_create(struct drm_device *dev,
 
 		/* initially, until copy_from_user() and bo lookup succeeds: */
 		submit->nr_bos = 0;
-		submit->nr_cmds = 0;
+		submit->cmdbuf = NULL;
 
 		INIT_LIST_HEAD(&submit->bo_list);
 		ww_acquire_init(&submit->ticket, &reservation_ww_class);
@@ -212,11 +212,11 @@ static int submit_bo(struct etnaviv_gem_submit *submit, u32 idx,
 }
 
 /* process the reloc's and patch up the cmdstream as needed: */
-static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_object *obj,
-		u32 offset, u32 nr_relocs, u64 relocs)
+static int submit_reloc(struct etnaviv_gem_submit *submit, void *stream,
+		u32 size, u32 nr_relocs, u64 relocs)
 {
 	u32 i, last_offset = 0;
-	u32 *ptr = obj->vaddr;
+	u32 *ptr = stream;
 	int ret;
 
 	for (i = 0; i < nr_relocs; i++) {
@@ -240,7 +240,7 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, struct etnaviv_gem_ob
 		/* offset in dwords: */
 		off = submit_reloc.submit_offset / 4;
 
-		if ((off >= (obj->base.size / 4)) ||
+		if ((off >= size ) ||
 				(off < last_offset)) {
 			DRM_ERROR("invalid offset %u at reloc %u\n", off, i);
 			return -EINVAL;
@@ -276,6 +276,9 @@ static void submit_cleanup(struct etnaviv_gem_submit *submit, bool fail)
 		drm_gem_object_unreference(&etnaviv_obj->base);
 	}
 
+	if (submit->cmdbuf)
+		etnaviv_gpu_cmdbuf_free(submit->cmdbuf);
+
 	ww_acquire_fini(&submit->ticket);
 	kfree(submit);
 }
@@ -286,11 +289,11 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct drm_etnaviv_gem_submit *args = data;
 	struct etnaviv_file_private *ctx = file->driver_priv;
-	struct drm_etnaviv_gem_submit_cmd *cmds;
 	struct drm_etnaviv_gem_submit_bo *bos;
 	struct etnaviv_gem_submit *submit;
+	struct etnaviv_cmdbuf *cmdbuf;
 	struct etnaviv_gpu *gpu;
-	unsigned i;
+	void *stream;
 	int ret;
 
 	if (args->pipe >= ETNA_MAX_PIPES)
@@ -300,27 +303,33 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (!gpu)
 		return -ENXIO;
 
-	if (args->nr_cmds > MAX_CMDS)
+	if (args->stream_size % 4) {
+		DRM_ERROR("non-aligned cmdstream buffer size: %u\n",
+			  args->stream_size);
 		return -EINVAL;
+	}
 
 	/*
 	 * Copy the command submission and bo array to kernel space in
 	 * one go, and do this outside of the dev->struct_mutex lock.
 	 */
-	cmds = drm_malloc_ab(args->nr_cmds, sizeof(*cmds));
 	bos = drm_malloc_ab(args->nr_bos, sizeof(*bos));
-	if (!cmds || !bos)
-		return -ENOMEM;
-
-	ret = copy_from_user(cmds, to_user_ptr(args->cmds),
-			     args->nr_cmds * sizeof(*cmds));
-	if (ret) {
-		ret = -EFAULT;
+	stream = drm_malloc_ab(1, args->stream_size);
+	cmdbuf = etnaviv_gpu_cmdbuf_new(gpu, ALIGN(args->stream_size, 8) + 8);
+	if (!bos || !stream || !cmdbuf) {
+		ret = -ENOMEM;
 		goto err_submit_cmds;
 	}
 
 	ret = copy_from_user(bos, to_user_ptr(args->bos),
 			     args->nr_bos * sizeof(*bos));
+	if (ret) {
+		ret = -EFAULT;
+		goto err_submit_cmds;
+	}
+
+	ret = copy_from_user(stream, to_user_ptr(args->stream),
+			     args->stream_size);
 	if (ret) {
 		ret = -EFAULT;
 		goto err_submit_cmds;
@@ -364,69 +373,21 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		goto out;
 
-	for (i = 0; i < args->nr_cmds; i++) {
-		struct drm_etnaviv_gem_submit_cmd *submit_cmd = cmds + i;
-		struct etnaviv_gem_object *etnaviv_obj;
-		unsigned max_size;
-
-		ret = submit_bo(submit, submit_cmd->submit_idx, &etnaviv_obj,
-				NULL);
-		if (ret)
-			goto out;
-
-		if (!(etnaviv_obj->flags & ETNA_BO_CMDSTREAM)) {
-			DRM_ERROR("cmdstream bo has flag ETNA_BO_CMDSTREAM not set\n");
-			ret = -EINVAL;
-			goto out;
-		}
-
-		if (submit_cmd->size % 4) {
-			DRM_ERROR("non-aligned cmdstream buffer size: %u\n",
-					submit_cmd->size);
-			ret = -EINVAL;
-			goto out;
-		}
-
-		if (submit_cmd->submit_offset % 8) {
-			DRM_ERROR("non-aligned cmdstream buffer size: %u\n",
-					submit_cmd->size);
-			ret = -EINVAL;
-			goto out;
-		}
-
-		/*
-		 * We must have space to add a LINK command at the end of
-		 * the command buffer.
-		 */
-		max_size = etnaviv_obj->base.size - 8;
-
-		if (submit_cmd->size > max_size ||
-		    submit_cmd->submit_offset > max_size - submit_cmd->size) {
-			DRM_ERROR("invalid cmdstream size: %u\n",
-				  submit_cmd->size);
-			ret = -EINVAL;
-			goto out;
-		}
-
-		submit->cmd[i].offset = submit_cmd->submit_offset / 4;
-		submit->cmd[i].size = submit_cmd->size / 4;
-		submit->cmd[i].obj = etnaviv_obj;
-
-		if (!etnaviv_cmd_validate_one(gpu, etnaviv_obj,
-					      submit->cmd[i].offset,
-					      submit->cmd[i].size)) {
-			ret = -EINVAL;
-			goto out;
-		}
-
-		ret = submit_reloc(submit, etnaviv_obj,
-				   submit_cmd->submit_offset,
-				   submit_cmd->nr_relocs, submit_cmd->relocs);
-		if (ret)
-			goto out;
+	if (!etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4)) {
+		ret = -EINVAL;
+		goto out;
 	}
 
-	submit->nr_cmds = i;
+	ret = submit_reloc(submit, stream, args->stream_size / 4,
+			   args->nr_relocs, args->relocs);
+	if (ret)
+		goto out;
+
+	memcpy(cmdbuf->vaddr, stream, args->stream_size);
+	cmdbuf->user_size = ALIGN(args->stream_size, 8);
+	/* transfer ownership of cmdbuf to submit */
+	submit->cmdbuf = cmdbuf;
+	cmdbuf = NULL;
 
 	ret = etnaviv_gpu_submit(gpu, submit, ctx);
 
@@ -447,11 +408,14 @@ out:
 	if (ret == -EAGAIN)
 		flush_workqueue(priv->wq);
 
- err_submit_cmds:
+err_submit_cmds:
+	/* if we still own the cmdbuf */
+	if (cmdbuf)
+		etnaviv_gpu_cmdbuf_free(cmdbuf);
+	if (stream)
+		drm_free_large(stream);
 	if (bos)
 		drm_free_large(bos);
-	if (cmds)
-		drm_free_large(cmds);
 
 	return ret;
 }

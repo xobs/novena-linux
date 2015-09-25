@@ -829,12 +829,41 @@ static void event_free(struct etnaviv_gpu *gpu, unsigned int event)
  * Cmdstream submission/retirement:
  */
 
+struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu, u32 size)
+{
+	struct etnaviv_cmdbuf *cmdbuf;
+
+	cmdbuf = kzalloc(sizeof(*cmdbuf), GFP_KERNEL);
+	if (!cmdbuf)
+		return NULL;
+
+	cmdbuf->vaddr = dma_alloc_writecombine(gpu->dev, size, &cmdbuf->paddr,
+					       GFP_KERNEL);
+	if (!cmdbuf->vaddr) {
+		kfree(cmdbuf);
+		return NULL;
+	}
+
+	cmdbuf->gpu = gpu;
+	cmdbuf->size = size;
+
+	return cmdbuf;
+}
+
+void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf)
+{
+	dma_free_writecombine(cmdbuf->gpu->dev, cmdbuf->size,
+			      cmdbuf->vaddr, cmdbuf->paddr);
+	kfree(cmdbuf);
+}
+
 static void retire_worker(struct work_struct *work)
 {
 	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
 					       retire_work);
 	struct drm_device *dev = gpu->drm;
 	u32 fence = gpu->completed_fence;
+	struct etnaviv_cmdbuf *cmdbuf, *tmp;
 
 	mutex_lock(&dev->struct_mutex);
 
@@ -854,6 +883,14 @@ static void retire_worker(struct work_struct *work)
 			drm_gem_object_unreference(&obj->base);
 		} else {
 			break;
+		}
+	}
+
+	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list,
+				 gpu_active_list) {
+		if (fence_after_eq(fence, cmdbuf->fence)) {
+			etnaviv_gpu_cmdbuf_free(cmdbuf);
+			list_del(&cmdbuf->gpu_active_list);
 		}
 	}
 
@@ -1196,6 +1233,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 	gpu->drm = drm;
 
 	INIT_LIST_HEAD(&gpu->active_list);
+	INIT_LIST_HEAD(&gpu->active_cmd_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
 	INIT_WORK(&gpu->recover_work, recover_worker);
 	init_waitqueue_head(&gpu->fence_event);

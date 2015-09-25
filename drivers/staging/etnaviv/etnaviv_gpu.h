@@ -103,6 +103,9 @@ struct etnaviv_gpu {
 	/* list of GEM active objects: */
 	struct list_head active_list;
 
+	/* list of currently in-flight command buffers */
+	struct list_head active_cmd_list;
+
 	u32 idle_mask;
 
 	/* Fencing support */
@@ -131,6 +134,20 @@ struct etnaviv_gpu {
 	u32 hangcheck_fence;
 	u32 hangcheck_dma_addr;
 	struct work_struct recover_work;
+};
+
+struct etnaviv_cmdbuf {
+	/* device this cmdbuf is allocated for */
+	struct etnaviv_gpu *gpu;
+	/* cmdbuf properties */
+	void *vaddr;
+	dma_addr_t paddr;
+	u32 size;
+	u32 user_size;
+	/* fence after which this buffer is to be disposed */
+	u32 fence;
+	/* per GPU in-flight list */
+	struct list_head gpu_active_list;
 };
 
 static inline void gpu_write(struct etnaviv_gpu *gpu, u32 reg, u32 data)
@@ -168,6 +185,9 @@ int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout);
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx);
+struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu,
+					      u32 size);
+void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf);
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu);
 void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu);
 

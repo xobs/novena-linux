@@ -111,6 +111,11 @@ static u32 gpu_va(struct etnaviv_gpu *gpu, struct etnaviv_gem_object *obj)
 	return obj->paddr - gpu->memory_base;
 }
 
+static u32 gpu_va_raw(struct etnaviv_gpu *gpu, u32 paddr)
+{
+	return paddr - gpu->memory_base;
+}
+
 static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *obj, u32 off, u32 len)
 {
@@ -153,10 +158,9 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit)
 {
 	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
-	struct etnaviv_gem_object *cmd;
 	u32 *lw = buffer->vaddr + ((buffer->offset - 4) * 4);
+	u32 *usercmd = submit->cmdbuf->vaddr;
 	u32 back, link_target, link_size, reserve_size, extra_size = 0;
-	u32 i;
 
 	if (drm_debug & DRM_UT_DRIVER)
 		etnaviv_buffer_dump(gpu, buffer, 0, 0x50);
@@ -194,35 +198,24 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	/* Skip over any extra instructions */
 	link_target += extra_size * sizeof(u32);
 
-	/* update offset for every cmd stream */
-	for (i = submit->nr_cmds; i--; ) {
-		cmd = submit->cmd[i].obj;
+	if (drm_debug & DRM_UT_DRIVER)
+		pr_info("stream link to 0x%08x @ 0x%08x %p\n",
+			link_target, gpu_va_raw(gpu, submit->cmdbuf->paddr),
+			submit->cmdbuf->vaddr);
 
-		cmd->offset = submit->cmd[i].offset + submit->cmd[i].size;
+	/* jump back from cmd to main buffer */
+	usercmd[submit->cmdbuf->user_size/4] = VIV_FE_LINK_HEADER_OP_LINK |
+				    VIV_FE_LINK_HEADER_PREFETCH(link_size);
+	usercmd[submit->cmdbuf->user_size/4 + 1] = link_target;
 
-		if (drm_debug & DRM_UT_DRIVER)
-			pr_info("stream link from buffer %u to 0x%08x @ 0x%08x %p\n",
-				i, link_target,
-				gpu_va(gpu, cmd) + cmd->offset * 4,
-				cmd->vaddr + cmd->offset * 4);
+	link_target = gpu_va_raw(gpu, submit->cmdbuf->paddr);
+	link_size = submit->cmdbuf->size / 8;
 
-		/* jump back from last cmd to main buffer */
-		CMD_LINK(cmd, link_size, link_target);
 
-		/* update the size */
-		submit->cmd[i].size = cmd->offset - submit->cmd[i].offset;
-
-		link_target = gpu_va(gpu, cmd) + submit->cmd[i].offset * 4;
-		link_size = submit->cmd[i].size * 2;
-	}
 
 	if (drm_debug & DRM_UT_DRIVER) {
-		for (i = 0; i < submit->nr_cmds; i++) {
-			struct etnaviv_gem_object *obj = submit->cmd[i].obj;
-
-			etnaviv_buffer_dump(gpu, obj, submit->cmd[i].offset,
-					submit->cmd[i].size);
-		}
+		print_hex_dump(KERN_INFO, "cmd ", DUMP_PREFIX_OFFSET, 16, 4,
+			       submit->cmdbuf->vaddr, submit->cmdbuf->size, 0);
 
 		pr_info("link op: %p\n", lw);
 		pr_info("link addr: %p\n", lw + 1);
@@ -259,6 +252,11 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		link_target = new_target;
 		link_size = extra_size;
 	}
+
+	/* take ownership of cmdbuffer*/
+	submit->cmdbuf->fence = submit->fence;
+	list_add_tail(&submit->cmdbuf->gpu_active_list, &gpu->active_cmd_list);
+	submit->cmdbuf = NULL;
 
 	/* trigger event */
 	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |
