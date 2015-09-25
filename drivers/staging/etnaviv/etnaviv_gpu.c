@@ -718,12 +718,40 @@ static void recover_worker(struct work_struct *work)
 	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
 					       recover_work);
 	struct drm_device *dev = gpu->drm;
+	unsigned long flags;
+	unsigned int i;
 
 	dev_err(gpu->dev, "hangcheck recover!\n");
 
+	if (pm_runtime_get_sync(gpu->dev) < 0)
+		return;
+
 	mutex_lock(&dev->struct_mutex);
-	/* TODO gpu->funcs->recover(gpu); */
+
+	etnaviv_hw_reset(gpu);
+
+	/* complete all events, the GPU won't do it after the reset */
+	spin_lock_irqsave(&gpu->event_spinlock, flags);
+	for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
+		if (!gpu->event[i].used)
+			continue;
+		gpu->event[i].used = false;
+		complete(&gpu->event_free);
+		/*
+		 * Decrement the PM count for each stuck event. This is safe
+		 * even in atomic context as we use ASYNC RPM here.
+		 */
+		pm_runtime_put_autosuspend(gpu->dev);
+	}
+	spin_unlock_irqrestore(&gpu->event_spinlock, flags);
+	gpu->completed_fence = gpu->submitted_fence;
+
+	etnaviv_gpu_hw_init(gpu);
+	gpu->switch_context = true;
+
 	mutex_unlock(&dev->struct_mutex);
+	pm_runtime_mark_last_busy(gpu->dev);
+	pm_runtime_put_autosuspend(gpu->dev);
 
 	/* Retire the buffer objects in a work */
 	etnaviv_queue_work(gpu->drm, &gpu->retire_work);
