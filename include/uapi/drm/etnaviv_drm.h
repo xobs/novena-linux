@@ -123,15 +123,7 @@ struct drm_etnaviv_gem_submit_reloc {
 	__u64 reloc_offset;   /* in, offset from start of reloc_bo */
 };
 
-/* submit-types:
- *   BUF - this cmd buffer is executed normally.
- *   CTX_RESTORE_BUF - only executed if there has been a GPU context
- *      switch since the last SUBMIT ioctl
- */
-#define ETNA_SUBMIT_CMD_BUF             0x0001
-#define ETNA_SUBMIT_CMD_CTX_RESTORE_BUF 0x0002
 struct drm_etnaviv_gem_submit_cmd {
-	__u32 type;           /* in, one of ETNA_SUBMIT_CMD_x */
 	__u32 submit_idx;     /* in, index of submit_bo cmdstream buffer */
 	__u32 submit_offset;  /* in, offset into submit_bo */
 	__u32 size;           /* in, cmdstream size */
