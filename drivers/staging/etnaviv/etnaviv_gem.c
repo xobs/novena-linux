@@ -31,19 +31,8 @@ static void etnaviv_gem_scatter_map(struct etnaviv_gem_object *etnaviv_obj)
 	 * For non-cached buffers, ensure the new pages are clean
 	 * because display controller, GPU, etc. are not coherent.
 	 */
-	if (etnaviv_obj->flags & ETNA_BO_CACHE_MASK) {
+	if (etnaviv_obj->flags & ETNA_BO_CACHE_MASK)
 		dma_map_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
-	} else {
-		struct scatterlist *sg;
-		unsigned int i;
-
-		for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-			sg_dma_address(sg) = sg_phys(sg);
-#ifdef CONFIG_NEED_SG_DMA_LENGTH
-			sg_dma_len(sg) = sg->length;
-#endif
-		}
-	}
 }
 
 static void etnaviv_gem_scatterlist_unmap(struct etnaviv_gem_object *etnaviv_obj)
@@ -66,9 +55,8 @@ static void etnaviv_gem_scatterlist_unmap(struct etnaviv_gem_object *etnaviv_obj
 	 * written into the remainder of the region, this can
 	 * discard those writes.
 	 */
-	if (etnaviv_obj->flags & ETNA_BO_CACHE_MASK) {
+	if (etnaviv_obj->flags & ETNA_BO_CACHE_MASK)
 		dma_unmap_sg(dev->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
-	}
 }
 
 /* called with dev->struct_mutex held */
@@ -138,27 +126,6 @@ void etnaviv_gem_put_pages(struct etnaviv_gem_object *etnaviv_obj)
 	/* when we start tracking the pin count, then do something here */
 }
 
-static int etnaviv_gem_mmap_cmd(struct drm_gem_object *obj,
-	struct vm_area_struct *vma)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	int ret;
-
-	/*
-	 * Clear the VM_PFNMAP flag that was set by drm_gem_mmap(), and set the
-	 * vm_pgoff (used as a fake buffer offset by DRM) to 0 as we want to map
-	 * the whole buffer.
-	 */
-	vma->vm_flags &= ~VM_PFNMAP;
-	vma->vm_pgoff = 0;
-
-	ret = dma_mmap_coherent(obj->dev->dev, vma,
-				etnaviv_obj->vaddr, etnaviv_obj->paddr,
-				vma->vm_end - vma->vm_start);
-
-	return ret;
-}
-
 static int etnaviv_gem_mmap_obj(struct drm_gem_object *obj,
 		struct vm_area_struct *vma)
 {
@@ -203,12 +170,7 @@ int etnaviv_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 
 	obj = to_etnaviv_bo(vma->vm_private_data);
-	if (obj->flags & ETNA_BO_CMDSTREAM)
-		ret = etnaviv_gem_mmap_cmd(vma->vm_private_data, vma);
-	else
-		ret = etnaviv_gem_mmap_obj(vma->vm_private_data, vma);
-
-	return ret;
+	return etnaviv_gem_mmap_obj(vma->vm_private_data, vma);
 }
 
 int etnaviv_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
@@ -295,11 +257,6 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct etnaviv_vram_mapping *mapping;
 	int ret = 0;
-
-	if (etnaviv_obj->flags & ETNA_BO_CMDSTREAM) {
-		*iova = etnaviv_obj->paddr;
-		return 0;
-	}
 
 	mapping = etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
 	if (!mapping) {
@@ -535,16 +492,6 @@ void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m)
 }
 #endif
 
-static void etnaviv_gem_cmd_release(struct etnaviv_gem_object *etnaviv_obj)
-{
-	dma_free_coherent(etnaviv_obj->base.dev->dev, etnaviv_obj->base.size,
-		etnaviv_obj->vaddr, etnaviv_obj->paddr);
-}
-
-static const struct etnaviv_gem_ops etnaviv_gem_cmd_ops = {
-	.release = etnaviv_gem_cmd_release,
-};
-
 static void etnaviv_gem_shmem_release(struct etnaviv_gem_object *etnaviv_obj)
 {
 	if (etnaviv_obj->vaddr)
@@ -607,40 +554,24 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 	bool valid = true;
 
 	/* validate flags */
-	if (flags & ETNA_BO_CMDSTREAM) {
-		if ((flags & ETNA_BO_CACHE_MASK) != 0)
-			valid = false;
-	} else {
-		switch (flags & ETNA_BO_CACHE_MASK) {
-		case ETNA_BO_UNCACHED:
-		case ETNA_BO_CACHED:
-		case ETNA_BO_WC:
-			break;
-		default:
-			valid = false;
-		}
+	switch (flags & ETNA_BO_CACHE_MASK) {
+	case ETNA_BO_UNCACHED:
+	case ETNA_BO_CACHED:
+	case ETNA_BO_WC:
+		break;
+	default:
+		valid = false;
 	}
 
 	if (!valid) {
-		dev_err(dev->dev, "invalid cache flag: %x (cmd: %d)\n",
-				(flags & ETNA_BO_CACHE_MASK),
-				(flags & ETNA_BO_CMDSTREAM));
+		dev_err(dev->dev, "invalid cache flag: %x\n",
+			(flags & ETNA_BO_CACHE_MASK));
 		return -EINVAL;
 	}
 
 	etnaviv_obj = kzalloc(sz, GFP_KERNEL);
 	if (!etnaviv_obj)
 		return -ENOMEM;
-
-	if (flags & ETNA_BO_CMDSTREAM) {
-		etnaviv_obj->vaddr = dma_alloc_coherent(dev->dev, size,
-				&etnaviv_obj->paddr, GFP_KERNEL);
-
-		if (!etnaviv_obj->vaddr) {
-			kfree(etnaviv_obj);
-			return -ENOMEM;
-		}
-	}
 
 	etnaviv_obj->flags = flags;
 
@@ -668,26 +599,20 @@ static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-	ret = 0;
-	if (flags & ETNA_BO_CMDSTREAM) {
-		to_etnaviv_bo(obj)->ops = &etnaviv_gem_cmd_ops;
-		drm_gem_private_object_init(dev, obj, size);
-	} else {
-		to_etnaviv_bo(obj)->ops = &etnaviv_gem_shmem_ops;
-		ret = drm_gem_object_init(dev, obj, size);
-		if (ret == 0) {
-			struct address_space *mapping;
+	to_etnaviv_bo(obj)->ops = &etnaviv_gem_shmem_ops;
+	ret = drm_gem_object_init(dev, obj, size);
+	if (ret == 0) {
+		struct address_space *mapping;
 
-			/*
-			 * Our buffers are kept pinned, so allocating them
-			 * from the MOVABLE zone is a really bad idea, and
-			 * conflicts with CMA.  See coments above new_inode()
-			 * why this is required _and_ expected if you're
-			 * going to pin these pages.
-			 */
-			mapping = file_inode(obj->filp)->i_mapping;
-			mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
-		}
+		/*
+		 * Our buffers are kept pinned, so allocating them
+		 * from the MOVABLE zone is a really bad idea, and
+		 * conflicts with CMA.  See coments above new_inode()
+		 * why this is required _and_ expected if you're
+		 * going to pin these pages.
+		 */
+		mapping = file_inode(obj->filp)->i_mapping;
+		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 	}
 
 	if (ret)
