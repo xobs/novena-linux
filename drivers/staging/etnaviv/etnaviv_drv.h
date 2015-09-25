@@ -103,7 +103,7 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 		u32 size, u32 flags);
 int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 	uintptr_t ptr, u32 size, u32 flags, u32 *handle);
-u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
+u16 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);

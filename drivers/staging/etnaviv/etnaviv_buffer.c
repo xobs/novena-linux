@@ -124,7 +124,7 @@ static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu,
 			ptr, len * 4, 0);
 }
 
-u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
+u16 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 {
 	struct etnaviv_gem_object *buffer = to_etnaviv_bo(gpu->buffer);
 
@@ -135,7 +135,7 @@ u32 etnaviv_buffer_init(struct etnaviv_gpu *gpu)
 	CMD_WAIT(buffer);
 	CMD_LINK(buffer, 2, gpu_va(gpu, buffer) + ((buffer->offset - 1) * 4));
 
-	return buffer->offset;
+	return buffer->offset / 2;
 }
 
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu)
