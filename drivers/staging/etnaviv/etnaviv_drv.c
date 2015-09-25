@@ -21,6 +21,7 @@
 #include "etnaviv_gpu.h"
 #include "etnaviv_gem.h"
 #include "etnaviv_mmu.h"
+#include "etnaviv_gem.h"
 
 #ifdef CONFIG_DRM_ETNAVIV_REGISTER_LOGGING
 static bool reglog;
@@ -234,6 +235,43 @@ static int etnaviv_mmu_show(struct drm_device *dev, struct seq_file *m)
 	return 0;
 }
 
+static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu, struct seq_file *m)
+{
+	struct etnaviv_gem_object *obj = to_etnaviv_bo(gpu->buffer);
+	u32 size = obj->base.size;
+	u32 *ptr = obj->vaddr;
+	u32 i;
+
+	seq_printf(m, "virt %p - phys 0x%llx - free 0x%08x\n",
+			obj->vaddr, (u64)obj->paddr, size - (obj->offset * 4));
+
+	for (i = 0; i < size / 4; i++) {
+		if (i && !(i % 4))
+			seq_puts(m, "\n");
+		if (i % 4 == 0)
+			seq_printf(m, "\t0x%p: ", ptr + i);
+		seq_printf(m, "%08x ", *(ptr + i));
+	}
+	seq_puts(m, "\n");
+}
+
+static int etnaviv_ring_show(struct drm_device *dev, struct seq_file *m)
+{
+	struct etnaviv_drm_private *priv = dev->dev_private;
+	struct etnaviv_gpu *gpu;
+	unsigned int i;
+
+	for (i = 0; i < ETNA_MAX_PIPES; i++) {
+		gpu = priv->gpu[i];
+		if (gpu) {
+			seq_printf(m, "Ring Buffer (%s): ",
+				   dev_name(gpu->dev));
+			etnaviv_buffer_dump(gpu, m);
+		}
+	}
+	return 0;
+}
+
 static int show_locked(struct seq_file *m, void *arg)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
@@ -282,6 +320,7 @@ static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gem", show_locked, 0, etnaviv_gem_show},
 		{ "mm", show_locked, 0, etnaviv_mm_show },
 		{"mmu", show_locked, 0, etnaviv_mmu_show},
+		{"ring", show_locked, 0, etnaviv_ring_show},
 };
 
 static int etnaviv_debugfs_init(struct drm_minor *minor)
