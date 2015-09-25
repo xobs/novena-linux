@@ -99,6 +99,8 @@ int etnaviv_gem_cpu_fini(struct drm_gem_object *obj);
 void etnaviv_gem_free_object(struct drm_gem_object *obj);
 int etnaviv_gem_new_handle(struct drm_device *dev, struct drm_file *file,
 		u32 size, u32 flags, u32 *handle);
+struct drm_gem_object *etnaviv_gem_new_locked(struct drm_device *dev,
+		u32 size, u32 flags);
 struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 		u32 size, u32 flags);
 int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
@@ -108,7 +110,7 @@ void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
-	struct etnaviv_gem_object *obj, unsigned int offset, unsigned int size);
+	void *stream, unsigned int size);
 
 #ifdef CONFIG_DEBUG_FS
 void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m);

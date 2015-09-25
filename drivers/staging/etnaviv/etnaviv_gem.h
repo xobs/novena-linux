@@ -115,13 +115,8 @@ struct etnaviv_gem_submit {
 	struct list_head bo_list;
 	struct ww_acquire_ctx ticket;
 	u32 fence;
-	unsigned int nr_cmds;
 	unsigned int nr_bos;
-	struct {
-		u32 offset; /* in dwords */
-		u32 size;  /* in dwords */
-		struct etnaviv_gem_object *obj;
-	} cmd[MAX_CMDS];
+	struct etnaviv_cmdbuf *cmdbuf;
 	struct {
 		u32 flags;
 		struct etnaviv_gem_object *obj;

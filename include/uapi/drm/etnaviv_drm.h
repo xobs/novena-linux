@@ -123,15 +123,6 @@ struct drm_etnaviv_gem_submit_reloc {
 	__u64 reloc_offset;   /* in, offset from start of reloc_bo */
 };
 
-struct drm_etnaviv_gem_submit_cmd {
-	__u32 submit_idx;     /* in, index of submit_bo cmdstream buffer */
-	__u32 submit_offset;  /* in, offset into submit_bo */
-	__u32 size;           /* in, cmdstream size */
-	__u32 pad;
-	__u32 nr_relocs;      /* in, number of submit_reloc's */
-	__u64 relocs;         /* in, ptr to array of submit_reloc's */
-};
-
 /* Each buffer referenced elsewhere in the cmdstream submit (ie. the
  * cmdstream buffer(s) themselves or reloc entries) has one (and only
  * one) entry in the submit->bos[] table.
@@ -159,14 +150,15 @@ struct drm_etnaviv_gem_submit_bo {
 #define ETNA_PIPE_2D      0x01
 #define ETNA_PIPE_VG      0x02
 struct drm_etnaviv_gem_submit {
+	__u32 fence;          /* out */
 	__u32 pipe;           /* in */
 	__u32 exec_state;     /* in, initial execution state (ETNA_PIPE_x) */
-	__u32 fence;          /* out */
 	__u32 nr_bos;         /* in, number of submit_bo's */
-	__u32 nr_cmds;        /* in, number of submit_cmd's */
-	__u32 pad;
+	__u32 nr_relocs;      /* in, number of submit_reloc's */
+	__u32 stream_size;    /* in, cmdstream size */
 	__u64 bos;            /* in, ptr to array of submit_bo's */
-	__u64 cmds;           /* in, ptr to array of submit_cmd's */
+	__u64 relocs;         /* in, ptr to array of submit_reloc's */
+	__u64 stream;         /* in, ptr to cmdstream */
 };
 
 /* The normal way to synchronize with the GPU is just to CPU_PREP on

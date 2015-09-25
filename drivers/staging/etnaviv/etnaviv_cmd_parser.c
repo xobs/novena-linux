@@ -61,10 +61,10 @@ static uint8_t cmd_length[32] = {
 	[FE_OPCODE_STALL] = 2,
 };
 
-bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
-	struct etnaviv_gem_object *obj, unsigned int offset, unsigned int size)
+bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, void *stream,
+			      unsigned int size)
 {
-	u32 *start = obj->vaddr + offset * 4;
+	u32 *start = stream;
 	u32 *buf = start;
 	u32 *end = buf + size;
 
