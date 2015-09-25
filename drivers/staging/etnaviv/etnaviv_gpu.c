@@ -379,7 +379,7 @@ static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
 
 static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 {
-	u32 words; /* 32 bit words */
+	u16 prefetch;
 
 	if (gpu->identity.model == chipModel_GC320 &&
 	    gpu_read(gpu, VIVS_HI_CHIP_TIME) != 0x2062400 &&
@@ -426,17 +426,14 @@ static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
 	etnaviv_iommu_domain_restore(gpu, gpu->mmu->domain);
 
 	/* Start command processor */
-	words = etnaviv_buffer_init(gpu);
-
-	/* convert number of 32 bit words to number of 64 bit words */
-	words = ALIGN(words, 2) / 2;
+	prefetch = etnaviv_buffer_init(gpu);
 
 	gpu_write(gpu, VIVS_HI_INTR_ENBL, ~0U);
 	gpu_write(gpu, VIVS_FE_COMMAND_ADDRESS,
 		  etnaviv_gem_paddr_locked(gpu->buffer) - gpu->memory_base);
 	gpu_write(gpu, VIVS_FE_COMMAND_CONTROL,
 		  VIVS_FE_COMMAND_CONTROL_ENABLE |
-		  VIVS_FE_COMMAND_CONTROL_PREFETCH(words));
+		  VIVS_FE_COMMAND_CONTROL_PREFETCH(prefetch));
 }
 
 int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
