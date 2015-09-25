@@ -82,6 +82,9 @@ struct etnaviv_gem_object {
 	bool is_ring_buffer;
 	u32 offset;
 
+	/* cache maintenance */
+	uint32_t last_cpu_prep_op;
+
 	struct etnaviv_gem_userptr userptr;
 };
 

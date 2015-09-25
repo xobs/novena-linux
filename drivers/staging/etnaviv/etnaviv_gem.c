@@ -424,10 +424,21 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
 }
 
+static inline enum dma_data_direction etnaviv_op_to_dma_dir(u32 op)
+{
+	if (op & ETNA_PREP_READ)
+		return DMA_FROM_DEVICE;
+	else if (op & ETNA_PREP_WRITE)
+		return DMA_TO_DEVICE;
+	else
+		return DMA_BIDIRECTIONAL;
+}
+
 int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 		struct timespec *timeout)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+	struct drm_device *dev = obj->dev;
 	int ret = 0;
 
 	if (is_active(etnaviv_obj)) {
@@ -444,14 +455,40 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 		ret = etnaviv_gpu_wait_fence_interruptible(gpu, fence, timeout);
 	}
 
-	/* TODO cache maintenance */
+	if (etnaviv_obj->flags & ETNA_BO_CACHED) {
+		if (!etnaviv_obj->sgt) {
+			void * ret;
+
+			mutex_lock(&dev->struct_mutex);
+			ret = etnaviv_gem_get_pages(etnaviv_obj);
+			mutex_unlock(&dev->struct_mutex);
+			if (IS_ERR(ret))
+				return PTR_ERR(ret);
+		}
+
+		dma_sync_sg_for_cpu(dev->dev, etnaviv_obj->sgt->sgl,
+				    etnaviv_obj->sgt->nents,
+				    etnaviv_op_to_dma_dir(op));
+		etnaviv_obj->last_cpu_prep_op = op;
+	}
 
 	return ret;
 }
 
 int etnaviv_gem_cpu_fini(struct drm_gem_object *obj)
 {
-	/* TODO cache maintenance */
+	struct drm_device *dev = obj->dev;
+	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+
+	if (etnaviv_obj->flags & ETNA_BO_CACHED) {
+		/* fini without a prep is almost certainly a userspace error */
+		WARN_ON(etnaviv_obj->last_cpu_prep_op == 0);
+		dma_sync_sg_for_device(dev->dev, etnaviv_obj->sgt->sgl,
+			etnaviv_obj->sgt->nents,
+			etnaviv_op_to_dma_dir(etnaviv_obj->last_cpu_prep_op));
+		etnaviv_obj->last_cpu_prep_op = 0;
+	}
+
 	return 0;
 }
 
