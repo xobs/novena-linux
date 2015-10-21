@@ -309,6 +309,13 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
+	if (args->exec_state != ETNA_PIPE_3D &&
+	    args->exec_state != ETNA_PIPE_2D &&
+	    args->exec_state != ETNA_PIPE_VG) {
+		DRM_ERROR("invalid exec_state: 0x%x\n", args->exec_state);
+		return -EINVAL;
+	}
+
 	/*
 	 * Copy the command submission and bo array to kernel space in
 	 * one go, and do this outside of the dev->struct_mutex lock.
