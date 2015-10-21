@@ -583,7 +583,7 @@ static struct drm_driver etnaviv_drm_driver = {
 	.fops               = &fops,
 	.name               = "etnaviv",
 	.desc               = "etnaviv DRM",
-	.date               = "20150302",
+	.date               = "20150925",
 	.major              = 1,
 	.minor              = 0,
 };
