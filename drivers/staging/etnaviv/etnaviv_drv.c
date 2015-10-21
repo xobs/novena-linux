@@ -393,6 +393,9 @@ static int etnaviv_ioctl_gem_cpu_prep(struct drm_device *dev, void *data,
 	struct drm_gem_object *obj;
 	int ret;
 
+	if (args->op & ~(ETNA_PREP_READ | ETNA_PREP_WRITE | ETNA_PREP_NOSYNC))
+		return -EINVAL;
+
 	obj = drm_gem_object_lookup(dev, file, args->handle);
 	if (!obj)
 		return -ENOENT;
