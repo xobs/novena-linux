@@ -373,6 +373,10 @@ static int etnaviv_ioctl_gem_new(struct drm_device *dev, void *data,
 {
 	struct drm_etnaviv_gem_new *args = data;
 
+	if (args->flags & ~(ETNA_BO_CACHED | ETNA_BO_WC | ETNA_BO_UNCACHED |
+			    ETNA_BO_FORCE_MMU))
+		return -EINVAL;
+
 	return etnaviv_gem_new_handle(dev, file, args->size,
 			args->flags, &args->handle);
 }
