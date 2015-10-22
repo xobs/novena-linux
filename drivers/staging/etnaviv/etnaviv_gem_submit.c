@@ -213,23 +213,17 @@ static int submit_bo(struct etnaviv_gem_submit *submit, u32 idx,
 
 /* process the reloc's and patch up the cmdstream as needed: */
 static int submit_reloc(struct etnaviv_gem_submit *submit, void *stream,
-		u32 size, u32 nr_relocs, u64 relocs)
+		u32 size, struct drm_etnaviv_gem_submit_reloc *relocs,
+		u32 nr_relocs)
 {
 	u32 i, last_offset = 0;
 	u32 *ptr = stream;
 	int ret;
 
 	for (i = 0; i < nr_relocs; i++) {
-		struct drm_etnaviv_gem_submit_reloc submit_reloc;
+		struct drm_etnaviv_gem_submit_reloc submit_reloc = relocs[i];
 		struct etnaviv_gem_object *bobj;
-		void __user *userptr =
-			to_user_ptr(relocs + (i * sizeof(submit_reloc)));
 		u32 iova, off;
-
-		ret = copy_from_user(&submit_reloc, userptr,
-				     sizeof(submit_reloc));
-		if (ret)
-			return -EFAULT;
 
 		if (submit_reloc.submit_offset % 4) {
 			DRM_ERROR("non-aligned reloc offset: %u\n",
@@ -289,6 +283,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct drm_etnaviv_gem_submit *args = data;
 	struct etnaviv_file_private *ctx = file->driver_priv;
+	struct drm_etnaviv_gem_submit_reloc *relocs;
 	struct drm_etnaviv_gem_submit_bo *bos;
 	struct etnaviv_gem_submit *submit;
 	struct etnaviv_cmdbuf *cmdbuf;
@@ -321,15 +316,23 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	 * one go, and do this outside of the dev->struct_mutex lock.
 	 */
 	bos = drm_malloc_ab(args->nr_bos, sizeof(*bos));
+	relocs = drm_malloc_ab(args->nr_relocs, sizeof(*relocs));
 	stream = drm_malloc_ab(1, args->stream_size);
 	cmdbuf = etnaviv_gpu_cmdbuf_new(gpu, ALIGN(args->stream_size, 8) + 8);
-	if (!bos || !stream || !cmdbuf) {
+	if (!bos || !relocs || !stream || !cmdbuf) {
 		ret = -ENOMEM;
 		goto err_submit_cmds;
 	}
 
 	ret = copy_from_user(bos, to_user_ptr(args->bos),
 			     args->nr_bos * sizeof(*bos));
+	if (ret) {
+		ret = -EFAULT;
+		goto err_submit_cmds;
+	}
+
+	ret = copy_from_user(relocs, to_user_ptr(args->relocs),
+			     args->nr_relocs * sizeof(*relocs));
 	if (ret) {
 		ret = -EFAULT;
 		goto err_submit_cmds;
@@ -386,7 +389,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	}
 
 	ret = submit_reloc(submit, stream, args->stream_size / 4,
-			   args->nr_relocs, args->relocs);
+			   relocs, args->nr_relocs);
 	if (ret)
 		goto out;
 
@@ -423,6 +426,8 @@ err_submit_cmds:
 		drm_free_large(stream);
 	if (bos)
 		drm_free_large(bos);
+	if (relocs)
+		drm_free_large(relocs);
 
 	return ret;
 }
