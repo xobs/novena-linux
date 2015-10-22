@@ -213,7 +213,7 @@ static int submit_bo(struct etnaviv_gem_submit *submit, u32 idx,
 
 /* process the reloc's and patch up the cmdstream as needed: */
 static int submit_reloc(struct etnaviv_gem_submit *submit, void *stream,
-		u32 size, struct drm_etnaviv_gem_submit_reloc *relocs,
+		u32 size, const struct drm_etnaviv_gem_submit_reloc *relocs,
 		u32 nr_relocs)
 {
 	u32 i, last_offset = 0;
@@ -221,18 +221,18 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, void *stream,
 	int ret;
 
 	for (i = 0; i < nr_relocs; i++) {
-		struct drm_etnaviv_gem_submit_reloc submit_reloc = relocs[i];
+		const struct drm_etnaviv_gem_submit_reloc *r = relocs + i;
 		struct etnaviv_gem_object *bobj;
 		u32 iova, off;
 
-		if (submit_reloc.submit_offset % 4) {
+		if (r->submit_offset % 4) {
 			DRM_ERROR("non-aligned reloc offset: %u\n",
-					submit_reloc.submit_offset);
+				  r->submit_offset);
 			return -EINVAL;
 		}
 
 		/* offset in dwords: */
-		off = submit_reloc.submit_offset / 4;
+		off = r->submit_offset / 4;
 
 		if ((off >= size ) ||
 				(off < last_offset)) {
@@ -240,17 +240,17 @@ static int submit_reloc(struct etnaviv_gem_submit *submit, void *stream,
 			return -EINVAL;
 		}
 
-		ret = submit_bo(submit, submit_reloc.reloc_idx, &bobj, &iova);
+		ret = submit_bo(submit, r->reloc_idx, &bobj, &iova);
 		if (ret)
 			return ret;
 
-		if (submit_reloc.reloc_offset >=
+		if (r->reloc_offset >=
 		    bobj->base.size - sizeof(*ptr)) {
 			DRM_ERROR("relocation %u outside object", i);
 			return -EINVAL;
 		}
 
-		ptr[off] = iova + submit_reloc.reloc_offset;
+		ptr[off] = iova + r->reloc_offset;
 
 		last_offset = off;
 	}
