@@ -32,11 +32,23 @@ static inline void __user *to_user_ptr(u64 address)
 	return (void __user *)(uintptr_t)address;
 }
 
+/*
+ * Return the storage size of a structure with a variable length array.
+ * The array is nelem elements of elem_size, where the base structure
+ * is defined by base.  If the size overflows size_t, return zero.
+ */
+static size_t size_vstruct(size_t nelem, size_t elem_size, size_t base)
+{
+	if (elem_size && nelem > (SIZE_MAX - base) / elem_size)
+		return 0;
+	return base + nelem * elem_size;
+}
+
 static struct etnaviv_gem_submit *submit_create(struct drm_device *dev,
-		struct etnaviv_gpu *gpu, int nr)
+		struct etnaviv_gpu *gpu, size_t nr)
 {
 	struct etnaviv_gem_submit *submit;
-	int sz = sizeof(*submit) + (nr * sizeof(submit->bos[0]));
+	size_t sz = size_vstruct(nr, sizeof(submit->bos[0]), sizeof(*submit));
 
 	submit = kmalloc(sz, GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
 	if (submit) {
