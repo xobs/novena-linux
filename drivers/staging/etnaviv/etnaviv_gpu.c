@@ -916,8 +916,8 @@ static void retire_worker(struct work_struct *work)
 	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list,
 				 gpu_active_list) {
 		if (fence_after_eq(fence, cmdbuf->fence)) {
-			etnaviv_gpu_cmdbuf_free(cmdbuf);
 			list_del(&cmdbuf->gpu_active_list);
+			etnaviv_gpu_cmdbuf_free(cmdbuf);
 		}
 	}
 
