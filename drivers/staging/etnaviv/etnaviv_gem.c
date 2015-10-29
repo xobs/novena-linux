@@ -338,15 +338,6 @@ void *etnaviv_gem_vaddr(struct drm_gem_object *obj)
 	return ret;
 }
 
-dma_addr_t etnaviv_gem_paddr_locked(struct drm_gem_object *obj)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-
-	WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
-
-	return etnaviv_obj->paddr;
-}
-
 void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
 	struct etnaviv_gpu *gpu, u32 access, u32 fence)
 {

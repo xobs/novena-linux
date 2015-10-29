@@ -69,18 +69,11 @@ struct etnaviv_gem_object {
 	struct sg_table *sgt;
 	void *vaddr;
 
-	/* for ETNA_BO_CMDSTREAM */
-	dma_addr_t paddr;
-
 	/* normally (resv == &_resv) except for imported bo's */
 	struct reservation_object *resv;
 	struct reservation_object _resv;
 
 	struct list_head vram_list;
-
-	/* for buffer manipulation during submit */
-	bool is_ring_buffer;
-	u32 offset;
 
 	/* cache maintenance */
 	u32 last_cpu_prep_op;

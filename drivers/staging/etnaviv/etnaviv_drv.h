@@ -89,7 +89,6 @@ int etnaviv_gem_prime_pin(struct drm_gem_object *obj);
 void etnaviv_gem_prime_unpin(struct drm_gem_object *obj);
 void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj);
 void *etnaviv_gem_vaddr(struct drm_gem_object *obj);
-dma_addr_t etnaviv_gem_paddr_locked(struct drm_gem_object *obj);
 void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
 		struct etnaviv_gpu *gpu, u32 access, u32 fence);
 void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj);
