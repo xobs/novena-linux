@@ -154,13 +154,61 @@ static void etnaviv_hw_specs(struct etnaviv_gpu *gpu)
 		gpu->identity.num_constants =
 			(specs[1] & VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__MASK)
 				>> VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__SHIFT;
+	}
 
+	/* Fill in the stream count if not specified */
+	if (gpu->identity.stream_count == 0) {
+		if (gpu->identity.model >= 0x1000)
+			gpu->identity.stream_count = 4;
+		else
+			gpu->identity.stream_count = 1;
+	}
+
+	/* Convert the register max value */
+	if (gpu->identity.register_max)
 		gpu->identity.register_max = 1 << gpu->identity.register_max;
+	else if (gpu->identity.model == 0x0400)
+		gpu->identity.register_max = 32;
+	else
+		gpu->identity.register_max = 64;
+
+	/* Convert thread count */
+	if (gpu->identity.thread_count)
 		gpu->identity.thread_count = 1 << gpu->identity.thread_count;
+	else if (gpu->identity.model == 0x0400)
+		gpu->identity.thread_count = 64;
+	else if (gpu->identity.model == 0x0500 ||
+		 gpu->identity.model == 0x0530)
+		gpu->identity.thread_count = 128;
+	else
+		gpu->identity.thread_count = 256;
+
+	if (gpu->identity.vertex_cache_size == 0)
+		gpu->identity.vertex_cache_size = 8;
+
+	if (gpu->identity.shader_core_count == 0) {
+		if (gpu->identity.model >= 0x1000)
+			gpu->identity.shader_core_count = 2;
+		else
+			gpu->identity.shader_core_count = 1;
+	}
+
+	if (gpu->identity.pixel_pipes == 0)
+		gpu->identity.pixel_pipes = 1;
+
+	/* Convert virtex buffer size */
+	if (gpu->identity.vertex_output_buffer_size) {
 		gpu->identity.vertex_output_buffer_size =
 			1 << gpu->identity.vertex_output_buffer_size;
+	} else if (gpu->identity.model == 0x0400) {
+		if (gpu->identity.revision < 0x4000)
+			gpu->identity.vertex_output_buffer_size = 512;
+		else if (gpu->identity.revision < 0x4200)
+			gpu->identity.vertex_output_buffer_size = 256;
+		else
+			gpu->identity.vertex_output_buffer_size = 128;
 	} else {
-		dev_err(gpu->dev, "TODO: determine GPU specs based on model\n");
+		gpu->identity.vertex_output_buffer_size = 512;
 	}
 
 	switch (gpu->identity.instruction_count) {
@@ -185,6 +233,9 @@ static void etnaviv_hw_specs(struct etnaviv_gpu *gpu)
 		gpu->identity.instruction_count = 256;
 		break;
 	}
+
+	if (gpu->identity.num_constants == 0)
+		gpu->identity.num_constants = 168;
 }
 
 static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
