@@ -617,10 +617,6 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 	if (ret < 0)
 		return ret;
 
-	ret = mutex_lock_interruptible(&gpu->drm->struct_mutex);
-	if (ret < 0)
-		goto err_rpm;
-
 	dma_lo = gpu_read(gpu, VIVS_FE_DMA_LOW);
 	dma_hi = gpu_read(gpu, VIVS_FE_DMA_HIGH);
 	axi = gpu_read(gpu, VIVS_HI_AXI_STATUS);
@@ -721,9 +717,6 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 
 	ret = 0;
 
-	mutex_unlock(&gpu->drm->struct_mutex);
-
-err_rpm:
 	pm_runtime_mark_last_busy(gpu->dev);
 	pm_runtime_put_autosuspend(gpu->dev);
 
