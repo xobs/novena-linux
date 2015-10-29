@@ -16,6 +16,7 @@
 
 #include "etnaviv_drv.h"
 #include "etnaviv_gem.h"
+#include "etnaviv_gpu.h"
 #include "etnaviv_mmu.h"
 
 static int etnaviv_fault_handler(struct iommu_domain *iommu, struct device *dev,
@@ -259,7 +260,7 @@ void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
 	kfree(mmu);
 }
 
-struct etnaviv_iommu *etnaviv_iommu_new(struct device *dev,
+struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
 	struct iommu_domain *domain, enum etnaviv_iommu_version version)
 {
 	struct etnaviv_iommu *mmu;
@@ -269,14 +270,14 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct device *dev,
 		return ERR_PTR(-ENOMEM);
 
 	mmu->domain = domain;
-	mmu->dev = dev;
+	mmu->gpu = gpu;
 	mmu->version = version;
 
 	drm_mm_init(&mmu->mm, domain->geometry.aperture_start,
 		    domain->geometry.aperture_end -
 		      domain->geometry.aperture_start + 1);
 
-	iommu_set_fault_handler(domain, etnaviv_fault_handler, dev);
+	iommu_set_fault_handler(domain, etnaviv_fault_handler, gpu->dev);
 
 	return mmu;
 }
