@@ -78,7 +78,7 @@ int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, u64 *offset);
 int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	struct drm_gem_object *obj, u32 *iova);
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-	int id, u32 *iova);
+	u32 *iova);
 void etnaviv_gem_put_iova(struct drm_gem_object *obj);
 struct sg_table *etnaviv_gem_prime_get_sg_table(struct drm_gem_object *obj);
 void *etnaviv_gem_prime_vmap(struct drm_gem_object *obj);

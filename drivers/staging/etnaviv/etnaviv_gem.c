@@ -274,7 +274,7 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 }
 
 int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-	int id, u32 *iova)
+	u32 *iova)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct etnaviv_vram_mapping *mapping =
