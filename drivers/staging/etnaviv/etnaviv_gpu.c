@@ -545,6 +545,12 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 		dev_err(gpu->dev, "could not create command buffer\n");
 		goto fail;
 	}
+	if (gpu->buffer->paddr - gpu->memory_base > 0x80000000) {
+		ret = -EINVAL;
+		dev_err(gpu->dev,
+			"command buffer outside valid memory window\n");
+		goto free_buffer;
+	}
 
 	/* Setup event management */
 	spin_lock_init(&gpu->event_spinlock);
@@ -564,6 +570,9 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 
 	return 0;
 
+free_buffer:
+	etnaviv_gpu_cmdbuf_free(gpu->buffer);
+	gpu->buffer = NULL;
 fail:
 	pm_runtime_mark_last_busy(gpu->dev);
 	pm_runtime_put_autosuspend(gpu->dev);
