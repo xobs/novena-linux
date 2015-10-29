@@ -83,7 +83,7 @@ struct etnaviv_gem_object {
 	u32 offset;
 
 	/* cache maintenance */
-	uint32_t last_cpu_prep_op;
+	u32 last_cpu_prep_op;
 
 	struct etnaviv_gem_userptr userptr;
 };
