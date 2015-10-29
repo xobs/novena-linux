@@ -24,10 +24,11 @@ enum etnaviv_iommu_version {
 	ETNAVIV_IOMMU_V2,
 };
 
+struct etnaviv_gpu;
 struct etnaviv_vram_mapping;
 
 struct etnaviv_iommu {
-	struct device *dev;
+	struct etnaviv_gpu *gpu;
 	struct iommu_domain *domain;
 
 	enum etnaviv_iommu_version version;
@@ -52,7 +53,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 void etnaviv_iommu_unmap_gem(struct etnaviv_vram_mapping *mapping);
 void etnaviv_iommu_destroy(struct etnaviv_iommu *iommu);
 
-struct etnaviv_iommu *etnaviv_iommu_new(struct device *dev,
+struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
 	struct iommu_domain *domain, enum etnaviv_iommu_version version);
 
 #endif /* __ETNAVIV_MMU_H__ */
