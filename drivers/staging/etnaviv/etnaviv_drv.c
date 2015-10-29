@@ -78,22 +78,6 @@ u32 etnaviv_readl(const void __iomem *addr)
  * DRM operations:
  */
 
-static int etnaviv_unload(struct drm_device *dev)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-
-	flush_workqueue(priv->wq);
-	destroy_workqueue(priv->wq);
-
-	component_unbind_all(dev->dev, dev);
-
-	dev->dev_private = NULL;
-
-	kfree(priv);
-
-	return 0;
-}
-
 
 static void load_gpu(struct drm_device *dev)
 {
@@ -113,47 +97,6 @@ static void load_gpu(struct drm_device *dev)
 			}
 		}
 	}
-}
-
-static int etnaviv_load(struct drm_device *dev, unsigned long flags)
-{
-	struct platform_device *pdev = dev->platformdev;
-	struct etnaviv_drm_private *priv;
-	int err;
-
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		dev_err(dev->dev, "failed to allocate private data\n");
-		return -ENOMEM;
-	}
-
-	dev->dev_private = priv;
-
-	priv->wq = alloc_ordered_workqueue("etnaviv", 0);
-	if (!priv->wq) {
-		err = -ENOMEM;
-		goto err_wq;
-	}
-
-	INIT_LIST_HEAD(&priv->inactive_list);
-	priv->num_gpus = 0;
-
-	platform_set_drvdata(pdev, dev);
-
-	err = component_bind_all(dev->dev, dev);
-	if (err < 0)
-		goto err_bind;
-
-	load_gpu(dev);
-
-	return 0;
-
-err_bind:
-	flush_workqueue(priv->wq);
-	destroy_workqueue(priv->wq);
-err_wq:
-	kfree(priv);
-	return err;
 }
 
 static int etnaviv_open(struct drm_device *dev, struct drm_file *file)
@@ -565,8 +508,6 @@ static struct drm_driver etnaviv_drm_driver = {
 				DRIVER_GEM |
 				DRIVER_PRIME |
 				DRIVER_RENDER,
-	.load               = etnaviv_load,
-	.unload             = etnaviv_unload,
 	.open               = etnaviv_open,
 	.preclose           = etnaviv_preclose,
 	.set_busid          = drm_platform_set_busid,
@@ -601,12 +542,76 @@ static struct drm_driver etnaviv_drm_driver = {
  */
 static int etnaviv_bind(struct device *dev)
 {
-	return drm_platform_init(&etnaviv_drm_driver, to_platform_device(dev));
+	struct etnaviv_drm_private *priv;
+	struct drm_device *drm;
+	int ret;
+
+	drm = drm_dev_alloc(&etnaviv_drm_driver, dev);
+	if (!drm)
+		return -ENOMEM;
+
+	drm->platformdev = to_platform_device(dev);
+
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv) {
+		dev_err(dev, "failed to allocate private data\n");
+		ret = -ENOMEM;
+		goto out_unref;
+	}
+	drm->dev_private = priv;
+
+	priv->wq = alloc_ordered_workqueue("etnaviv", 0);
+	if (!priv->wq) {
+		ret = -ENOMEM;
+		goto out_wq;
+	}
+
+	INIT_LIST_HEAD(&priv->inactive_list);
+	priv->num_gpus = 0;
+
+	dev_set_drvdata(dev, drm);
+
+	ret = component_bind_all(dev, drm);
+	if (ret < 0)
+		goto out_bind;
+
+	load_gpu(drm);
+
+	ret = drm_dev_register(drm, 0);
+	if (ret)
+		goto out_register;
+
+	return 0;
+
+out_register:
+	component_unbind_all(dev, drm);
+out_bind:
+	flush_workqueue(priv->wq);
+	destroy_workqueue(priv->wq);
+out_wq:
+	kfree(priv);
+out_unref:
+	drm_dev_unref(drm);
+
+	return ret;
 }
 
 static void etnaviv_unbind(struct device *dev)
 {
-	drm_put_dev(dev_get_drvdata(dev));
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct etnaviv_drm_private *priv = drm->dev_private;
+
+	drm_dev_unregister(drm);
+
+	flush_workqueue(priv->wq);
+	destroy_workqueue(priv->wq);
+
+	component_unbind_all(dev, drm);
+
+	drm->dev_private = NULL;
+	kfree(priv);
+
+	drm_put_dev(drm);
 }
 
 static const struct component_master_ops etnaviv_master_ops = {
