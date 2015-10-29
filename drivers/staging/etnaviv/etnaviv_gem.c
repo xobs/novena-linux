@@ -396,7 +396,7 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct drm_device *dev = obj->dev;
-	int ret = 0;
+	int ret;
 
 	if (is_active(etnaviv_obj)) {
 		struct etnaviv_gpu *gpu = etnaviv_obj->gpu;
@@ -410,11 +410,13 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 			timeout = NULL;
 
 		ret = etnaviv_gpu_wait_fence_interruptible(gpu, fence, timeout);
+		if (ret)
+			return ret;
 	}
 
 	if (etnaviv_obj->flags & ETNA_BO_CACHED) {
 		if (!etnaviv_obj->sgt) {
-			void * ret;
+			void *ret;
 
 			mutex_lock(&dev->struct_mutex);
 			ret = etnaviv_gem_get_pages(etnaviv_obj);
@@ -429,7 +431,7 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 		etnaviv_obj->last_cpu_prep_op = op;
 	}
 
-	return ret;
+	return 0;
 }
 
 int etnaviv_gem_cpu_fini(struct drm_gem_object *obj)
