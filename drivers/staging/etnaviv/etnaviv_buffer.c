@@ -90,10 +90,16 @@ static void etnaviv_cmd_select_pipe(struct etnaviv_cmdbuf *buffer, u8 pipe)
 	u32 flush;
 	u32 stall;
 
+	/*
+	 * This assumes that if we're switching to 2D, we're switching
+	 * away from 3D, and vice versa.  Hence, if we're switching to
+	 * the 2D core, we need to flush the 3D depth and color caches,
+	 * otherwise we need to flush the 2D pixel engine cache.
+	 */
 	if (pipe == ETNA_PIPE_2D)
 		flush = VIVS_GL_FLUSH_CACHE_DEPTH | VIVS_GL_FLUSH_CACHE_COLOR;
 	else
-		flush = VIVS_GL_FLUSH_CACHE_TEXTURE;
+		flush = VIVS_GL_FLUSH_CACHE_PE2D;
 
 	stall = VIVS_GL_SEMAPHORE_TOKEN_FROM(SYNC_RECIPIENT_FE) |
 		VIVS_GL_SEMAPHORE_TOKEN_TO(SYNC_RECIPIENT_PE);
