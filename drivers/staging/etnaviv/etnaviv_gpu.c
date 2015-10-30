@@ -613,17 +613,6 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 
 	seq_printf(m, "%s Status:\n", dev_name(gpu->dev));
 
-	ret = pm_runtime_get_sync(gpu->dev);
-	if (ret < 0)
-		return ret;
-
-	dma_lo = gpu_read(gpu, VIVS_FE_DMA_LOW);
-	dma_hi = gpu_read(gpu, VIVS_FE_DMA_HIGH);
-	axi = gpu_read(gpu, VIVS_HI_AXI_STATUS);
-	idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
-
-	verify_dma(gpu, &debug);
-
 	seq_puts(m, "\tfeatures\n");
 	seq_printf(m, "\t minor_features0: 0x%08x\n",
 		   gpu->identity.minor_features0);
@@ -655,6 +644,21 @@ int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
 			gpu->identity.instruction_count);
 	seq_printf(m, "\t num_constants: %d\n",
 			gpu->identity.num_constants);
+
+	if (!(gpu->identity.features &
+	      (chipFeatures_PIPE_2D | chipFeatures_PIPE_3D)))
+		return 0;
+
+	ret = pm_runtime_get_sync(gpu->dev);
+	if (ret < 0)
+		return ret;
+
+	dma_lo = gpu_read(gpu, VIVS_FE_DMA_LOW);
+	dma_hi = gpu_read(gpu, VIVS_FE_DMA_HIGH);
+	axi = gpu_read(gpu, VIVS_HI_AXI_STATUS);
+	idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
+
+	verify_dma(gpu, &debug);
 
 	seq_printf(m, "\taxi: 0x%08x\n", axi);
 	seq_printf(m, "\tidle: 0x%08x\n", idle);
