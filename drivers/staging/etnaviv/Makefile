@@ -13,6 +13,7 @@ etnaviv-y := \
 	etnaviv_iommu.o \
 	etnaviv_iommu_v2.o \
 	etnaviv_mmu.o \
-	etnaviv_buffer.o
+	etnaviv_buffer.o \
+	etnaviv_dump.o
 
 obj-$(CONFIG_DRM_ETNAVIV)	+= etnaviv.o
