@@ -15,7 +15,9 @@
  */
 
 #include <linux/component.h>
+#include <linux/moduleparam.h>
 #include <linux/of_device.h>
+#include "etnaviv_dump.h"
 #include "etnaviv_gpu.h"
 #include "etnaviv_gem.h"
 #include "etnaviv_mmu.h"
@@ -30,6 +32,9 @@ static const struct platform_device_id gpu_ids[] = {
 	{ .name = "etnaviv-gpu,2d" },
 	{ },
 };
+
+static bool etnaviv_dump_core = true;
+module_param_named(dump_core, etnaviv_dump_core, bool, 0600);
 
 /*
  * Driver functions:
@@ -784,6 +789,12 @@ static void recover_worker(struct work_struct *work)
 		return;
 
 	mutex_lock(&dev->struct_mutex);
+
+	/* Only catch the first event, or when manually re-armed */
+	if (etnaviv_dump_core) {
+		etnaviv_core_dump(gpu);
+		etnaviv_dump_core = false;
+	}
 
 	etnaviv_hw_reset(gpu);
 

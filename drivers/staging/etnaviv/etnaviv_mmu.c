@@ -281,3 +281,21 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
 
 	return mmu;
 }
+
+size_t etnaviv_iommu_dump_size(struct etnaviv_iommu *iommu)
+{
+	struct etnaviv_iommu_ops *ops;
+
+	ops = container_of(iommu->domain->ops, struct etnaviv_iommu_ops, ops);
+
+	return ops->dump_size(iommu->domain);
+}
+
+void etnaviv_iommu_dump(struct etnaviv_iommu *iommu, void *buf)
+{
+	struct etnaviv_iommu_ops *ops;
+
+	ops = container_of(iommu->domain->ops, struct etnaviv_iommu_ops, ops);
+
+	ops->dump(iommu->domain, buf);
+}

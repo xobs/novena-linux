@@ -22,6 +22,7 @@
 #include <linux/bitops.h>
 
 #include "etnaviv_gpu.h"
+#include "etnaviv_mmu.h"
 #include "etnaviv_iommu.h"
 #include "state_hi.xml.h"
 
@@ -132,7 +133,7 @@ static void etnaviv_domain_free(struct iommu_domain *domain)
 	kfree(etnaviv_domain);
 }
 
-static int etnaviv_iommu_map(struct iommu_domain *domain, unsigned long iova,
+static int etnaviv_iommuv1_map(struct iommu_domain *domain, unsigned long iova,
 	   phys_addr_t paddr, size_t size, int prot)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
@@ -147,7 +148,7 @@ static int etnaviv_iommu_map(struct iommu_domain *domain, unsigned long iova,
 	return 0;
 }
 
-static size_t etnaviv_iommu_unmap(struct iommu_domain *domain,
+static size_t etnaviv_iommuv1_unmap(struct iommu_domain *domain,
 	unsigned long iova, size_t size)
 {
 	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
@@ -171,12 +172,28 @@ static phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain,
 	return pgtable_read(&etnaviv_domain->pgtable, iova);
 }
 
-static struct iommu_ops etnaviv_iommu_ops = {
-	.domain_free = etnaviv_domain_free,
-	.map = etnaviv_iommu_map,
-	.unmap = etnaviv_iommu_unmap,
-	.iova_to_phys = etnaviv_iommu_iova_to_phys,
-	.pgsize_bitmap = SZ_4K,
+static size_t etnaviv_iommuv1_dump_size(struct iommu_domain *domain)
+{
+	return PT_SIZE;
+}
+
+static void etnaviv_iommuv1_dump(struct iommu_domain *domain, void *buf)
+{
+	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
+
+	memcpy(buf, etnaviv_domain->pgtable.pgtable, PT_SIZE);
+}
+
+static struct etnaviv_iommu_ops etnaviv_iommu_ops = {
+	.ops = {
+		.domain_free = etnaviv_domain_free,
+		.map = etnaviv_iommuv1_map,
+		.unmap = etnaviv_iommuv1_unmap,
+		.iova_to_phys = etnaviv_iommu_iova_to_phys,
+		.pgsize_bitmap = SZ_4K,
+	},
+	.dump_size = etnaviv_iommuv1_dump_size,
+	.dump = etnaviv_iommuv1_dump,
 };
 
 void etnaviv_iommu_domain_restore(struct etnaviv_gpu *gpu,
@@ -207,7 +224,7 @@ struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
 	etnaviv_domain->dev = gpu->dev;
 
 	etnaviv_domain->domain.type = __IOMMU_DOMAIN_PAGING;
-	etnaviv_domain->domain.ops = &etnaviv_iommu_ops;
+	etnaviv_domain->domain.ops = &etnaviv_iommu_ops.ops;
 	etnaviv_domain->domain.geometry.aperture_start = GPU_MEM_START;
 	etnaviv_domain->domain.geometry.aperture_end = GPU_MEM_START + PT_ENTRIES * SZ_4K - 1;
 
