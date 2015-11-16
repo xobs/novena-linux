@@ -1091,8 +1091,6 @@ void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu)
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx)
 {
-	struct drm_device *dev = gpu->drm;
-	struct etnaviv_drm_private *priv = dev->dev_private;
 	unsigned int event, i;
 	int ret;
 
@@ -1116,7 +1114,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		return -EBUSY;
 	}
 
-	submit->fence = ++priv->next_fence;
+	submit->fence = ++gpu->next_fence;
 
 	gpu->submitted_fence = submit->fence;
 	gpu->event[event].fence = submit->fence;

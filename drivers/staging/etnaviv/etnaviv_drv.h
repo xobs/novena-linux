@@ -53,8 +53,6 @@ struct etnaviv_drm_private {
 	int num_gpus;
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
 
-	u32 next_fence;
-
 	/* list of GEM objects: */
 	struct list_head inactive_list;
 
