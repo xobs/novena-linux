@@ -395,7 +395,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		goto out;
 
-	if (!etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4)) {
+	if (!etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4
+				      relocs, args->nr_relocs)) {
 		ret = -EINVAL;
 		goto out;
 	}

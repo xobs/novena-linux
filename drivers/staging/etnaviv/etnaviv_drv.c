@@ -691,6 +691,8 @@ static int __init etnaviv_init(void)
 {
 	int ret;
 
+	etnaviv_validate_init();
+
 	ret = platform_driver_register(&etnaviv_gpu_driver);
 	if (ret != 0)
 		return ret;

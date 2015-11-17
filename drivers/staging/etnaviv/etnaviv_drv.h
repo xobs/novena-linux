@@ -106,8 +106,10 @@ u16 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 	struct etnaviv_gem_submit *submit);
+void etnaviv_validate_init(void);
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
-	void *stream, unsigned int size);
+	u32 *stream, unsigned int size,
+	struct drm_etnaviv_gem_submit_reloc *relocs, unsigned int reloc_size);
 
 #ifdef CONFIG_DEBUG_FS
 void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m);
