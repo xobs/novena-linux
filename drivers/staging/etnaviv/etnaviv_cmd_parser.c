@@ -23,34 +23,114 @@
 
 #define EXTRACT(val, field) (((val) & field##__MASK) >> field##__SHIFT)
 
-static bool etnaviv_validate_load_state(struct etnaviv_gpu *gpu, u32 *buf,
-	unsigned int state, unsigned int num)
+struct etna_validation_state {
+	struct etnaviv_gpu *gpu;
+	const struct drm_etnaviv_gem_submit_reloc *relocs;
+	unsigned int num_relocs;
+	u32 *start;
+};
+
+static const struct {
+	u16 offset;
+	u16 size;
+} etnaviv_sensitive_states[] __initconst = {
+#define ST(start, num) { (start) >> 2, (num) }
+	/* 2D */
+	ST(0x1200, 1),
+	ST(0x1228, 1),
+	ST(0x1238, 1),
+	ST(0x1284, 1),
+	ST(0x128c, 1),
+	ST(0x1304, 1),
+	ST(0x1310, 1),
+	ST(0x1318, 1),
+	ST(0x12800, 4),
+	ST(0x128a0, 4),
+	ST(0x128c0, 4),
+	ST(0x12970, 4),
+	ST(0x12a00, 8),
+	ST(0x12b40, 8),
+	ST(0x12b80, 8),
+	ST(0x12ce0, 8),
+	/* 3D */
+	ST(0x0644, 1),
+	ST(0x064c, 1),
+	ST(0x0680, 8),
+	ST(0x1410, 1),
+	ST(0x1430, 1),
+	ST(0x1458, 1),
+	ST(0x1460, 8),
+	ST(0x1480, 8),
+	ST(0x1500, 8),
+	ST(0x1520, 8),
+	ST(0x1608, 1),
+	ST(0x1610, 1),
+	ST(0x16c0, 8),
+	ST(0x16e0, 8),
+	ST(0x2400, 14 * 16),
+	ST(0x10800, 32 * 16),
+#undef ST
+};
+
+#define ETNAVIV_STATES_SIZE (VIV_FE_LOAD_STATE_HEADER_OFFSET__MASK + 1u)
+static DECLARE_BITMAP(etnaviv_states, ETNAVIV_STATES_SIZE);
+
+void __init etnaviv_validate_init(void)
 {
-	return true;
-	if (0x1200 - state < num * 4)
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(etnaviv_sensitive_states); i++)
+		bitmap_set(etnaviv_states, etnaviv_sensitive_states[i].offset,
+			   etnaviv_sensitive_states[i].size);
+}
+
+static void etnaviv_warn_if_non_sensitive(struct etna_validation_state *state,
+	unsigned int buf_offset, unsigned int state_addr)
+{
+	if (state->num_relocs && state->relocs->submit_offset < buf_offset) {
+		dev_warn_once(state->gpu->dev,
+			      "%s: relocation for non-sensitive state 0x%x at offset %u\n",
+			      __func__, state_addr,
+			      state->relocs->submit_offset);
+		while (state->num_relocs &&
+		       state->relocs->submit_offset < buf_offset) {
+			state->relocs++;
+			state->num_relocs--;
+		}
+	}
+}
+
+static bool etnaviv_validate_load_state(struct etna_validation_state *state,
+	u32 *ptr, unsigned int state_offset, unsigned int num)
+{
+	unsigned int size = min(ETNAVIV_STATES_SIZE, state_offset + num);
+	unsigned int st_offset = state_offset, buf_offset;
+
+	for_each_set_bit_from(st_offset, etnaviv_states, size) {
+		buf_offset = (ptr - state->start +
+			      st_offset - state_offset) * 4;
+
+		etnaviv_warn_if_non_sensitive(state, buf_offset, st_offset * 4);
+		if (state->num_relocs &&
+		    state->relocs->submit_offset == buf_offset) {
+			state->relocs++;
+			state->num_relocs--;
+			continue;
+		}
+
+		dev_warn_ratelimited(state->gpu->dev,
+				     "%s: load state touches restricted state 0x%x at offset %u\n",
+				     __func__, st_offset * 4, buf_offset);
 		return false;
-	if (0x1228 - state < num * 4)
-		return false;
-	if (0x1238 - state < num * 4)
-		return false;
-	if (0x1284 - state < num * 4)
-		return false;
-	if (0x128c - state < num * 4)
-		return false;
-	if (0x1304 - state < num * 4)
-		return false;
-	if (0x1310 - state < num * 4)
-		return false;
-	if (0x1318 - state < num * 4)
-		return false;
-	if (0x1280c - state < num * 4 + 0x0c)
-		return false;
-	if (0x128ac - state < num * 4 + 0x0c)
-		return false;
-	if (0x128cc - state < num * 4 + 0x0c)
-		return false;
-	if (0x1297c - state < num * 4 + 0x0c)
-		return false;
+	}
+
+	if (state->num_relocs) {
+		buf_offset = (ptr - state->start + num) * 4;
+		etnaviv_warn_if_non_sensitive(state, buf_offset, st_offset * 4 +
+					      state->relocs->submit_offset -
+					      buf_offset);
+	}
+
 	return true;
 }
 
@@ -61,12 +141,19 @@ static uint8_t cmd_length[32] = {
 	[FE_OPCODE_STALL] = 2,
 };
 
-bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, void *stream,
-			      unsigned int size)
+bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, u32 *stream,
+			      unsigned int size,
+			      struct drm_etnaviv_gem_submit_reloc *relocs,
+			      unsigned int reloc_size)
 {
-	u32 *start = stream;
-	u32 *buf = start;
+	struct etna_validation_state state;
+	u32 *buf = stream;
 	u32 *end = buf + size;
+
+	state.gpu = gpu;
+	state.relocs = relocs;
+	state.num_relocs = reloc_size;
+	state.start = stream;
 
 	while (buf < end) {
 		u32 cmd = *buf;
@@ -81,12 +168,9 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, void *stream,
 				break;
 
 			off = EXTRACT(cmd, VIV_FE_LOAD_STATE_HEADER_OFFSET);
-			if (!etnaviv_validate_load_state(gpu, buf + 1,
-							 off * 4, n)) {
-				dev_warn(gpu->dev, "%s: load state covers restricted state (0x%x-0x%x) at offset %tu\n",
-					 __func__, off * 4, (off + n) * 4, buf - start);
+			if (!etnaviv_validate_load_state(&state, buf + 1,
+							 off, n))
 				return false;
-			}
 			break;
 
 		case FE_OPCODE_DRAW_2D:
@@ -100,7 +184,7 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, void *stream,
 			len = cmd_length[op];
 			if (len == 0) {
 				dev_err(gpu->dev, "%s: op %u not permitted at offset %tu\n",
-					__func__, op, buf - start);
+					__func__, op, buf - state.start);
 				return false;
 			}
 			break;
@@ -111,7 +195,7 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu, void *stream,
 
 	if (buf > end) {
 		dev_err(gpu->dev, "%s: commands overflow end of buffer: %tu > %u\n",
-			__func__, buf - start, size);
+			__func__, buf - state.start, size);
 		return false;
 	}
 
