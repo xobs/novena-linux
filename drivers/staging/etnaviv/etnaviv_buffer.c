@@ -156,7 +156,7 @@ void etnaviv_buffer_end(struct etnaviv_gpu *gpu)
 }
 
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
-	struct etnaviv_gem_submit *submit)
+	struct etnaviv_cmdbuf *cmdbuf)
 {
 	struct etnaviv_cmdbuf *buffer = gpu->buffer;
 	u32 *lw = buffer->vaddr + buffer->user_size - 16;
@@ -199,20 +199,19 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 
 	if (drm_debug & DRM_UT_DRIVER)
 		pr_info("stream link to 0x%08x @ 0x%08x %p\n",
-			link_target, gpu_va(gpu, submit->cmdbuf),
-			submit->cmdbuf->vaddr);
+			link_target, gpu_va(gpu, cmdbuf), cmdbuf->vaddr);
 
 	/* jump back from cmd to main buffer */
-	CMD_LINK(submit->cmdbuf, link_size, link_target);
+	CMD_LINK(cmdbuf, link_size, link_target);
 
-	link_target = gpu_va(gpu, submit->cmdbuf);
-	link_size = submit->cmdbuf->size / 8;
+	link_target = gpu_va(gpu, cmdbuf);
+	link_size = cmdbuf->size / 8;
 
 
 
 	if (drm_debug & DRM_UT_DRIVER) {
 		print_hex_dump(KERN_INFO, "cmd ", DUMP_PREFIX_OFFSET, 16, 4,
-			       submit->cmdbuf->vaddr, submit->cmdbuf->size, 0);
+			       cmdbuf->vaddr, cmdbuf->size, 0);
 
 		pr_info("link op: %p\n", lw);
 		pr_info("link addr: %p\n", lw + 1);
@@ -237,8 +236,7 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		}
 
 		if (gpu->switch_context) {
-			etnaviv_cmd_select_pipe(buffer,
-						submit->cmdbuf->exec_state);
+			etnaviv_cmd_select_pipe(buffer, cmdbuf->exec_state);
 			gpu->switch_context = false;
 		}
 

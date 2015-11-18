@@ -1125,7 +1125,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		gpu->lastctx = submit->cmdbuf->ctx;
 	}
 
-	etnaviv_buffer_queue(gpu, event, submit);
+	etnaviv_buffer_queue(gpu, event, submit->cmdbuf);
 
 	/* take ownership of cmdbuffer*/
 	submit->cmdbuf->fence = submit->fence;
