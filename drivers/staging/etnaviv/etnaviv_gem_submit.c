@@ -294,7 +294,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct drm_etnaviv_gem_submit *args = data;
-	struct etnaviv_file_private *ctx = file->driver_priv;
 	struct drm_etnaviv_gem_submit_reloc *relocs;
 	struct drm_etnaviv_gem_submit_bo *bos;
 	struct etnaviv_gem_submit *submit;
@@ -337,6 +336,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	}
 
 	cmdbuf->exec_state = args->exec_state;
+	cmdbuf->ctx = file->driver_priv;
 
 	ret = copy_from_user(bos, to_user_ptr(args->bos),
 			     args->nr_bos * sizeof(*bos));
@@ -413,7 +413,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	submit->cmdbuf = cmdbuf;
 	cmdbuf = NULL;
 
-	ret = etnaviv_gpu_submit(gpu, submit, ctx);
+	ret = etnaviv_gpu_submit(gpu, submit);
 
 	args->fence = submit->fence;
 
