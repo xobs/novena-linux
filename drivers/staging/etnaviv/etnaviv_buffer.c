@@ -237,7 +237,8 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		}
 
 		if (gpu->switch_context) {
-			etnaviv_cmd_select_pipe(buffer, submit->exec_state);
+			etnaviv_cmd_select_pipe(buffer,
+						submit->cmdbuf->exec_state);
 			gpu->switch_context = false;
 		}
 
