@@ -812,7 +812,7 @@ static void recover_worker(struct work_struct *work)
 		pm_runtime_put_autosuspend(gpu->dev);
 	}
 	spin_unlock_irqrestore(&gpu->event_spinlock, flags);
-	gpu->completed_fence = gpu->submitted_fence;
+	gpu->completed_fence = gpu->active_fence;
 
 	etnaviv_gpu_hw_init(gpu);
 	gpu->switch_context = true;
@@ -853,16 +853,16 @@ static void hangcheck_handler(unsigned long data)
 		}
 	}
 
-	if (!progress && fence_after(gpu->submitted_fence, fence)) {
+	if (!progress && fence_after(gpu->active_fence, fence)) {
 		dev_err(gpu->dev, "hangcheck detected gpu lockup!\n");
 		dev_err(gpu->dev, "     completed fence: %u\n", fence);
-		dev_err(gpu->dev, "     submitted fence: %u\n",
-			gpu->submitted_fence);
+		dev_err(gpu->dev, "     active fence: %u\n",
+			gpu->active_fence);
 		etnaviv_queue_work(gpu->drm, &gpu->recover_work);
 	}
 
 	/* if still more pending work, reset the hangcheck timer: */
-	if (fence_after(gpu->submitted_fence, gpu->hangcheck_fence))
+	if (fence_after(gpu->active_fence, gpu->hangcheck_fence))
 		hangcheck_timer_reset(gpu);
 }
 
@@ -1015,9 +1015,9 @@ int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 {
 	int ret;
 
-	if (fence_after(fence, gpu->submitted_fence)) {
+	if (fence_after(fence, gpu->next_fence)) {
 		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
-				fence, gpu->submitted_fence);
+				fence, gpu->next_fence);
 		return -EINVAL;
 	}
 
@@ -1116,7 +1116,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 	submit->fence = ++gpu->next_fence;
 
-	gpu->submitted_fence = submit->fence;
+	gpu->active_fence = submit->fence;
 	gpu->event[event].fence = submit->fence;
 
 	if (gpu->lastctx != cmdbuf->ctx) {
@@ -1482,7 +1482,7 @@ static int etnaviv_gpu_rpm_suspend(struct device *dev)
 	u32 idle, mask;
 
 	/* If we have outstanding fences, we're not idle */
-	if (gpu->completed_fence != gpu->submitted_fence)
+	if (gpu->completed_fence != gpu->active_fence)
 		return -EBUSY;
 
 	/* Check whether the hardware (except FE) is idle */

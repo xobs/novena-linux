@@ -112,7 +112,7 @@ struct etnaviv_gpu {
 
 	/* Fencing support */
 	u32 next_fence;
-	u32 submitted_fence;
+	u32 active_fence;
 	u32 completed_fence;
 	u32 retired_fence;
 	wait_queue_head_t fence_event;
