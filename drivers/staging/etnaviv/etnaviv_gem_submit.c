@@ -57,7 +57,6 @@ static struct etnaviv_gem_submit *submit_create(struct drm_device *dev,
 
 		/* initially, until copy_from_user() and bo lookup succeeds: */
 		submit->nr_bos = 0;
-		submit->cmdbuf = NULL;
 
 		INIT_LIST_HEAD(&submit->bo_list);
 		ww_acquire_init(&submit->ticket, &reservation_ww_class);
@@ -282,9 +281,6 @@ static void submit_cleanup(struct etnaviv_gem_submit *submit, bool fail)
 		drm_gem_object_unreference(&etnaviv_obj->base);
 	}
 
-	if (submit->cmdbuf)
-		etnaviv_gpu_cmdbuf_free(submit->cmdbuf);
-
 	ww_acquire_fini(&submit->ticket);
 	kfree(submit);
 }
@@ -409,11 +405,10 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 	memcpy(cmdbuf->vaddr, stream, args->stream_size);
 	cmdbuf->user_size = ALIGN(args->stream_size, 8);
-	/* transfer ownership of cmdbuf to submit */
-	submit->cmdbuf = cmdbuf;
-	cmdbuf = NULL;
 
-	ret = etnaviv_gpu_submit(gpu, submit);
+	ret = etnaviv_gpu_submit(gpu, submit, cmdbuf);
+	if (ret == 0)
+		cmdbuf = NULL;
 
 	args->fence = submit->fence;
 
