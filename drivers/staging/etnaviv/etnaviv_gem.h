@@ -111,7 +111,6 @@ struct etnaviv_gem_submit {
 	struct ww_acquire_ctx ticket;
 	u32 fence;
 	unsigned int nr_bos;
-	struct etnaviv_cmdbuf *cmdbuf;
 	struct {
 		u32 flags;
 		struct etnaviv_gem_object *obj;

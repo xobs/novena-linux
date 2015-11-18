@@ -191,7 +191,7 @@ int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout);
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
-	struct etnaviv_gem_submit *submit);
+	struct etnaviv_gem_submit *submit, struct etnaviv_cmdbuf *cmdbuf);
 struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu,
 					      u32 size);
 void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf);
