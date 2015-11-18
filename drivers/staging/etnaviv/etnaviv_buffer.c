@@ -249,11 +249,6 @@ void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
 		link_size = extra_size;
 	}
 
-	/* take ownership of cmdbuffer*/
-	submit->cmdbuf->fence = submit->fence;
-	list_add_tail(&submit->cmdbuf->gpu_active_list, &gpu->active_cmd_list);
-	submit->cmdbuf = NULL;
-
 	/* trigger event */
 	CMD_LOAD_STATE(buffer, VIVS_GL_EVENT, VIVS_GL_EVENT_EVENT_ID(event) |
 		       VIVS_GL_EVENT_FROM_PE);

@@ -1127,6 +1127,11 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 	etnaviv_buffer_queue(gpu, event, submit);
 
+	/* take ownership of cmdbuffer*/
+	submit->cmdbuf->fence = submit->fence;
+	list_add_tail(&submit->cmdbuf->gpu_active_list, &gpu->active_cmd_list);
+	submit->cmdbuf = NULL;
+
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 
