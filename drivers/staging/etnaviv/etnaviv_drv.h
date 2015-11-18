@@ -36,6 +36,7 @@
 #include <drm/drm_gem.h>
 #include <drm/etnaviv_drm.h>
 
+struct etnaviv_cmdbuf;
 struct etnaviv_gpu;
 struct etnaviv_mmu;
 struct etnaviv_gem_object;
@@ -105,7 +106,7 @@ int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 u16 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
-	struct etnaviv_gem_submit *submit);
+	struct etnaviv_cmdbuf *cmdbuf);
 void etnaviv_validate_init(void);
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 	u32 *stream, unsigned int size,
