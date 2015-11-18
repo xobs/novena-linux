@@ -336,6 +336,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		goto err_submit_cmds;
 	}
 
+	cmdbuf->exec_state = args->exec_state;
+
 	ret = copy_from_user(bos, to_user_ptr(args->bos),
 			     args->nr_bos * sizeof(*bos));
 	if (ret) {
@@ -385,7 +387,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		ret = -ENOMEM;
 		goto out;
 	}
-	submit->exec_state = args->exec_state;
 
 	ret = submit_lookup_objects(submit, file, bos, args->nr_bos);
 	if (ret)

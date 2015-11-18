@@ -149,6 +149,8 @@ struct etnaviv_cmdbuf {
 	u32 user_size;
 	/* fence after which this buffer is to be disposed */
 	u32 fence;
+	/* target exec state */
+	u32 exec_state;
 	/* per GPU in-flight list */
 	struct list_head gpu_active_list;
 };
