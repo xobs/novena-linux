@@ -142,6 +142,8 @@ struct etnaviv_gpu {
 struct etnaviv_cmdbuf {
 	/* device this cmdbuf is allocated for */
 	struct etnaviv_gpu *gpu;
+	/* user context key, must be unique between all active users */
+	struct etnaviv_file_private *ctx;
 	/* cmdbuf properties */
 	void *vaddr;
 	dma_addr_t paddr;
@@ -189,7 +191,7 @@ int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout);
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
-	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx);
+	struct etnaviv_gem_submit *submit);
 struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu,
 					      u32 size);
 void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf);

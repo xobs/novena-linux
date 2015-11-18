@@ -1089,7 +1089,7 @@ void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu)
 
 /* add bo's to gpu's ring, and kick gpu: */
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
-	struct etnaviv_gem_submit *submit, struct etnaviv_file_private *ctx)
+	struct etnaviv_gem_submit *submit)
 {
 	unsigned int event, i;
 	int ret;
@@ -1119,10 +1119,10 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	gpu->submitted_fence = submit->fence;
 	gpu->event[event].fence = submit->fence;
 
-	if (gpu->lastctx != ctx) {
+	if (gpu->lastctx != submit->cmdbuf->ctx) {
 		gpu->mmu->need_flush = true;
 		gpu->switch_context = true;
-		gpu->lastctx = ctx;
+		gpu->lastctx = submit->cmdbuf->ctx;
 	}
 
 	etnaviv_buffer_queue(gpu, event, submit);
