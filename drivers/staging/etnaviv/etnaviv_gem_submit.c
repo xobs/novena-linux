@@ -96,6 +96,10 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 			goto out_unlock;
 		}
 
+		/*
+		 * Take a refcount on the object. The file table lock
+		 * prevents the object_idr's refcount on this being dropped.
+		 */
 		drm_gem_object_reference(obj);
 
 		submit->bos[i].obj = to_etnaviv_bo(obj);
@@ -279,7 +283,7 @@ static void submit_cleanup(struct etnaviv_gem_submit *submit)
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 
 		submit_unlock_object(submit, i);
-		drm_gem_object_unreference(&etnaviv_obj->base);
+		drm_gem_object_unreference_unlocked(&etnaviv_obj->base);
 	}
 
 	ww_acquire_fini(&submit->ticket);
@@ -356,6 +360,20 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		goto err_submit_cmds;
 	}
 
+	submit = submit_create(dev, gpu, args->nr_bos);
+	if (!submit) {
+		ret = -ENOMEM;
+		goto err_submit_cmds;
+	}
+
+	ret = submit_lookup_objects(submit, file, bos, args->nr_bos);
+	if (ret)
+		goto err_submit_objects;
+
+	ret = submit_lock_objects(submit);
+	if (ret)
+		goto err_submit_objects;
+
 	/*
 	 * Avoid big circular locking dependency loops:
 	 * - reading debugfs results in mmap_sem depending on i_mutex_key#3
@@ -378,20 +396,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		goto err_submit_cmds;
 
 	mutex_lock(&dev->struct_mutex);
-
-	submit = submit_create(dev, gpu, args->nr_bos);
-	if (!submit) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	ret = submit_lookup_objects(submit, file, bos, args->nr_bos);
-	if (ret)
-		goto out;
-
-	ret = submit_lock_objects(submit);
-	if (ret)
-		goto out;
 
 	ret = submit_pin_objects(submit);
 	if (ret)
@@ -418,10 +422,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	args->fence = submit->fence;
 
 out:
-	if (submit) {
-		submit_unpin_objects(submit);
-		submit_cleanup(submit, !!ret);
-	}
+	submit_unpin_objects(submit);
 	mutex_unlock(&dev->struct_mutex);
 
 	etnaviv_gpu_pm_put(gpu);
@@ -433,6 +434,9 @@ out:
 	 */
 	if (ret == -EAGAIN)
 		flush_workqueue(priv->wq);
+
+err_submit_objects:
+	submit_cleanup(submit);
 
 err_submit_cmds:
 	/* if we still own the cmdbuf */
