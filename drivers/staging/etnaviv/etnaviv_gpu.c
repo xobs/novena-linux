@@ -974,7 +974,7 @@ static void retire_worker(struct work_struct *work)
 		     fence_after_eq(fence, obj->write_fence))) {
 			/* move to inactive: */
 			etnaviv_gem_move_to_inactive(&obj->base);
-			etnaviv_gem_put_iova(&obj->base);
+			etnaviv_gem_put_iova(gpu, &obj->base);
 			drm_gem_object_unreference(&obj->base);
 		} else {
 			break;
