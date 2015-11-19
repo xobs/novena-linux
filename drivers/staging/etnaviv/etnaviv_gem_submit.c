@@ -374,6 +374,12 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		goto err_submit_objects;
 
+	if (!etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4,
+				      relocs, args->nr_relocs)) {
+		ret = -EINVAL;
+		goto err_submit_objects;
+	}
+
 	/*
 	 * Avoid big circular locking dependency loops:
 	 * - reading debugfs results in mmap_sem depending on i_mutex_key#3
@@ -400,12 +406,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	ret = submit_pin_objects(submit);
 	if (ret)
 		goto out;
-
-	if (!etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4
-				      relocs, args->nr_relocs)) {
-		ret = -EINVAL;
-		goto out;
-	}
 
 	ret = submit_reloc(submit, stream, args->stream_size / 4,
 			   relocs, args->nr_relocs);
