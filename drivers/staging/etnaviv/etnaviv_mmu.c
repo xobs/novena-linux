@@ -165,10 +165,10 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 				continue;
 
 			/*
-			 * If it's on the submit list, then it is part of
+			 * If the iova is locked, then it is part of
 			 * a submission, and we want to keep its entry.
 			 */
-			if (!list_empty(&o->submit_entry))
+			if (free->use)
 				continue;
 
 			list_add(&free->scan_node, &list);

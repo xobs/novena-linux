@@ -126,7 +126,7 @@ static void submit_unlock_unpin_bo(struct etnaviv_gem_submit *submit, int i)
 	struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 
 	if (submit->bos[i].flags & BO_PINNED)
-		etnaviv_gem_put_iova(&etnaviv_obj->base);
+		etnaviv_gem_put_iova(submit->gpu, &etnaviv_obj->base);
 
 	if (submit->bos[i].flags & BO_LOCKED)
 		ww_mutex_unlock(&etnaviv_obj->resv->lock);

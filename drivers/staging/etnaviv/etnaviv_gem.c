@@ -267,22 +267,25 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 				gpu->memory_base, &mapping);
 	}
 
-	if (!ret)
+	if (!ret) {
+		mapping->use += 1;
 		*iova = mapping->iova;
+	}
 
 	return ret;
 }
 
-void etnaviv_gem_put_iova(struct drm_gem_object *obj)
+void etnaviv_gem_put_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj)
 {
-	/*
-	 * XXX TODO ..
-	 * NOTE: probably don't need a _locked() version.. we wouldn't
-	 * normally unmap here, but instead just mark that it could be
-	 * unmapped (if the iova refcnt drops to zero), but then later
-	 * if another _get_iova_locked() fails we can start unmapping
-	 * things that are no longer needed..
-	 */
+	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
+	struct etnaviv_vram_mapping *mapping;
+
+	WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
+
+	mapping = etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
+
+	WARN_ON(mapping->use == 0);
+	mapping->use -= 1;
 }
 
 void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj)
