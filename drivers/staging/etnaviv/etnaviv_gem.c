@@ -551,7 +551,6 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 	etnaviv_obj->resv = &etnaviv_obj->_resv;
 	reservation_object_init(&etnaviv_obj->_resv);
 
-	INIT_LIST_HEAD(&etnaviv_obj->submit_entry);
 	INIT_LIST_HEAD(&etnaviv_obj->mm_list);
 	INIT_LIST_HEAD(&etnaviv_obj->vram_list);
 
