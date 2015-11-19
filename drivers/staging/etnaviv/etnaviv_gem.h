@@ -59,13 +59,6 @@ struct etnaviv_gem_object {
 	u32 access;
 	u32 read_fence, write_fence;
 
-	/* Transiently in the process of submit ioctl, objects associated
-	 * with the submit are on submit->bo_list.. this only lasts for
-	 * the duration of the ioctl, so one bo can never be on multiple
-	 * submit lists.
-	 */
-	struct list_head submit_entry;
-
 	struct page **pages;
 	struct sg_table *sgt;
 	void *vaddr;
@@ -108,7 +101,6 @@ static inline bool is_active(struct etnaviv_gem_object *etnaviv_obj)
 struct etnaviv_gem_submit {
 	struct drm_device *dev;
 	struct etnaviv_gpu *gpu;
-	struct list_head bo_list;
 	struct ww_acquire_ctx ticket;
 	u32 fence;
 	unsigned int nr_bos;

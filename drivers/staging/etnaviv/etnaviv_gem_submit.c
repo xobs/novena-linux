@@ -58,7 +58,6 @@ static struct etnaviv_gem_submit *submit_create(struct drm_device *dev,
 		/* initially, until copy_from_user() and bo lookup succeeds: */
 		submit->nr_bos = 0;
 
-		INIT_LIST_HEAD(&submit->bo_list);
 		ww_acquire_init(&submit->ticket, &reservation_ww_class);
 	}
 
@@ -77,7 +76,6 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 
 	for (i = 0, bo = submit_bos; i < nr_bos; i++, bo++) {
 		struct drm_gem_object *obj;
-		struct etnaviv_gem_object *etnaviv_obj;
 
 		if (bo->flags & BO_INVALID_FLAGS) {
 			DRM_ERROR("invalid flags: %x\n", bo->flags);
@@ -98,20 +96,9 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 			goto out_unlock;
 		}
 
-		etnaviv_obj = to_etnaviv_bo(obj);
-
-		if (!list_empty(&etnaviv_obj->submit_entry)) {
-			DRM_ERROR("handle %u at index %u already on submit list\n",
-				  bo->handle, i);
-			ret = -EINVAL;
-			goto out_unlock;
-		}
-
 		drm_gem_object_reference(obj);
 
-		submit->bos[i].obj = etnaviv_obj;
-
-		list_add_tail(&etnaviv_obj->submit_entry, &submit->bo_list);
+		submit->bos[i].obj = to_etnaviv_bo(obj);
 	}
 
 out_unlock:
@@ -153,6 +140,9 @@ retry:
 		if (!(submit->bos[i].flags & BO_LOCKED)) {
 			ret = ww_mutex_lock_interruptible(&etnaviv_obj->resv->lock,
 					&submit->ticket);
+			if (ret == -EALREADY)
+				DRM_ERROR("BO at index %u already on submit list\n",
+					  i);
 			if (ret)
 				goto fail;
 			submit->bos[i].flags |= BO_LOCKED;
@@ -277,7 +267,6 @@ static void submit_cleanup(struct etnaviv_gem_submit *submit, bool fail)
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 
 		submit_unlock_unpin_bo(submit, i);
-		list_del_init(&etnaviv_obj->submit_entry);
 		drm_gem_object_unreference(&etnaviv_obj->base);
 	}
 
