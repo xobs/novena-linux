@@ -273,29 +273,6 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	return ret;
 }
 
-int etnaviv_gem_get_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
-	u32 *iova)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	struct etnaviv_vram_mapping *mapping =
-			etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
-	int ret;
-
-	/* this is safe right now because we don't unmap until the
-	 * bo is deleted:
-	 */
-	if (mapping) {
-		*iova = mapping->iova;
-		return 0;
-	}
-
-	mutex_lock(&obj->dev->struct_mutex);
-	ret = etnaviv_gem_get_iova_locked(gpu, obj, iova);
-	mutex_unlock(&obj->dev->struct_mutex);
-
-	return ret;
-}
-
 void etnaviv_gem_put_iova(struct drm_gem_object *obj)
 {
 	/*
