@@ -1080,12 +1080,11 @@ static void retire_worker(struct work_struct *work)
 	unsigned int i;
 
 	mutex_lock(&dev->struct_mutex);
-	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list,
-				 gpu_active_list) {
+	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list, node) {
 		if (!fence_is_signaled(cmdbuf->fence))
 			break;
 
-		list_del(&cmdbuf->gpu_active_list);
+		list_del(&cmdbuf->node);
 		fence_put(cmdbuf->fence);
 
 		for (i = 0; i < cmdbuf->nr_bos; i++) {
@@ -1229,7 +1228,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	etnaviv_buffer_queue(gpu, event, cmdbuf);
 
 	cmdbuf->fence = fence;
-	list_add_tail(&cmdbuf->gpu_active_list, &gpu->active_cmd_list);
+	list_add_tail(&cmdbuf->node, &gpu->active_cmd_list);
 
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
