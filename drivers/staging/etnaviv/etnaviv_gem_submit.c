@@ -14,6 +14,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/reservation.h>
 #include "etnaviv_drv.h"
 #include "etnaviv_gpu.h"
 #include "etnaviv_gem.h"
@@ -159,6 +160,23 @@ fail:
 			slow_locked = contended;
 			goto retry;
 		}
+	}
+
+	return ret;
+}
+
+static int submit_fence_sync(const struct etnaviv_gem_submit *submit)
+{
+	unsigned int context = submit->gpu->fence_context;
+	int i, ret = 0;
+
+	for (i = 0; i < submit->nr_bos; i++) {
+		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
+		bool write = submit->bos[i].flags & ETNA_SUBMIT_BO_WRITE;
+
+		ret = etnaviv_gpu_fence_sync_obj(etnaviv_obj, context, write);
+		if (ret)
+			break;
 	}
 
 	return ret;
@@ -368,6 +386,10 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		ret = -EINVAL;
 		goto err_submit_objects;
 	}
+
+	ret = submit_fence_sync(submit);
+	if (ret)
+		goto err_submit_objects;
 
 	/*
 	 * Avoid big circular locking dependency loops:
