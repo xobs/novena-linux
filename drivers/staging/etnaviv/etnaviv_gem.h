@@ -48,7 +48,6 @@ struct etnaviv_gem_object {
 	u32 flags;
 
 	struct list_head gem_node;
-	struct list_head mm_list;
 	struct etnaviv_gpu *gpu;     /* non-null if active */
 	u32 access;
 	u32 read_fence, write_fence;
