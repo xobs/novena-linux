@@ -1105,20 +1105,6 @@ static void retire_worker(struct work_struct *work)
 	wake_up_all(&gpu->fence_event);
 }
 
-static unsigned long etnaviv_timeout_to_jiffies(struct timespec *timeout)
-{
-	unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
-	unsigned long start_jiffies = jiffies;
-	unsigned long remaining_jiffies;
-
-	if (time_after(start_jiffies, timeout_jiffies))
-		remaining_jiffies = 0;
-	else
-		remaining_jiffies = timeout_jiffies - start_jiffies;
-
-	return remaining_jiffies;
-}
-
 int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
 	u32 fence, struct timespec *timeout)
 {
