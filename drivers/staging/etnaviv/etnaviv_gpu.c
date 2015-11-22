@@ -15,6 +15,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/fence.h>
 #include <linux/moduleparam.h>
 #include <linux/of_device.h>
 #include "etnaviv_dump.h"
@@ -1319,6 +1320,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 		return ret;
 
 	gpu->drm = drm;
+	gpu->fence_context = fence_context_alloc(1);
 
 	INIT_LIST_HEAD(&gpu->active_cmd_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
