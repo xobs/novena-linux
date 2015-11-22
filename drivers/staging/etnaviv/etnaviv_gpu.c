@@ -544,7 +544,7 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
 	}
 
 	/* Create buffer: */
-	gpu->buffer = etnaviv_gpu_cmdbuf_new(gpu, PAGE_SIZE);
+	gpu->buffer = etnaviv_gpu_cmdbuf_new(gpu, PAGE_SIZE, 0);
 	if (!gpu->buffer) {
 		ret = -ENOMEM;
 		dev_err(gpu->dev, "could not create command buffer\n");
@@ -924,11 +924,14 @@ static void event_free(struct etnaviv_gpu *gpu, unsigned int event)
  * Cmdstream submission/retirement:
  */
 
-struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu, u32 size)
+struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu, u32 size,
+	size_t nr_bos)
 {
 	struct etnaviv_cmdbuf *cmdbuf;
+	size_t sz = size_vstruct(nr_bos, sizeof(cmdbuf->bo[0]),
+				 sizeof(*cmdbuf));
 
-	cmdbuf = kzalloc(sizeof(*cmdbuf), GFP_KERNEL);
+	cmdbuf = kzalloc(sz, GFP_KERNEL);
 	if (!cmdbuf)
 		return NULL;
 
@@ -959,34 +962,23 @@ static void retire_worker(struct work_struct *work)
 	struct drm_device *dev = gpu->drm;
 	u32 fence = gpu->completed_fence;
 	struct etnaviv_cmdbuf *cmdbuf, *tmp;
+	unsigned int i;
 
 	mutex_lock(&dev->struct_mutex);
-
-	while (!list_empty(&gpu->active_list)) {
-		struct etnaviv_gem_object *obj;
-
-		obj = list_first_entry(&gpu->active_list,
-				struct etnaviv_gem_object, mm_list);
-
-		if ((!(obj->access & ETNA_SUBMIT_BO_READ) ||
-		     fence_after_eq(fence, obj->read_fence)) &&
-		    (!(obj->access & ETNA_SUBMIT_BO_WRITE) ||
-		     fence_after_eq(fence, obj->write_fence))) {
-			/* move to inactive: */
-			etnaviv_gem_move_to_inactive(&obj->base);
-			etnaviv_gem_put_iova(gpu, &obj->base);
-			drm_gem_object_unreference(&obj->base);
-		} else {
-			break;
-		}
-	}
-
 	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list,
 				 gpu_active_list) {
-		if (fence_after_eq(fence, cmdbuf->fence)) {
-			list_del(&cmdbuf->gpu_active_list);
-			etnaviv_gpu_cmdbuf_free(cmdbuf);
+		if (!fence_after_eq(fence, cmdbuf->fence))
+			break;
+
+		list_del(&cmdbuf->gpu_active_list);
+
+		for (i = 0; i < cmdbuf->nr_bos; i++) {
+			etnaviv_gem_move_to_inactive(&cmdbuf->bo[i]->base);
+			etnaviv_gem_put_iova(gpu, &cmdbuf->bo[i]->base);
+			drm_gem_object_unreference(&cmdbuf->bo[i]->base);
 		}
+
+		etnaviv_gpu_cmdbuf_free(cmdbuf);
 	}
 
 	gpu->retired_fence = fence;
@@ -1132,20 +1124,17 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
+		u32 iova;
+
+		/* Each cmdbuf takes a reference on the bo and iova */
+		drm_gem_object_reference(&etnaviv_obj->base);
+		etnaviv_gem_get_iova_locked(gpu, &etnaviv_obj->base, &iova);
+		cmdbuf->bo[i] = etnaviv_obj;
 
 		/* can't happen yet.. but when we add 2d support we'll have
 		 * to deal w/ cross-ring synchronization:
 		 */
 		WARN_ON(is_active(etnaviv_obj) && (etnaviv_obj->gpu != gpu));
-
-		if (!is_active(etnaviv_obj)) {
-			u32 iova;
-
-			/* ring takes a reference to the bo and iova: */
-			drm_gem_object_reference(&etnaviv_obj->base);
-			etnaviv_gem_get_iova_locked(gpu, &etnaviv_obj->base,
-						    &iova);
-		}
 
 		if (submit->bos[i].flags & (ETNA_SUBMIT_BO_READ |
 					    ETNA_SUBMIT_BO_WRITE))
@@ -1153,6 +1142,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 						   submit->bos[i].flags,
 						   submit->fence);
 	}
+	cmdbuf->nr_bos = submit->nr_bos;
 	hangcheck_timer_reset(gpu);
 
 	return 0;

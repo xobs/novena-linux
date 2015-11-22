@@ -32,18 +32,6 @@ static inline void __user *to_user_ptr(u64 address)
 	return (void __user *)(uintptr_t)address;
 }
 
-/*
- * Return the storage size of a structure with a variable length array.
- * The array is nelem elements of elem_size, where the base structure
- * is defined by base.  If the size overflows size_t, return zero.
- */
-static size_t size_vstruct(size_t nelem, size_t elem_size, size_t base)
-{
-	if (elem_size && nelem > (SIZE_MAX - base) / elem_size)
-		return 0;
-	return base + nelem * elem_size;
-}
-
 static struct etnaviv_gem_submit *submit_create(struct drm_device *dev,
 		struct etnaviv_gpu *gpu, size_t nr)
 {
@@ -330,7 +318,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	bos = drm_malloc_ab(args->nr_bos, sizeof(*bos));
 	relocs = drm_malloc_ab(args->nr_relocs, sizeof(*relocs));
 	stream = drm_malloc_ab(1, args->stream_size);
-	cmdbuf = etnaviv_gpu_cmdbuf_new(gpu, ALIGN(args->stream_size, 8) + 8);
+	cmdbuf = etnaviv_gpu_cmdbuf_new(gpu, ALIGN(args->stream_size, 8) + 8,
+					args->nr_bos);
 	if (!bos || !relocs || !stream || !cmdbuf) {
 		ret = -ENOMEM;
 		goto err_submit_cmds;
