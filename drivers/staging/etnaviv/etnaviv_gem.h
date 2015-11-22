@@ -47,14 +47,7 @@ struct etnaviv_gem_object {
 
 	u32 flags;
 
-	/* And object is either:
-	 *  inactive - on priv->inactive_list
-	 *  active   - on one one of the gpu's active_list..  well, at
-	 *     least for now we don't have (I don't think) hw sync between
-	 *     2d and 3d one devices which have both, meaning we need to
-	 *     block on submit if a bo is already on other ring
-	 *
-	 */
+	struct list_head gem_node;
 	struct list_head mm_list;
 	struct etnaviv_gpu *gpu;     /* non-null if active */
 	u32 access;
