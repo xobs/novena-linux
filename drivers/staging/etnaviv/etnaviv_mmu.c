@@ -95,9 +95,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
 	struct etnaviv_vram_mapping **out_mapping)
 {
-	struct etnaviv_drm_private *priv = etnaviv_obj->base.dev->dev_private;
-	struct sg_table *sgt = etnaviv_obj->sgt;
 	struct etnaviv_vram_mapping *mapping, *free = NULL;
+	struct sg_table *sgt = etnaviv_obj->sgt;
 	struct drm_mm_node *node;
 	int ret;
 
@@ -108,6 +107,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	INIT_LIST_HEAD(&mapping->scan_node);
 	mapping->object = etnaviv_obj;
 	mapping->mmu = mmu;
+	mapping->use = 1;
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
 	if (sgt->nents == 1 && !(etnaviv_obj->flags & ETNA_BO_FORCE_MMU)) {
@@ -118,6 +118,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 			mapping->iova = iova;
 			list_add_tail(&mapping->obj_node,
 				      &etnaviv_obj->vram_list);
+			list_add_tail(&mapping->mmu_node,
+				      &mmu->mappings);
 			if (out_mapping)
 				*out_mapping = mapping;
 			return 0;
@@ -126,7 +128,6 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 	node = &mapping->vram_node;
 	while (1) {
-		struct etnaviv_gem_object *o;
 		struct etnaviv_vram_mapping *m, *n;
 		struct list_head list;
 		bool found;
@@ -153,20 +154,14 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 		found = 0;
 		INIT_LIST_HEAD(&list);
-		list_for_each_entry(o, &priv->inactive_list, mm_list) {
-			free = etnaviv_gem_get_vram_mapping(o, mmu);
-			if (!free)
-				continue;
-
-			/*
-			 * If this vram node has not been used, skip this.
-			 */
+		list_for_each_entry(free, &mmu->mappings, mmu_node) {
+			/* If this vram node has not been used, skip this. */
 			if (!free->vram_node.mm)
 				continue;
 
 			/*
-			 * If the iova is locked, then it is part of
-			 * a submission, and we want to keep its entry.
+			 * If the iova is pinned, then it's in-use,
+			 * so we must keep its mapping.
 			 */
 			if (free->use)
 				continue;
@@ -225,6 +220,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	}
 
 	list_add_tail(&mapping->obj_node, &etnaviv_obj->vram_list);
+	list_add_tail(&mapping->mmu_node, &mmu->mappings);
 	if (out_mapping)
 		*out_mapping = mapping;
 
@@ -239,6 +235,8 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_vram_mapping *mapping)
 	if (!mapping)
 		return;
 
+	WARN_ON(mapping->use);
+
 	mmu = mapping->mmu;
 
 	/* If the vram node is on the mm, unmap and remove the node */
@@ -249,6 +247,7 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_vram_mapping *mapping)
 		drm_mm_remove_node(&mapping->vram_node);
 	}
 
+	list_del(&mapping->mmu_node);
 	list_del(&mapping->obj_node);
 	kfree(mapping);
 }
@@ -272,6 +271,7 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
 	mmu->domain = domain;
 	mmu->gpu = gpu;
 	mmu->version = version;
+	INIT_LIST_HEAD(&mmu->mappings);
 
 	drm_mm_init(&mmu->mm, domain->geometry.aperture_start,
 		    domain->geometry.aperture_end -
