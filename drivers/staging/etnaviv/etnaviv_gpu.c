@@ -873,6 +873,46 @@ static void hangcheck_disable(struct etnaviv_gpu *gpu)
 	cancel_work_sync(&gpu->recover_work);
 }
 
+/* fence object management */
+int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
+	unsigned int context, bool exclusive)
+{
+	struct reservation_object *robj = etnaviv_obj->resv;
+	struct reservation_object_list *fobj;
+	struct fence *fence;
+	int i, ret, held;
+
+	/*
+	 * If we have any shared fences, then the exclusive fence
+	 * should be ignored as it will already have been signalled.
+	 */
+	fobj = reservation_object_get_list(robj);
+	if (!fobj || fobj->shared_count == 0) {
+		/* Wait on any existing exclusive fence which isn't our own */
+		fence = reservation_object_get_excl(robj);
+		if (fence && fence->context != context) {
+			ret = fence_wait(fence, true);
+			if (ret)
+				return ret;
+		}
+	}
+
+	if (!exclusive || !fobj)
+		return 0;
+
+	held = reservation_object_held(robj);
+	for (i = 0; i < fobj->shared_count; i++) {
+		fence = rcu_dereference_protected(fobj->shared[i], held);
+		if (fence->context != context) {
+			ret = fence_wait(fence, true);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * event management:
  */
