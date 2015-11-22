@@ -518,9 +518,8 @@ int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj)
 	return 0;
 }
 
-static int etnaviv_gem_new_impl(struct drm_device *dev,
-		u32 size, u32 flags,
-		struct drm_gem_object **obj)
+static int etnaviv_gem_new_impl(struct drm_device *dev, u32 size, u32 flags,
+	const struct etnaviv_gem_ops *ops, struct drm_gem_object **obj)
 {
 	struct etnaviv_gem_object *etnaviv_obj;
 	unsigned sz = sizeof(*etnaviv_obj);
@@ -547,6 +546,7 @@ static int etnaviv_gem_new_impl(struct drm_device *dev,
 		return -ENOMEM;
 
 	etnaviv_obj->flags = flags;
+	etnaviv_obj->ops = ops;
 
 	etnaviv_obj->resv = &etnaviv_obj->_resv;
 	reservation_object_init(&etnaviv_obj->_resv);
@@ -567,11 +567,11 @@ static struct drm_gem_object *__etnaviv_gem_new(struct drm_device *dev,
 
 	size = PAGE_ALIGN(size);
 
-	ret = etnaviv_gem_new_impl(dev, size, flags, &obj);
+	ret = etnaviv_gem_new_impl(dev, size, flags, &etnaviv_gem_shmem_ops,
+				   &obj);
 	if (ret)
 		goto fail;
 
-	to_etnaviv_bo(obj)->ops = &etnaviv_gem_shmem_ops;
 	ret = drm_gem_object_init(dev, obj, size);
 	if (ret == 0) {
 		struct address_space *mapping;
@@ -644,12 +644,12 @@ struct drm_gem_object *etnaviv_gem_new(struct drm_device *dev,
 }
 
 int etnaviv_gem_new_private(struct drm_device *dev, size_t size, u32 flags,
-	struct etnaviv_gem_object **res)
+	const struct etnaviv_gem_ops *ops, struct etnaviv_gem_object **res)
 {
 	struct drm_gem_object *obj;
 	int ret;
 
-	ret = etnaviv_gem_new_impl(dev, size, flags, &obj);
+	ret = etnaviv_gem_new_impl(dev, size, flags, ops, &obj);
 	if (ret)
 		return ret;
 
@@ -834,11 +834,11 @@ int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 	struct etnaviv_gem_object *etnaviv_obj;
 	int ret;
 
-	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_CACHED, &etnaviv_obj);
+	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_CACHED,
+				      &etnaviv_gem_userptr_ops, &etnaviv_obj);
 	if (ret)
 		return ret;
 
-	etnaviv_obj->ops = &etnaviv_gem_userptr_ops;
 	etnaviv_obj->userptr.ptr = ptr;
 	etnaviv_obj->userptr.task = current;
 	etnaviv_obj->userptr.ro = !(flags & ETNA_USERPTR_WRITE);
