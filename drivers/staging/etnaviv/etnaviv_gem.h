@@ -49,6 +49,7 @@ struct etnaviv_gem_object {
 
 	struct list_head gem_node;
 	struct etnaviv_gpu *gpu;     /* non-null if active */
+	atomic_t gpu_active;
 	u32 access;
 	u32 read_fence, write_fence;
 
@@ -81,7 +82,7 @@ struct etnaviv_gem_ops {
 
 static inline bool is_active(struct etnaviv_gem_object *etnaviv_obj)
 {
-	return etnaviv_obj->gpu != NULL;
+	return atomic_read(&etnaviv_obj->gpu_active) != 0;
 }
 
 #define MAX_CMDS 4
