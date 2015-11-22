@@ -89,13 +89,13 @@ struct drm_gem_object *etnaviv_gem_prime_import_sg_table(struct drm_device *dev,
 	size_t size = PAGE_ALIGN(attach->dmabuf->size);
 	int ret, npages;
 
-	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_WC, &etnaviv_obj);
+	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_WC,
+				      &etnaviv_gem_prime_ops, &etnaviv_obj);
 	if (ret < 0)
 		return ERR_PTR(ret);
 
 	npages = size / PAGE_SIZE;
 
-	etnaviv_obj->ops = &etnaviv_gem_prime_ops;
 	etnaviv_obj->sgt = sgt;
 	etnaviv_obj->pages = drm_malloc_ab(npages, sizeof(struct page *));
 	if (!etnaviv_obj->pages) {
