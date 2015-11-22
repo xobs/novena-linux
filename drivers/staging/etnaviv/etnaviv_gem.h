@@ -51,7 +51,6 @@ struct etnaviv_gem_object {
 	struct etnaviv_gpu *gpu;     /* non-null if active */
 	atomic_t gpu_active;
 	u32 access;
-	u32 read_fence, write_fence;
 
 	struct page **pages;
 	struct sg_table *sgt;
