@@ -153,7 +153,7 @@ struct etnaviv_cmdbuf {
 	/* target exec state */
 	u32 exec_state;
 	/* per GPU in-flight list */
-	struct list_head gpu_active_list;
+	struct list_head node;
 	/* BOs attached to this command buffer */
 	unsigned int nr_bos;
 	struct etnaviv_gem_object *bo[0];

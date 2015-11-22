@@ -134,7 +134,7 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 		    mmu_size + gpu->buffer->size;
 
 	/* Add in the active command buffers */
-	list_for_each_entry(cmd, &gpu->active_cmd_list, gpu_active_list) {
+	list_for_each_entry(cmd, &gpu->active_cmd_list, node) {
 		file_size += cmd->size;
 		n_obj++;
 	}
@@ -177,7 +177,7 @@ void etnaviv_core_dump(struct etnaviv_gpu *gpu)
 	etnaviv_core_dump_mem(&iter, ETDUMP_BUF_RING, gpu->buffer->vaddr,
 			      gpu->buffer->size, gpu->buffer->paddr);
 
-	list_for_each_entry(cmd, &gpu->active_cmd_list, gpu_active_list)
+	list_for_each_entry(cmd, &gpu->active_cmd_list, node)
 		etnaviv_core_dump_mem(&iter, ETDUMP_BUF_CMD, cmd->vaddr,
 				      cmd->size, cmd->paddr);
 
