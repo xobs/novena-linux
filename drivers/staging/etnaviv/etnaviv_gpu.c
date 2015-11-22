@@ -1089,7 +1089,6 @@ static void retire_worker(struct work_struct *work)
 		fence_put(cmdbuf->fence);
 
 		for (i = 0; i < cmdbuf->nr_bos; i++) {
-			etnaviv_gem_move_to_inactive(&cmdbuf->bo[i]->base);
 			etnaviv_gem_put_iova(gpu, &cmdbuf->bo[i]->base);
 			atomic_dec(&cmdbuf->bo[i]->gpu_active);
 			drm_gem_object_unreference(&cmdbuf->bo[i]->base);
@@ -1248,17 +1247,6 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		else
 			reservation_object_add_shared_fence(etnaviv_obj->resv,
 							    fence);
-
-		/* can't happen yet.. but when we add 2d support we'll have
-		 * to deal w/ cross-ring synchronization:
-		 */
-		WARN_ON(is_active(etnaviv_obj) && (etnaviv_obj->gpu != gpu));
-
-		if (submit->bos[i].flags & (ETNA_SUBMIT_BO_READ |
-					    ETNA_SUBMIT_BO_WRITE))
-			etnaviv_gem_move_to_active(&etnaviv_obj->base, gpu,
-						   submit->bos[i].flags,
-						   submit->fence);
 	}
 	cmdbuf->nr_bos = submit->nr_bos;
 	hangcheck_timer_reset(gpu);
