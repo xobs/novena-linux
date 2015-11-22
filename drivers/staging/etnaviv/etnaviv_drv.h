@@ -146,4 +146,19 @@ static inline bool fence_after_eq(u32 a, u32 b)
 	return (s32)(a - b) >= 0;
 }
 
+static inline unsigned long etnaviv_timeout_to_jiffies(
+	const struct timespec *timeout)
+{
+	unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
+	unsigned long start_jiffies = jiffies;
+	unsigned long remaining_jiffies;
+
+	if (time_after(start_jiffies, timeout_jiffies))
+		remaining_jiffies = 0;
+	else
+		remaining_jiffies = timeout_jiffies - start_jiffies;
+
+	return remaining_jiffies;
+}
+
 #endif /* __ETNAVIV_DRV_H__ */

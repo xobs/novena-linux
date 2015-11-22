@@ -365,22 +365,20 @@ int etnaviv_gem_cpu_prep(struct drm_gem_object *obj, u32 op,
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct drm_device *dev = obj->dev;
+	bool write = !!(op & ETNA_PREP_WRITE);
 	int ret;
 
-	if (is_active(etnaviv_obj)) {
-		struct etnaviv_gpu *gpu = etnaviv_obj->gpu;
-		u32 fence = 0;
+	if (op & ETNA_PREP_NOSYNC) {
+		if (!reservation_object_test_signaled_rcu(etnaviv_obj->resv,
+							  write))
+			return -EBUSY;
+	} else {
+		unsigned long remain = etnaviv_timeout_to_jiffies(timeout);
 
-		if (op & ETNA_PREP_READ)
-			fence = etnaviv_obj->write_fence;
-		if (op & ETNA_PREP_WRITE)
-			fence = max(fence, etnaviv_obj->read_fence);
-		if (op & ETNA_PREP_NOSYNC)
-			timeout = NULL;
-
-		ret = etnaviv_gpu_wait_fence_interruptible(gpu, fence, timeout);
-		if (ret)
-			return ret;
+		ret = reservation_object_wait_timeout_rcu(etnaviv_obj->resv,
+							  write, true, remain);
+		if (ret <= 0)
+			return ret == 0 ? -ETIMEDOUT : ret;
 	}
 
 	if (etnaviv_obj->flags & ETNA_BO_CACHED) {
