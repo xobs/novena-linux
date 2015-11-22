@@ -123,6 +123,18 @@ u32 etnaviv_readl(const void __iomem *addr);
 #define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 #define VERB(fmt, ...) if (0) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 
+/*
+ * Return the storage size of a structure with a variable length array.
+ * The array is nelem elements of elem_size, where the base structure
+ * is defined by base.  If the size overflows size_t, return zero.
+ */
+static inline size_t size_vstruct(size_t nelem, size_t elem_size, size_t base)
+{
+	if (elem_size && nelem > (SIZE_MAX - base) / elem_size)
+		return 0;
+	return base + nelem * elem_size;
+}
+
 /* returns true if fence a comes after fence b */
 static inline bool fence_after(u32 a, u32 b)
 {

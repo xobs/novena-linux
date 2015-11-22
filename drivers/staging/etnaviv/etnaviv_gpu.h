@@ -155,6 +155,9 @@ struct etnaviv_cmdbuf {
 	u32 exec_state;
 	/* per GPU in-flight list */
 	struct list_head gpu_active_list;
+	/* BOs attached to this command buffer */
+	unsigned int nr_bos;
+	struct etnaviv_gem_object *bo[0];
 };
 
 static inline void gpu_write(struct etnaviv_gpu *gpu, u32 reg, u32 data)
@@ -193,7 +196,7 @@ int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_cmdbuf *cmdbuf);
 struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu,
-					      u32 size);
+					      u32 size, size_t nr_bos);
 void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf);
 int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu);
 void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu);
