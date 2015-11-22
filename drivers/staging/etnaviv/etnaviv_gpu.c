@@ -975,6 +975,7 @@ static void retire_worker(struct work_struct *work)
 		for (i = 0; i < cmdbuf->nr_bos; i++) {
 			etnaviv_gem_move_to_inactive(&cmdbuf->bo[i]->base);
 			etnaviv_gem_put_iova(gpu, &cmdbuf->bo[i]->base);
+			atomic_dec(&cmdbuf->bo[i]->gpu_active);
 			drm_gem_object_unreference(&cmdbuf->bo[i]->base);
 		}
 
@@ -1130,6 +1131,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		drm_gem_object_reference(&etnaviv_obj->base);
 		etnaviv_gem_get_iova_locked(gpu, &etnaviv_obj->base, &iova);
 		cmdbuf->bo[i] = etnaviv_obj;
+		atomic_inc(&etnaviv_obj->gpu_active);
 
 		/* can't happen yet.. but when we add 2d support we'll have
 		 * to deal w/ cross-ring synchronization:
