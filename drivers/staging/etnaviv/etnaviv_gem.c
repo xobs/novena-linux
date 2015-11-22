@@ -335,9 +335,6 @@ void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
 		etnaviv_obj->write_fence = fence;
 
 	etnaviv_obj->access |= access;
-
-	list_del_init(&etnaviv_obj->mm_list);
-	list_add_tail(&etnaviv_obj->mm_list, &gpu->active_list);
 }
 
 void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
@@ -351,7 +348,6 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 	etnaviv_obj->read_fence = 0;
 	etnaviv_obj->write_fence = 0;
 	etnaviv_obj->access = 0;
-	list_del_init(&etnaviv_obj->mm_list);
 }
 
 static inline enum dma_data_direction etnaviv_op_to_dma_dir(u32 op)
@@ -561,7 +557,6 @@ static int etnaviv_gem_new_impl(struct drm_device *dev, u32 size, u32 flags,
 		reservation_object_init(&etnaviv_obj->_resv);
 	}
 
-	INIT_LIST_HEAD(&etnaviv_obj->mm_list);
 	INIT_LIST_HEAD(&etnaviv_obj->vram_list);
 
 	*obj = &etnaviv_obj->base;

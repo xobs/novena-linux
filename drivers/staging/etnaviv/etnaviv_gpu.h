@@ -102,9 +102,6 @@ struct etnaviv_gpu {
 	struct completion event_free;
 	spinlock_t event_spinlock;
 
-	/* list of GEM active objects: */
-	struct list_head active_list;
-
 	/* list of currently in-flight command buffers */
 	struct list_head active_cmd_list;
 

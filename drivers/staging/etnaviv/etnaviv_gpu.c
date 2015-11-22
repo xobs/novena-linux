@@ -1318,7 +1318,6 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 
 	gpu->drm = drm;
 
-	INIT_LIST_HEAD(&gpu->active_list);
 	INIT_LIST_HEAD(&gpu->active_cmd_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
 	INIT_WORK(&gpu->recover_work, recover_worker);
@@ -1343,8 +1342,6 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
 	DBG("%s", dev_name(gpu->dev));
 
 	hangcheck_disable(gpu);
-
-	WARN_ON(!list_empty(&gpu->active_list));
 
 #ifdef CONFIG_PM
 	pm_runtime_get_sync(gpu->dev);
