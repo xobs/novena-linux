@@ -79,7 +79,7 @@ struct etnaviv_chip_identity {
 
 struct etnaviv_event {
 	bool used;
-	u32 fence;
+	struct fence *fence;
 };
 
 struct etnaviv_cmdbuf;
@@ -114,6 +114,7 @@ struct etnaviv_gpu {
 	u32 retired_fence;
 	wait_queue_head_t fence_event;
 	unsigned int fence_context;
+	spinlock_t fence_spinlock;
 
 	/* worker for handling active-list retiring: */
 	struct work_struct retire_work;
@@ -148,7 +149,7 @@ struct etnaviv_cmdbuf {
 	u32 size;
 	u32 user_size;
 	/* fence after which this buffer is to be disposed */
-	u32 fence;
+	struct fence *fence;
 	/* target exec state */
 	u32 exec_state;
 	/* per GPU in-flight list */
