@@ -55,7 +55,7 @@ struct etnaviv_drm_private {
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
 
 	/* list of GEM objects: */
-	struct list_head inactive_list;
+	struct list_head gem_list;
 
 	struct workqueue_struct *wq;
 };
@@ -111,7 +111,8 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 	struct drm_etnaviv_gem_submit_reloc *relocs, unsigned int reloc_size);
 
 #ifdef CONFIG_DEBUG_FS
-void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m);
+void etnaviv_gem_describe_objects(struct etnaviv_drm_private *priv,
+	struct seq_file *m);
 #endif
 
 void __iomem *etnaviv_ioremap(struct platform_device *pdev, const char *name,

@@ -138,20 +138,8 @@ static void etnaviv_preclose(struct drm_device *dev, struct drm_file *file)
 static int etnaviv_gem_show(struct drm_device *dev, struct seq_file *m)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
-	struct etnaviv_gpu *gpu;
-	unsigned int i;
 
-	for (i = 0; i < ETNA_MAX_PIPES; i++) {
-		gpu = priv->gpu[i];
-		if (gpu) {
-			seq_printf(m, "Active Objects (%s):\n",
-				   dev_name(gpu->dev));
-			etnaviv_gem_describe_objects(&gpu->active_list, m);
-		}
-	}
-
-	seq_puts(m, "Inactive Objects:\n");
-	etnaviv_gem_describe_objects(&priv->inactive_list, m);
+	etnaviv_gem_describe_objects(priv, m);
 
 	return 0;
 }
@@ -566,7 +554,7 @@ static int etnaviv_bind(struct device *dev)
 		goto out_wq;
 	}
 
-	INIT_LIST_HEAD(&priv->inactive_list);
+	INIT_LIST_HEAD(&priv->gem_list);
 	priv->num_gpus = 0;
 
 	dev_set_drvdata(dev, drm);

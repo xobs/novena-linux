@@ -343,7 +343,6 @@ void etnaviv_gem_move_to_active(struct drm_gem_object *obj,
 void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 {
 	struct drm_device *dev = obj->dev;
-	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
@@ -353,7 +352,6 @@ void etnaviv_gem_move_to_inactive(struct drm_gem_object *obj)
 	etnaviv_obj->write_fence = 0;
 	etnaviv_obj->access = 0;
 	list_del_init(&etnaviv_obj->mm_list);
-	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
 }
 
 static inline enum dma_data_direction etnaviv_op_to_dma_dir(u32 op)
@@ -450,13 +448,14 @@ static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 			off, etnaviv_obj->vaddr, obj->size);
 }
 
-void etnaviv_gem_describe_objects(struct list_head *list, struct seq_file *m)
+void etnaviv_gem_describe_objects(struct etnaviv_drm_private *priv,
+	struct seq_file *m)
 {
 	struct etnaviv_gem_object *etnaviv_obj;
 	int count = 0;
 	size_t size = 0;
 
-	list_for_each_entry(etnaviv_obj, list, mm_list) {
+	list_for_each_entry(etnaviv_obj, &priv->gem_list, gem_node) {
 		struct drm_gem_object *obj = &etnaviv_obj->base;
 
 		seq_puts(m, "   ");
@@ -492,7 +491,7 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 	/* object should not be on active list: */
 	WARN_ON(is_active(etnaviv_obj));
 
-	list_del(&etnaviv_obj->mm_list);
+	list_del(&etnaviv_obj->gem_node);
 
 	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
 				 obj_node) {
@@ -519,7 +518,7 @@ int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj)
 	if (ret)
 		return ret;
 
-	list_add_tail(&etnaviv_obj->mm_list, &priv->inactive_list);
+	list_add_tail(&etnaviv_obj->gem_node, &priv->gem_list);
 	mutex_unlock(&dev->struct_mutex);
 
 	return 0;
