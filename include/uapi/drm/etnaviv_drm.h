@@ -104,6 +104,7 @@ struct drm_etnaviv_gem_cpu_prep {
 
 struct drm_etnaviv_gem_cpu_fini {
 	__u32 handle;         /* in */
+	__u32 flags;          /* in, placeholder for now, no defined values */
 };
 
 /*
@@ -167,9 +168,12 @@ struct drm_etnaviv_gem_submit {
  * mainly just exists as a way to implement the gallium pipe_fence
  * APIs without requiring a dummy bo to synchronize on.
  */
+#define ETNA_WAIT_NONBLOCK      0x01
 struct drm_etnaviv_wait_fence {
 	__u32 pipe;           /* in */
 	__u32 fence;          /* in */
+	__u32 flags;          /* in, mask of ETNA_WAIT_x */
+	__u32 pad;
 	struct drm_etnaviv_timespec timeout;   /* in */
 };
 
@@ -185,6 +189,8 @@ struct drm_etnaviv_gem_userptr {
 struct drm_etnaviv_gem_wait {
 	__u32 pipe;				/* in */
 	__u32 handle;				/* in, bo to be waited for */
+	__u32 flags;				/* in, mask of ETNA_WAIT_x  */
+	__u32 pad;
 	struct drm_etnaviv_timespec timeout;	/* in */
 };
 

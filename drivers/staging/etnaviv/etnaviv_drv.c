@@ -332,6 +332,9 @@ static int etnaviv_ioctl_gem_cpu_fini(struct drm_device *dev, void *data,
 	struct drm_gem_object *obj;
 	int ret;
 
+	if (args->flags)
+		return -EINVAL;
+
 	obj = drm_gem_object_lookup(dev, file, args->handle);
 	if (!obj)
 		return -ENOENT;
@@ -368,7 +371,11 @@ static int etnaviv_ioctl_wait_fence(struct drm_device *dev, void *data,
 {
 	struct drm_etnaviv_wait_fence *args = data;
 	struct etnaviv_drm_private *priv = dev->dev_private;
+	struct timespec *timeout = &TS(args->timeout);
 	struct etnaviv_gpu *gpu;
+
+	if (args->flags & ~(ETNA_WAIT_NONBLOCK))
+		return -EINVAL;
 
 	if (args->pipe >= ETNA_MAX_PIPES)
 		return -EINVAL;
@@ -377,8 +384,11 @@ static int etnaviv_ioctl_wait_fence(struct drm_device *dev, void *data,
 	if (!gpu)
 		return -ENXIO;
 
+	if (args->flags & ETNA_WAIT_NONBLOCK)
+		timeout = NULL;
+
 	return etnaviv_gpu_wait_fence_interruptible(gpu, args->fence,
-						    &TS(args->timeout));
+						    timeout);
 }
 
 static int etnaviv_ioctl_gem_userptr(struct drm_device *dev, void *data,
@@ -416,9 +426,13 @@ static int etnaviv_ioctl_gem_wait(struct drm_device *dev, void *data,
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct drm_etnaviv_gem_wait *args = data;
+	struct timespec *timeout = &TS(args->timeout);
 	struct drm_gem_object *obj;
 	struct etnaviv_gpu *gpu;
 	int ret;
+
+	if (args->flags & ~(ETNA_WAIT_NONBLOCK))
+		return -EINVAL;
 
 	if (args->pipe >= ETNA_MAX_PIPES)
 		return -EINVAL;
@@ -431,7 +445,10 @@ static int etnaviv_ioctl_gem_wait(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
-	ret = etnaviv_gem_wait_bo(gpu, obj, &TS(args->timeout));
+	if (args->flags & ETNA_WAIT_NONBLOCK)
+		timeout = NULL;
+
+	ret = etnaviv_gem_wait_bo(gpu, obj, timeout);
 
 	drm_gem_object_unreference_unlocked(obj);
 
@@ -501,7 +518,7 @@ static struct drm_driver etnaviv_drm_driver = {
 	.fops               = &fops,
 	.name               = "etnaviv",
 	.desc               = "etnaviv DRM",
-	.date               = "20150925",
+	.date               = "20151126",
 	.major              = 1,
 	.minor              = 0,
 };
