@@ -948,7 +948,7 @@ int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 	struct reservation_object *robj = etnaviv_obj->resv;
 	struct reservation_object_list *fobj;
 	struct fence *fence;
-	int i, ret, held;
+	int i, ret;
 
 	if (!exclusive) {
 		ret = reservation_object_reserve_shared(robj);
@@ -974,9 +974,9 @@ int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 	if (!exclusive || !fobj)
 		return 0;
 
-	held = reservation_object_held(robj);
 	for (i = 0; i < fobj->shared_count; i++) {
-		fence = rcu_dereference_protected(fobj->shared[i], held);
+		fence = rcu_dereference_protected(fobj->shared[i],
+						reservation_object_held(robj));
 		if (fence->context != context) {
 			ret = fence_wait(fence, true);
 			if (ret)
