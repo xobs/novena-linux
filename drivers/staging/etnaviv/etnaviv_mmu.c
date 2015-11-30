@@ -91,6 +91,16 @@ int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, u32 iova,
 	return 0;
 }
 
+static void etnaviv_iommu_remove_mapping(struct etnaviv_iommu *mmu,
+	struct etnaviv_vram_mapping *mapping)
+{
+	struct etnaviv_gem_object *etnaviv_obj = mapping->object;
+
+	etnaviv_iommu_unmap(mmu, mapping->vram_node.start,
+			    etnaviv_obj->sgt, etnaviv_obj->base.size);
+	drm_mm_remove_node(&mapping->vram_node);
+}
+
 int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
 	struct etnaviv_vram_mapping *mapping)
@@ -212,17 +222,11 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 	struct etnaviv_vram_mapping *mapping)
 {
-	struct etnaviv_gem_object *etnaviv_obj;
-
 	WARN_ON(mapping->use);
 
 	/* If the vram node is on the mm, unmap and remove the node */
-	if (mapping->vram_node.mm == &mmu->mm) {
-		etnaviv_obj = mapping->object;
-		etnaviv_iommu_unmap(mmu, mapping->vram_node.start,
-				    etnaviv_obj->sgt, etnaviv_obj->base.size);
-		drm_mm_remove_node(&mapping->vram_node);
-	}
+	if (mapping->vram_node.mm == &mmu->mm)
+		etnaviv_iommu_remove_mapping(mmu, mapping);
 
 	list_del(&mapping->mmu_node);
 }
