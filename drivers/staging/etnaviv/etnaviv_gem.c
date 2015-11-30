@@ -496,7 +496,7 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
 				 obj_node) {
 		WARN_ON(mapping->use);
-		etnaviv_iommu_unmap_gem(mapping);
+		etnaviv_iommu_unmap_gem(mapping->mmu, mapping);
 	}
 
 	drm_gem_free_mmap_offset(obj);

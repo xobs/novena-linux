@@ -192,7 +192,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 		list_for_each_entry_safe(m, n, &list, scan_node) {
 			list_del_init(&m->scan_node);
-			etnaviv_iommu_unmap_gem(m);
+			etnaviv_iommu_unmap_gem(mmu, m);
 		}
 
 		/*
@@ -227,17 +227,12 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	return ret;
 }
 
-void etnaviv_iommu_unmap_gem(struct etnaviv_vram_mapping *mapping)
+void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
+	struct etnaviv_vram_mapping *mapping)
 {
-	struct etnaviv_iommu *mmu;
 	struct etnaviv_gem_object *etnaviv_obj;
 
-	if (!mapping)
-		return;
-
 	WARN_ON(mapping->use);
-
-	mmu = mapping->mmu;
 
 	/* If the vram node is on the mm, unmap and remove the node */
 	if (mapping->vram_node.mm == &mmu->mm) {
