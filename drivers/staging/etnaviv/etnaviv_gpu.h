@@ -87,6 +87,7 @@ struct etnaviv_cmdbuf;
 struct etnaviv_gpu {
 	struct drm_device *drm;
 	struct device *dev;
+	struct mutex lock;
 	struct etnaviv_chip_identity identity;
 	struct etnaviv_file_private *lastctx;
 	bool switch_context;
