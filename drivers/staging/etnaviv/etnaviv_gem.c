@@ -229,7 +229,6 @@ out:
 	}
 }
 
-/* get mmap offset - must be called under struct_mutex */
 int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, u64 *offset)
 {
 	int ret;
