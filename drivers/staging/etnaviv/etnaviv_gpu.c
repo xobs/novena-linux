@@ -1237,7 +1237,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		u32 iova;
 
 		/* Each cmdbuf takes a refcount on the iova */
-		etnaviv_gem_get_iova_locked(gpu, &etnaviv_obj->base, &iova);
+		etnaviv_gem_get_iova(gpu, &etnaviv_obj->base, &iova);
 		cmdbuf->bo[i] = etnaviv_obj;
 		atomic_inc(&etnaviv_obj->gpu_active);
 
