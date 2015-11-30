@@ -370,13 +370,7 @@ static int etnaviv_ioctl_gem_info(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret == 0) {
-		ret = etnaviv_gem_mmap_offset(obj, &args->offset);
-
-		mutex_unlock(&dev->struct_mutex);
-	}
-
+	ret = etnaviv_gem_mmap_offset(obj, &args->offset);
 	drm_gem_object_unreference_unlocked(obj);
 
 	return ret;
