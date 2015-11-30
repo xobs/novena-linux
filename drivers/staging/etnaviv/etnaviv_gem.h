@@ -44,6 +44,7 @@ struct etnaviv_vram_mapping {
 struct etnaviv_gem_object {
 	struct drm_gem_object base;
 	const struct etnaviv_gem_ops *ops;
+	struct mutex lock;
 
 	u32 flags;
 

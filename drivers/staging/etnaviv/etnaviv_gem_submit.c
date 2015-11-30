@@ -205,8 +205,8 @@ static int submit_pin_objects(struct etnaviv_gem_submit *submit)
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 		u32 iova;
 
-		ret = etnaviv_gem_get_iova_locked(submit->gpu,
-						  &etnaviv_obj->base, &iova);
+		ret = etnaviv_gem_get_iova(submit->gpu, &etnaviv_obj->base,
+					   &iova);
 		if (ret)
 			break;
 
@@ -331,7 +331,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 	/*
 	 * Copy the command submission and bo array to kernel space in
-	 * one go, and do this outside of the dev->struct_mutex lock.
+	 * one go, and do this outside of any locks.
 	 */
 	bos = drm_malloc_ab(args->nr_bos, sizeof(*bos));
 	relocs = drm_malloc_ab(args->nr_relocs, sizeof(*relocs));
@@ -439,9 +439,9 @@ out:
 	etnaviv_gpu_pm_put(gpu);
 
 	/*
-	 * If we're returning -EAGAIN, it could be due to the userptr code
-	 * wanting to run its workqueue outside of the struct_mutex.
-	 * Flush our workqueue to ensure that it is run in a timely manner.
+	 * If we're returning -EAGAIN, it may be due to the userptr code
+	 * wanting to run its workqueue outside of any locks. Flush our
+	 * workqueue to ensure that it is run in a timely manner.
 	 */
 	if (ret == -EAGAIN)
 		flush_workqueue(priv->wq);

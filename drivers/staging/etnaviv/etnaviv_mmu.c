@@ -110,6 +110,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct drm_mm_node *node;
 	int ret;
 
+	lockdep_assert_held(&etnaviv_obj->lock);
+
 	mutex_lock(&mmu->lock);
 
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
