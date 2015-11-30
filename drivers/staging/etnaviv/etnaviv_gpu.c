@@ -1190,9 +1190,28 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	unsigned int event, i;
 	int ret;
 
-	ret = pm_runtime_get_sync(gpu->dev);
+	/*
+	 * Avoid big circular locking dependency loops:
+	 * - reading debugfs results in mmap_sem depending on i_mutex_key#3
+	 *   (iterate_dir -> filldir64)
+	 * - struct_mutex depends on mmap_sem
+	 *   (vm_mmap_pgoff -> drm_gem_mmap)
+	 * then if we try to do a get_sync() under struct_mutex,
+	 * - genpd->lock depends on struct_mutex
+	 *   (etnaviv_ioctl_gem_submit -> pm_genpd_runtime_resume)
+	 * - (regulator) rdev->mutex depends on genpd->lock
+	 *   (pm_genpd_poweron -> regulator_enable)
+	 * - i_mutex_key#3 depends on rdev->mutex
+	 *   (create_regulator -> debugfs::start_creating)
+	 * and lockdep rightfully explodes.
+	 *
+	 * Avoid this by getting runtime PM outside of the struct_mutex lock.
+	 */
+	ret = etnaviv_gpu_pm_get_sync(gpu);
 	if (ret < 0)
 		return ret;
+
+	mutex_lock(&dev->struct_mutex);
 
 	/*
 	 * TODO
@@ -1206,15 +1225,15 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	event = event_alloc(gpu);
 	if (unlikely(event == ~0U)) {
 		DRM_ERROR("no free event\n");
-		pm_runtime_put_autosuspend(gpu->dev);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto out_unlock;
 	}
 
 	fence = etnaviv_gpu_fence_alloc(gpu);
 	if (!fence) {
 		event_free(gpu, event);
-		pm_runtime_put_autosuspend(gpu->dev);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out_unlock;
 	}
 
 	gpu->event[event].fence = fence;
@@ -1231,6 +1250,9 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 	cmdbuf->fence = fence;
 	list_add_tail(&cmdbuf->node, &gpu->active_cmd_list);
+
+	/* We're committed to adding this command buffer, hold a PM reference */
+	pm_runtime_get_noresume(gpu->dev);
 
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
@@ -1250,8 +1272,14 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	}
 	cmdbuf->nr_bos = submit->nr_bos;
 	hangcheck_timer_reset(gpu);
+	ret = 0;
 
-	return 0;
+out_unlock:
+	mutex_unlock(&dev->struct_mutex);
+
+	etnaviv_gpu_pm_put(gpu);
+
+	return ret;
 }
 
 /*

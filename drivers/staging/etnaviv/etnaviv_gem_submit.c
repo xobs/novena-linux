@@ -403,33 +403,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	memcpy(cmdbuf->vaddr, stream, args->stream_size);
 	cmdbuf->user_size = ALIGN(args->stream_size, 8);
 
-	/*
-	 * Avoid big circular locking dependency loops:
-	 * - reading debugfs results in mmap_sem depending on i_mutex_key#3
-	 *   (iterate_dir -> filldir64)
-	 * - struct_mutex depends on mmap_sem
-	 *   (vm_mmap_pgoff -> drm_gem_mmap)
-	 * then if we try to do a get_sync() under struct_mutex,
-	 * - genpd->lock depends on struct_mutex
-	 *   (etnaviv_ioctl_gem_submit -> pm_genpd_runtime_resume)
-	 * - (regulator) rdev->mutex depends on genpd->lock
-	 *   (pm_genpd_poweron -> regulator_enable)
-	 * - i_mutex_key#3 depends on rdev->mutex
-	 *   (create_regulator -> debugfs::start_creating)
-	 * and lockdep rightfully explodes.
-	 *
-	 * Avoid this by getting runtime PM outside of the struct_mutex lock.
-	 */
-	ret = etnaviv_gpu_pm_get_sync(gpu);
-	if (ret < 0)
-		goto err_submit_cmds;
-
-	mutex_lock(&dev->struct_mutex);
 	ret = etnaviv_gpu_submit(gpu, submit, cmdbuf);
-	mutex_unlock(&dev->struct_mutex);
-
-	etnaviv_gpu_pm_put(gpu);
-
 	if (ret == 0)
 		cmdbuf = NULL;
 
