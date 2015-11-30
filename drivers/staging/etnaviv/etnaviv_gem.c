@@ -243,6 +243,20 @@ int etnaviv_gem_mmap_offset(struct drm_gem_object *obj, u64 *offset)
 	return ret;
 }
 
+static struct etnaviv_vram_mapping *
+etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
+			     struct etnaviv_iommu *mmu)
+{
+	struct etnaviv_vram_mapping *mapping;
+
+	list_for_each_entry(mapping, &obj->vram_list, obj_node) {
+		if (mapping->mmu == mmu)
+			return mapping;
+	}
+
+	return NULL;
+}
+
 /* should be called under struct_mutex.. although it can be called
  * from atomic context without struct_mutex to acquire an extra
  * iova ref if you know one is already held.
@@ -682,20 +696,6 @@ int etnaviv_gem_new_private(struct drm_device *dev, size_t size, u32 flags,
 	*res = to_etnaviv_bo(obj);
 
 	return 0;
-}
-
-struct etnaviv_vram_mapping *
-etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
-			     struct etnaviv_iommu *mmu)
-{
-	struct etnaviv_vram_mapping *mapping;
-
-	list_for_each_entry(mapping, &obj->vram_list, obj_node) {
-		if (mapping->mmu == mmu)
-			return mapping;
-	}
-
-	return NULL;
 }
 
 struct get_pages_work {

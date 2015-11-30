@@ -106,9 +106,6 @@ struct etnaviv_gem_submit {
 
 int etnaviv_gem_wait_bo(struct etnaviv_gpu *gpu, struct drm_gem_object *obj,
 	struct timespec *timeout);
-struct etnaviv_vram_mapping *
-etnaviv_gem_get_vram_mapping(struct etnaviv_gem_object *obj,
-			     struct etnaviv_iommu *mmu);
 int etnaviv_gem_new_private(struct drm_device *dev, size_t size, u32 flags,
 	struct reservation_object *robj, const struct etnaviv_gem_ops *ops,
 	struct etnaviv_gem_object **res);
