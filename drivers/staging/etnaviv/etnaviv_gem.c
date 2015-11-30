@@ -282,13 +282,23 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	if (IS_ERR(pages))
 		return PTR_ERR(pages);
 
-	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-	if (!mapping)
-		return -ENOMEM;
+	/*
+	 * See if we have a reaped vram mapping we can re-use before
+	 * allocating a fresh mapping.
+	 */
+	mapping = etnaviv_gem_get_vram_mapping(etnaviv_obj, NULL);
+	if (!mapping) {
+		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+		if (!mapping)
+			return -ENOMEM;
 
-	INIT_LIST_HEAD(&mapping->scan_node);
-	mapping->object = etnaviv_obj;
-	mapping->mmu = mmu;
+		INIT_LIST_HEAD(&mapping->scan_node);
+		mapping->object = etnaviv_obj;
+	} else {
+		list_del(&mapping->obj_node);
+	}
+
+	mapping->mmu = gpu->mmu;
 	mapping->use = 1;
 
 	ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj, gpu->memory_base,
@@ -521,8 +531,13 @@ void etnaviv_gem_free_object(struct drm_gem_object *obj)
 
 	list_for_each_entry_safe(mapping, tmp, &etnaviv_obj->vram_list,
 				 obj_node) {
+		struct etnaviv_iommu *mmu = mapping->mmu;
+
 		WARN_ON(mapping->use);
-		etnaviv_iommu_unmap_gem(mapping->mmu, mapping);
+
+		if (mmu)
+			etnaviv_iommu_unmap_gem(mmu, mapping);
+
 		list_del(&mapping->obj_node);
 		kfree(mapping);
 	}

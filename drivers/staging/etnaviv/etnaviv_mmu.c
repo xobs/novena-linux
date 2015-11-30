@@ -186,17 +186,23 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 			if (!drm_mm_scan_remove_block(&m->vram_node))
 				list_del_init(&m->scan_node);
 
+		/*
+		 * Unmap the blocks which need to be reaped from the MMU.
+		 * Clear the mmu pointer to prevent the get_iova finding
+		 * this mapping.
+		 */
 		list_for_each_entry_safe(m, n, &list, scan_node) {
-			etnaviv_iommu_unmap_gem(mmu, m);
-			list_del(&m->scan_node);
-			list_del(&m->obj_node);
-			kfree(m);
+			etnaviv_iommu_remove_mapping(mmu, m);
+			m->mmu = NULL;
+			list_del_init(&m->mmu_node);
+			list_del_init(&m->scan_node);
 		}
 
 		/*
 		 * We removed enough mappings so that the new allocation will
-		 * succeed.  Ensure that the MMU will be flushed and retry
-		 * the allocation one more time.
+		 * succeed.  Ensure that the MMU will be flushed before the
+		 * associated commit requesting this mapping, and retry the
+		 * allocation one more time.
 		 */
 		mmu->need_flush = true;
 	}
