@@ -146,7 +146,13 @@ static int etnaviv_gem_show(struct drm_device *dev, struct seq_file *m)
 
 static int etnaviv_mm_show(struct drm_device *dev, struct seq_file *m)
 {
-	return drm_mm_dump_table(m, &dev->vma_offset_manager->vm_addr_space_mm);
+	int ret;
+
+	read_lock(&dev->vma_offset_manager->vm_lock);
+	ret = drm_mm_dump_table(m, &dev->vma_offset_manager->vm_addr_space_mm);
+	read_unlock(&dev->vma_offset_manager->vm_lock);
+
+	return ret;
 }
 
 static int etnaviv_mmu_show(struct drm_device *dev, struct seq_file *m)
@@ -203,6 +209,16 @@ static int etnaviv_ring_show(struct drm_device *dev, struct seq_file *m)
 	return 0;
 }
 
+static int show_unlocked(struct seq_file *m, void *arg)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct drm_device *dev = node->minor->dev;
+	int (*show)(struct drm_device *dev, struct seq_file *m) =
+			node->info_ent->data;
+
+	return show(dev, m);
+}
+
 static int show_locked(struct seq_file *m, void *arg)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
@@ -249,7 +265,7 @@ static int show_each_gpu(struct seq_file *m, void *arg)
 static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gpu", show_each_gpu, 0, etnaviv_gpu_debugfs},
 		{"gem", show_locked, 0, etnaviv_gem_show},
-		{ "mm", show_locked, 0, etnaviv_mm_show },
+		{ "mm", show_unlocked, 0, etnaviv_mm_show },
 		{"mmu", show_locked, 0, etnaviv_mmu_show},
 		{"ring", show_locked, 0, etnaviv_ring_show},
 };
