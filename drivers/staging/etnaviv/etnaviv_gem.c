@@ -274,8 +274,25 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 
 	mapping = etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
 	if (mapping) {
-		mapping->use += 1;
-		goto out;
+		/*
+		 * Holding the object lock prevents the use count changing
+		 * beneath us.  If the use count is zero, the MMU might be
+		 * reaping this object, so take the lock and re-check that
+		 * the MMU owns this mapping to close this race.
+		 */
+		if (mapping->use == 0) {
+			mutex_lock(&gpu->mmu->lock);
+			if (mapping->mmu == gpu->mmu)
+				mapping->use += 1;
+			else
+				mapping = NULL;
+			mutex_unlock(&gpu->mmu->lock);
+			if (mapping)
+				goto out;
+		} else {
+			mapping->use += 1;
+			goto out;
+		}
 	}
 
 	pages = etnaviv_gem_get_pages(etnaviv_obj);

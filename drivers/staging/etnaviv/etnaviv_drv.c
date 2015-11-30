@@ -155,20 +155,14 @@ static int etnaviv_mm_show(struct drm_device *dev, struct seq_file *m)
 	return ret;
 }
 
-static int etnaviv_mmu_show(struct drm_device *dev, struct seq_file *m)
+static int etnaviv_mmu_show(struct etnaviv_gpu *gpu, struct seq_file *m)
 {
-	struct etnaviv_drm_private *priv = dev->dev_private;
-	struct etnaviv_gpu *gpu;
-	unsigned int i;
+	seq_printf(m, "Active Objects (%s):\n", dev_name(gpu->dev));
 
-	for (i = 0; i < ETNA_MAX_PIPES; i++) {
-		gpu = priv->gpu[i];
-		if (gpu) {
-			seq_printf(m, "Active Objects (%s):\n",
-				   dev_name(gpu->dev));
-			drm_mm_dump_table(m, &gpu->mmu->mm);
-		}
-	}
+	mutex_lock(&gpu->mmu->lock);
+	drm_mm_dump_table(m, &gpu->mmu->mm);
+	mutex_unlock(&gpu->mmu->lock);
+
 	return 0;
 }
 
@@ -266,7 +260,7 @@ static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gpu", show_each_gpu, 0, etnaviv_gpu_debugfs},
 		{"gem", show_unlocked, 0, etnaviv_gem_show},
 		{ "mm", show_unlocked, 0, etnaviv_mm_show },
-		{"mmu", show_locked, 0, etnaviv_mmu_show},
+		{"mmu", show_each_gpu, 0, etnaviv_mmu_show},
 		{"ring", show_locked, 0, etnaviv_ring_show},
 };
 
