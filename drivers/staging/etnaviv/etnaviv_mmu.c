@@ -110,6 +110,8 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 	struct drm_mm_node *node;
 	int ret;
 
+	mutex_lock(&mmu->lock);
+
 	/* v1 MMU can optimize single entry (contiguous) scatterlists */
 	if (sgt->nents == 1 && !(etnaviv_obj->flags & ETNA_BO_FORCE_MMU)) {
 		u32 iova;
@@ -118,6 +120,7 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
 			mapping->iova = iova;
 			list_add_tail(&mapping->mmu_node, &mmu->mappings);
+			mutex_unlock(&mmu->lock);
 			return 0;
 		}
 	}
@@ -207,8 +210,10 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		mmu->need_flush = true;
 	}
 
-	if (ret < 0)
+	if (ret < 0) {
+		mutex_unlock(&mmu->lock);
 		return ret;
+	}
 
 	mmu->last_iova = node->start + etnaviv_obj->base.size;
 	mapping->iova = node->start;
@@ -217,10 +222,12 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 
 	if (ret < 0) {
 		drm_mm_remove_node(node);
+		mutex_unlock(&mmu->lock);
 		return ret;
 	}
 
 	list_add_tail(&mapping->mmu_node, &mmu->mappings);
+	mutex_unlock(&mmu->lock);
 
 	return ret;
 }
@@ -230,11 +237,14 @@ void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
 {
 	WARN_ON(mapping->use);
 
+	mutex_lock(&mmu->lock);
+
 	/* If the vram node is on the mm, unmap and remove the node */
 	if (mapping->vram_node.mm == &mmu->mm)
 		etnaviv_iommu_remove_mapping(mmu, mapping);
 
 	list_del(&mapping->mmu_node);
+	mutex_unlock(&mmu->lock);
 }
 
 void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
@@ -256,6 +266,7 @@ struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
 	mmu->domain = domain;
 	mmu->gpu = gpu;
 	mmu->version = version;
+	mutex_init(&mmu->lock);
 	INIT_LIST_HEAD(&mmu->mappings);
 
 	drm_mm_init(&mmu->mm, domain->geometry.aperture_start,
