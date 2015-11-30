@@ -264,7 +264,7 @@ static int show_each_gpu(struct seq_file *m, void *arg)
 
 static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gpu", show_each_gpu, 0, etnaviv_gpu_debugfs},
-		{"gem", show_locked, 0, etnaviv_gem_show},
+		{"gem", show_unlocked, 0, etnaviv_gem_show},
 		{ "mm", show_unlocked, 0, etnaviv_mm_show },
 		{"mmu", show_locked, 0, etnaviv_mmu_show},
 		{"ring", show_locked, 0, etnaviv_ring_show},
@@ -564,6 +564,7 @@ static int etnaviv_bind(struct device *dev)
 		goto out_wq;
 	}
 
+	mutex_init(&priv->gem_lock);
 	INIT_LIST_HEAD(&priv->gem_list);
 	priv->num_gpus = 0;
 

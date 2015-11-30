@@ -55,6 +55,7 @@ struct etnaviv_drm_private {
 	struct etnaviv_gpu *gpu[ETNA_MAX_PIPES];
 
 	/* list of GEM objects: */
+	struct mutex gem_lock;
 	struct list_head gem_list;
 
 	struct workqueue_struct *wq;

@@ -453,14 +453,11 @@ static void etnaviv_gem_describe_fence(struct fence *fence,
 
 static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {
-	struct drm_device *dev = obj->dev;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct reservation_object *robj = etnaviv_obj->resv;
 	struct reservation_object_list *fobj;
 	struct fence *fence;
 	unsigned long off = drm_vma_node_start(&obj->vma_node);
-
-	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
 	seq_printf(m, "%08x: %c %2d (%2d) %08lx %p %zd\n",
 			etnaviv_obj->flags, is_active(etnaviv_obj) ? 'A' : 'I',
@@ -491,6 +488,7 @@ void etnaviv_gem_describe_objects(struct etnaviv_drm_private *priv,
 	int count = 0;
 	size_t size = 0;
 
+	mutex_lock(&priv->gem_lock);
 	list_for_each_entry(etnaviv_obj, &priv->gem_list, gem_node) {
 		struct drm_gem_object *obj = &etnaviv_obj->base;
 
@@ -499,6 +497,7 @@ void etnaviv_gem_describe_objects(struct etnaviv_drm_private *priv,
 		count++;
 		size += obj->size;
 	}
+	mutex_unlock(&priv->gem_lock);
 
 	seq_printf(m, "Total %d objects, %zu bytes\n", count, size);
 }
@@ -555,14 +554,10 @@ int etnaviv_gem_obj_add(struct drm_device *dev, struct drm_gem_object *obj)
 {
 	struct etnaviv_drm_private *priv = dev->dev_private;
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-	int ret;
 
-	ret = mutex_lock_killable(&dev->struct_mutex);
-	if (ret)
-		return ret;
-
+	mutex_lock(&priv->gem_lock);
 	list_add_tail(&etnaviv_obj->gem_node, &priv->gem_list);
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&priv->gem_lock);
 
 	return 0;
 }
