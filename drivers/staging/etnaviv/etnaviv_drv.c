@@ -118,14 +118,16 @@ static void etnaviv_preclose(struct drm_device *dev, struct drm_file *file)
 	struct etnaviv_file_private *ctx = file->driver_priv;
 	unsigned int i;
 
-	mutex_lock(&dev->struct_mutex);
 	for (i = 0; i < ETNA_MAX_PIPES; i++) {
 		struct etnaviv_gpu *gpu = priv->gpu[i];
 
-		if (gpu && gpu->lastctx == ctx)
-			gpu->lastctx = NULL;
+		if (gpu) {
+			mutex_lock(&gpu->lock);
+			if (gpu->lastctx == ctx)
+				gpu->lastctx = NULL;
+			mutex_unlock(&gpu->lock);
+		}
 	}
-	mutex_unlock(&dev->struct_mutex);
 
 	kfree(ctx);
 }
@@ -186,20 +188,14 @@ static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu, struct seq_file *m)
 	seq_puts(m, "\n");
 }
 
-static int etnaviv_ring_show(struct drm_device *dev, struct seq_file *m)
+static int etnaviv_ring_show(struct etnaviv_gpu *gpu, struct seq_file *m)
 {
-	struct etnaviv_drm_private *priv = dev->dev_private;
-	struct etnaviv_gpu *gpu;
-	unsigned int i;
+	seq_printf(m, "Ring Buffer (%s): ", dev_name(gpu->dev));
 
-	for (i = 0; i < ETNA_MAX_PIPES; i++) {
-		gpu = priv->gpu[i];
-		if (gpu) {
-			seq_printf(m, "Ring Buffer (%s): ",
-				   dev_name(gpu->dev));
-			etnaviv_buffer_dump(gpu, m);
-		}
-	}
+	mutex_lock(&gpu->lock);
+	etnaviv_buffer_dump(gpu, m);
+	mutex_unlock(&gpu->lock);
+
 	return 0;
 }
 
@@ -211,25 +207,6 @@ static int show_unlocked(struct seq_file *m, void *arg)
 			node->info_ent->data;
 
 	return show(dev, m);
-}
-
-static int show_locked(struct seq_file *m, void *arg)
-{
-	struct drm_info_node *node = (struct drm_info_node *) m->private;
-	struct drm_device *dev = node->minor->dev;
-	int (*show)(struct drm_device *dev, struct seq_file *m) =
-			node->info_ent->data;
-	int ret;
-
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret)
-		return ret;
-
-	ret = show(dev, m);
-
-	mutex_unlock(&dev->struct_mutex);
-
-	return ret;
 }
 
 static int show_each_gpu(struct seq_file *m, void *arg)
@@ -261,7 +238,7 @@ static struct drm_info_list etnaviv_debugfs_list[] = {
 		{"gem", show_unlocked, 0, etnaviv_gem_show},
 		{ "mm", show_unlocked, 0, etnaviv_mm_show },
 		{"mmu", show_each_gpu, 0, etnaviv_mmu_show},
-		{"ring", show_locked, 0, etnaviv_ring_show},
+		{"ring", show_each_gpu, 0, etnaviv_ring_show},
 };
 
 static int etnaviv_debugfs_init(struct drm_minor *minor)
