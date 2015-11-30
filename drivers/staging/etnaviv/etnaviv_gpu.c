@@ -1088,9 +1088,11 @@ static void retire_worker(struct work_struct *work)
 		fence_put(cmdbuf->fence);
 
 		for (i = 0; i < cmdbuf->nr_bos; i++) {
-			etnaviv_gem_put_iova(gpu, &cmdbuf->bo[i]->base);
-			atomic_dec(&cmdbuf->bo[i]->gpu_active);
-			drm_gem_object_unreference(&cmdbuf->bo[i]->base);
+			struct etnaviv_gem_object *etnaviv_obj = cmdbuf->bo[i];
+
+			atomic_dec(&etnaviv_obj->gpu_active);
+			/* drop the refcount taken in etnaviv_gpu_submit */
+			etnaviv_gem_put_iova(gpu, &etnaviv_obj->base);
 		}
 
 		etnaviv_gpu_cmdbuf_free(cmdbuf);
@@ -1234,8 +1236,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 		u32 iova;
 
-		/* Each cmdbuf takes a reference on the bo and iova */
-		drm_gem_object_reference(&etnaviv_obj->base);
+		/* Each cmdbuf takes a refcount on the iova */
 		etnaviv_gem_get_iova_locked(gpu, &etnaviv_obj->base, &iova);
 		cmdbuf->bo[i] = etnaviv_obj;
 		atomic_inc(&etnaviv_obj->gpu_active);

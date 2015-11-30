@@ -262,8 +262,7 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	mapping = etnaviv_gem_get_vram_mapping(etnaviv_obj, gpu->mmu);
 	if (mapping) {
 		mapping->use += 1;
-		*iova = mapping->iova;
-		return 0;
+		goto out;
 	}
 
 	pages = etnaviv_gem_get_pages(etnaviv_obj);
@@ -273,8 +272,13 @@ int etnaviv_gem_get_iova_locked(struct etnaviv_gpu *gpu,
 	/* etnaviv_iommu_map_gem initialises use-count */
 	ret = etnaviv_iommu_map_gem(gpu->mmu, etnaviv_obj, gpu->memory_base,
 				    &mapping);
-	if (!ret)
+
+out:
+	if (!ret) {
+		/* Take a reference on the object */
+		drm_gem_object_reference(obj);
 		*iova = mapping->iova;
+	}
 
 	return ret;
 }
@@ -290,6 +294,8 @@ void etnaviv_gem_put_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj)
 
 	WARN_ON(mapping->use == 0);
 	mapping->use -= 1;
+
+	drm_gem_object_unreference(obj);
 }
 
 void *etnaviv_gem_vaddr_locked(struct drm_gem_object *obj)
