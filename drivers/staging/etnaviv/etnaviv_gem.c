@@ -348,7 +348,7 @@ void etnaviv_gem_put_iova(struct etnaviv_gpu *gpu, struct drm_gem_object *obj)
 	mapping->use -= 1;
 	mutex_unlock(&etnaviv_obj->lock);
 
-	drm_gem_object_unreference(obj);
+	drm_gem_object_unreference_unlocked(obj);
 }
 
 void *etnaviv_gem_vaddr(struct drm_gem_object *obj)

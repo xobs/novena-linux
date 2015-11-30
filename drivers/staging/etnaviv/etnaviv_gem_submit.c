@@ -391,6 +391,18 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		goto err_submit_objects;
 
+	ret = submit_pin_objects(submit);
+	if (ret)
+		goto out;
+
+	ret = submit_reloc(submit, stream, args->stream_size / 4,
+			   relocs, args->nr_relocs);
+	if (ret)
+		goto out;
+
+	memcpy(cmdbuf->vaddr, stream, args->stream_size);
+	cmdbuf->user_size = ALIGN(args->stream_size, 8);
+
 	/*
 	 * Avoid big circular locking dependency loops:
 	 * - reading debugfs results in mmap_sem depending on i_mutex_key#3
@@ -413,20 +425,11 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		goto err_submit_cmds;
 
 	mutex_lock(&dev->struct_mutex);
-
-	ret = submit_pin_objects(submit);
-	if (ret)
-		goto out;
-
-	ret = submit_reloc(submit, stream, args->stream_size / 4,
-			   relocs, args->nr_relocs);
-	if (ret)
-		goto out;
-
-	memcpy(cmdbuf->vaddr, stream, args->stream_size);
-	cmdbuf->user_size = ALIGN(args->stream_size, 8);
-
 	ret = etnaviv_gpu_submit(gpu, submit, cmdbuf);
+	mutex_unlock(&dev->struct_mutex);
+
+	etnaviv_gpu_pm_put(gpu);
+
 	if (ret == 0)
 		cmdbuf = NULL;
 
@@ -434,9 +437,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 out:
 	submit_unpin_objects(submit);
-	mutex_unlock(&dev->struct_mutex);
-
-	etnaviv_gpu_pm_put(gpu);
 
 	/*
 	 * If we're returning -EAGAIN, it may be due to the userptr code
