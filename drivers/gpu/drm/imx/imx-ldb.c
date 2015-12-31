@@ -57,6 +57,7 @@ struct imx_ldb_channel {
 	struct drm_connector connector;
 	struct drm_encoder encoder;
 	struct drm_panel *panel;
+	struct drm_bridge *bridge;
 	struct device_node *child;
 	int chno;
 	void *edid;
@@ -398,6 +399,23 @@ static int imx_ldb_get_clk(struct imx_ldb *ldb, int chno)
 	return PTR_ERR_OR_ZERO(ldb->clk_pll[chno]);
 }
 
+/* returns the number of bridges attached */
+static int imx_ldb_attach_lcd_bridge(struct imx_ldb_channel *imx_ldb_ch,
+				struct drm_encoder *encoder)
+{
+        int ret;
+
+	encoder->bridge = imx_ldb_ch->bridge;
+	imx_ldb_ch->bridge->encoder = encoder;
+	ret = drm_bridge_attach(encoder->dev, imx_ldb_ch->bridge);
+	if (ret) {
+		DRM_ERROR("Failed to attach bridge to drm\n");
+		return ret;
+	}
+
+        return 0;
+}
+
 static int imx_ldb_register(struct drm_device *drm,
 	struct imx_ldb_channel *imx_ldb_ch)
 {
@@ -423,6 +441,14 @@ static int imx_ldb_register(struct drm_device *drm,
 			&imx_ldb_encoder_helper_funcs);
 	drm_encoder_init(drm, &imx_ldb_ch->encoder, &imx_ldb_encoder_funcs,
 			 DRM_MODE_ENCODER_LVDS);
+
+        /* Pre-empt LDB connector creation if there's a bridge */
+	if (imx_ldb_ch->bridge) {
+		ret = imx_ldb_attach_lcd_bridge(imx_ldb_ch,
+						&imx_ldb_ch->encoder);
+		if (!ret)
+			return ret;
+	}
 
 	drm_connector_helper_add(&imx_ldb_ch->connector,
 			&imx_ldb_connector_helper_funcs);
@@ -590,14 +616,17 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
 			endpoint = of_get_child_by_name(port, "endpoint");
 			if (endpoint) {
 				remote = of_graph_get_remote_port_parent(endpoint);
-				if (remote)
-					channel->panel = of_drm_find_panel(remote);
-				else
+				if (!remote)
 					return -EPROBE_DEFER;
-				if (!channel->panel) {
-					dev_err(dev, "panel not found: %s\n",
+
+				channel->panel = of_drm_find_panel(remote);
+				channel->bridge = of_drm_find_bridge(remote);
+
+				if (!channel->panel && !channel->bridge) {
+					dev_err(dev,
+						"panel or bridge not found: %s\n",
 						remote->full_name);
-					return -EPROBE_DEFER;
+						return -EPROBE_DEFER;
 				}
 			}
 		}
@@ -606,7 +635,7 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
 		if (edidp) {
 			channel->edid = kmemdup(edidp, channel->edid_len,
 						GFP_KERNEL);
-		} else if (!channel->panel) {
+		} else if ((!channel->panel) && (!channel->bridge)) {
 			ret = of_get_drm_display_mode(child, &channel->mode, 0);
 			if (!ret)
 				channel->mode_valid = 1;
