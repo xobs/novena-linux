@@ -22,6 +22,7 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/resource.h>
 #include <linux/signal.h>
 #include <linux/types.h>
@@ -33,6 +34,8 @@
 
 struct imx6_pcie {
 	int			reset_gpio;
+	struct regulator	*vdd3p3;
+	struct regulator	*vdd1p5;
 	struct clk		*pcie_bus;
 	struct clk		*pcie_phy;
 	struct clk		*pcie;
@@ -587,6 +590,35 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 					    GPIOF_OUT_INIT_LOW, "PCIe reset");
 		if (ret) {
 			dev_err(&pdev->dev, "unable to get reset gpio\n");
+			return ret;
+		}
+	}
+
+	/* Fetch regulators */
+	imx6_pcie->vdd3p3 = devm_regulator_get_optional(&pdev->dev, "vdd3p3");
+	if (IS_ERR(imx6_pcie->vdd3p3)) {
+		ret = PTR_ERR(imx6_pcie->vdd3p3);
+		imx6_pcie->vdd3p3 = NULL;
+	}
+	else {
+		ret = regulator_enable(imx6_pcie->vdd3p3);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable regulator: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
+	imx6_pcie->vdd1p5 = devm_regulator_get_optional(&pdev->dev, "vdd1p5");
+	if (IS_ERR(imx6_pcie->vdd1p5)) {
+		ret = PTR_ERR(imx6_pcie->vdd1p5);
+		imx6_pcie->vdd1p5 = NULL;
+	}
+	else {
+		ret = regulator_enable(imx6_pcie->vdd1p5);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable regulator: %d\n",
+				ret);
 			return ret;
 		}
 	}
