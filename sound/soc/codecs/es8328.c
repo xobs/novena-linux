@@ -666,8 +666,6 @@ static int es8328_resume(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	es8328_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-
 	es8328_set_rates(codec, es8328);
 
 	return 0;
