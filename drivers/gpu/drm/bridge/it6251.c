@@ -649,7 +649,6 @@ it6251_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err;
 	}
 
-	dev_err(&client->dev, "Succeeded in probing it6251\n");
 	return 0;
 
 err:
