@@ -293,7 +293,7 @@
 	status = "okay";
 
 	spidev@0 {
-		compatible = "spidev";
+		compatible = "kosagi,novena-fpga-spidev";
 		spi-max-frequency = <30000000>;
 		reg = <0>;
 	};
