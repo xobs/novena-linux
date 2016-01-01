@@ -661,6 +661,38 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int imx6_pcie_suspend(struct device *dev)
+{
+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+
+	return 0;
+}
+
+static int imx6_pcie_resume(struct device *dev)
+{
+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+
+	/*
+	 * This is a workaround for
+	 * ERR005723: PCIe does not support L2 power down
+	 * Toggling the PHY PD bit around system L2 state switching seems to be
+	 * enough to wake the PCIe logic after a power down.
+	 */
+	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(imx6_pcie_pm_ops,
+		imx6_pcie_suspend,
+		imx6_pcie_resume);
+
 static void imx6_pcie_shutdown(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie = platform_get_drvdata(pdev);
@@ -679,6 +711,7 @@ static struct platform_driver imx6_pcie_driver = {
 	.driver = {
 		.name	= "imx6q-pcie",
 		.of_match_table = imx6_pcie_of_match,
+		.pm = &imx6_pcie_pm_ops,
 	},
 	.shutdown = imx6_pcie_shutdown,
 };
