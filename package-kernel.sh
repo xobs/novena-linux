@@ -1,7 +1,7 @@
 #!/bin/sh
 # A script to build the kernel .deb files, as used by Kosagi.
 threads=$(($(grep '^processor' /proc/cpuinfo  | cut -d: -f2 | tail -n1)+1))
-version=4.4-rc7-novena-r1
+version=4.4-rc8-novena-r1
 
 echo "Building v${version} with ${threads} threads"
 git tag -d "v${version}" 2> /dev/null
