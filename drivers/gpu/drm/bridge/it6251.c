@@ -49,9 +49,6 @@ struct it6251_bridge {
 	struct i2c_client *lvds_client;
 	struct regulator *regulator;
 	struct drm_panel *panel;
-//	struct delayed_work init_work;
-	int delay_jiffies;
-	int delay_tries;
 };
 
 #define LVDS_ADDR 0x5e
@@ -204,6 +201,8 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 	int rpclkcnt;
 	int clkcnt;
 	int refstate;
+	u16 hactive;
+	u16 vactive;
 
 	status = it6251_read(it6251, IT6251_SYSTEM_STATUS);
 	dev_info(it6251->dev, "System status: 0x%02x\n", status);
@@ -232,6 +231,14 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 	refstate = it6251_lvds_read(it6251, IT6251_REF_STATE);
 	dev_info(it6251->dev, "Ref Link State: 0x%02x\n", refstate);
 
+	hactive = it6251_read(it6251, 0xa5);
+	hactive = ((it6251_read(it6251, 0xa6) & 0x1f) << 8) + hactive;
+	dev_info(it6251->dev, "hactive: %d\n", hactive);
+
+	vactive = it6251_read(it6251, 0xaf);
+	vactive = ((it6251_read(it6251, 0xb0) & 0x0f) << 8) + vactive;
+	dev_info(it6251->dev, "vactive: %d\n", vactive);
+
 	if ((refstate & 0x1f) != 0)
 		return 0;
 
@@ -239,10 +246,24 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 	if (refstate & IT6251_REF_STATE_MUTED)
 		return 0;
 
+	if (it6251->panel) {
+		struct drm_panel *panel = it6251->panel;
+
+		if (panel->connector) {
+			struct drm_display_mode *mode;
+
+			list_for_each_entry(mode, &panel->connector->modes, head) {
+				if ((mode->hdisplay == hactive)
+				 && (mode->vdisplay == vactive))
+					return 1;
+			}
+		}
+	}
+
 	return 1;
 }
 
-static void it6251_init(struct it6251_bridge *it6251)
+static int it6251_init(struct it6251_bridge *it6251)
 {
 	int reg;
 	int tries;
@@ -250,7 +271,7 @@ static void it6251_init(struct it6251_bridge *it6251)
 	/* The bootloader can leave the chip already initialized */
 	if (it6251_is_stable(it6251)) {
 		dev_info(it6251->dev, "eDP system is already stable\n");
-		return;
+		return 0;
 	}
 
 	/* Reset DisplayPort half (setting bit 2 causes it to not respond
@@ -351,10 +372,12 @@ video_maybe_stable:
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
 	 */
-	if (!it6251_is_stable(it6251))
+	if (!it6251_is_stable(it6251)) {
 		dev_err(it6251->dev, "warning: bridge is not stable\n");
+		return 1;
+	}
 
-	return;
+	return 0;
 }
 
 static int it6251_power_up(struct it6251_bridge *it6251)
@@ -434,8 +457,6 @@ static int it6251_resume(struct device *dev, bool do_power_up)
 			return ret;
 	}
 
-	it6251->delay_jiffies = INIT_RETRY_DELAY_START;
-	it6251->delay_tries = 0;
 	return 0;
 }
 
@@ -480,13 +501,20 @@ static void it6251_pre_enable(struct drm_bridge *bridge)
 static void it6251_enable(struct drm_bridge *bridge)
 {
 	struct it6251_bridge *it6251 = bridge_to_it6251(bridge);
+	int tries;
 
 	if (drm_panel_enable(it6251->panel)) {
 		DRM_ERROR("failed to enable panel\n");
 		return;
 	}
 
-	it6251_init(it6251);
+	for (tries = 0; tries < 5; tries++) {
+		int ret;
+
+		ret = it6251_init(it6251);
+		if (!ret)
+			break;
+	}
 }
 
 static void it6251_disable(struct drm_bridge *bridge)
@@ -664,8 +692,6 @@ static int it6251_remove(struct i2c_client *client)
 {
 	struct it6251_bridge *it6251 = i2c_get_clientdata(client);
 	int ret;
-
-//	cancel_delayed_work_sync(&it6251->init_work);
 
 	if (it6251->lvds_client)
 		i2c_unregister_device(it6251->lvds_client);
