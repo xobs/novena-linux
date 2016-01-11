@@ -460,7 +460,6 @@ static int it6251_resume(struct device *dev, bool do_power_up)
 	return 0;
 }
 
-
 /* I2C driver functions */
 
 static int it6251_pm_suspend(struct device *dev)
@@ -514,6 +513,15 @@ static void it6251_enable(struct drm_bridge *bridge)
 		ret = it6251_init(it6251);
 		if (!ret)
 			break;
+
+		/* If the resolution isn't correct, restart the chip */
+		ret = regulator_disable(it6251->regulator);
+		if (ret)
+			dev_err(it6251->dev, "unable to disable regulator\n");
+
+		ret = it6251_power_up(it6251);
+		if (ret)
+			dev_err(it6251->dev, "unable to power up\n");
 	}
 }
 
