@@ -74,6 +74,9 @@ struct it6251_bridge {
 #define IT6251_REF_STATE_EQ_PATTERN			(1 << 3)
 #define IT6251_REF_STATE_NORMAL_OPERATION		(1 << 4)
 #define IT6251_REF_STATE_MUTED				(1 << 5)
+#define IT6251_RPC_REQ					0x2b
+#define IT6251_RPC_REQ_RPC_FIFOFULL			(1 << 6)
+#define IT6251_RPC_REQ_RPC_FIFOEMPTY			(1 << 7)
 
 #define IT6251_REG_PCLK_CNT_LOW				0x57
 #define IT6251_REG_PCLK_CNT_HIGH			0x58
@@ -201,6 +204,7 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 	int rpclkcnt;
 	int clkcnt;
 	int refstate;
+	int rpcreq;
 	u16 hactive;
 	u16 vactive;
 
@@ -214,22 +218,15 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 		| ((it6251_read(it6251, 0x14) << 8) & 0x0f00));
 	dev_info(it6251->dev, "RPCLKCnt: %d\n", rpclkcnt);
 
-	/*
-	if (rpclkcnt != 2260)
-		return 0;
-	*/
-
 	clkcnt = ((it6251_lvds_read(it6251, IT6251_REG_PCLK_CNT_LOW) & 0xff) |
 		 ((it6251_lvds_read(it6251, IT6251_REG_PCLK_CNT_HIGH) << 8) & 0x0f00));
 	dev_info(it6251->dev, "Clock: 0x%02x\n", clkcnt);
 
-	/*
-	if (clkcnt != 0x193)
-		return 0;
-	*/
-
 	refstate = it6251_lvds_read(it6251, IT6251_REF_STATE);
 	dev_info(it6251->dev, "Ref Link State: 0x%02x\n", refstate);
+
+	rpcreq = it6251_lvds_read(it6251, IT6251_RPC_REQ);
+	dev_info(it6251->dev, "RPC Req: 0x%02x\n", rpcreq);
 
 	hactive = it6251_read(it6251, 0xa5);
 	hactive = ((it6251_read(it6251, 0xa6) & 0x1f) << 8) + hactive;
@@ -241,6 +238,11 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 
 	if ((refstate & 0x1f) != 0)
 		return 0;
+
+	if (rpcreq & IT6251_RPC_REQ_RPC_FIFOFULL) {
+		dev_err(it6251->dev, "RPC fifofull is set, might be an error\n");
+		return 0;
+	}
 
 	/* If video is muted, that's a failure */
 	if (refstate & IT6251_REF_STATE_MUTED)
@@ -258,15 +260,24 @@ static int it6251_is_stable(struct it6251_bridge *it6251)
 					return 1;
 			}
 		}
+		else
+			dev_info(it6251->dev, "no panel connector\n");
 	}
+	else
+		dev_info(it6251->dev, "no panel\n");
 
-	return 1;
+	dev_info(it6251->dev, "no match found\n");
+
+	if (vactive == 1080)
+		return 1;
+
+	return 0;
 }
 
 static int it6251_init(struct it6251_bridge *it6251)
 {
 	int reg;
-	int tries;
+	int stable_delays;
 
 	/* The bootloader can leave the chip already initialized */
 	if (it6251_is_stable(it6251)) {
@@ -348,26 +359,16 @@ static int it6251_init(struct it6251_bridge *it6251)
 
 	it6251_write(it6251, 0x17, 0x01); // start link training
 
-	
-	for (tries = 0; tries < 5; tries++) {
-		int stable_delays;
-		for (stable_delays = 0; stable_delays < 100; stable_delays++) {
-			reg = it6251_read(it6251, 0x0e);
-			if ((reg & 0x1f) == 0x10) {
-				reg = it6251_read(it6251, IT6251_SYSTEM_STATUS);
-				if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
-					goto video_maybe_stable;
-			}
-			udelay(2000);
+	for (stable_delays = 0; stable_delays < 100; stable_delays++) {
+		reg = it6251_read(it6251, 0x0e);
+		if ((reg & 0x1f) == 0x10) {
+			reg = it6251_read(it6251, IT6251_SYSTEM_STATUS);
+			if (reg & IT6251_SYSTEM_STATUS_RVIDEOSTABLE)
+				break;
 		}
-
-		dev_info(it6251->dev, "panel not stable, retraining\n");
-		it6251_write(it6251, 0x05, 0x00);
-		it6251_write(it6251, 0x17, 0x04);
-		it6251_write(it6251, 0x17, 0x01);
+		udelay(2000);
 	}
 
-video_maybe_stable:
 	/*
 	 * If we couldn't stabilize, requeue and try again, because it means
 	 * that the LVDS channel isn't stable yet.
