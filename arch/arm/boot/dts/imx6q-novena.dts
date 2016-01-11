@@ -99,7 +99,7 @@
 		regulator-name = "lcd-display-power";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		startup-delay-us = <200000>;
+		startup-delay-us = <2000000>;
 		gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		regulator-boot-on;
@@ -399,6 +399,7 @@
 	rtc: pcf8523@68 {
 		compatible = "nxp,pcf8523";
 		reg = <0x68>;
+		nxp,12p5_pf;
 	};
 };
 
@@ -929,6 +930,10 @@
 		MATRIX_KEY(1, 1, KEY_CONFIG)
 	>;
 	status = "okay";
+};
+
+&L2 {
+	arm,shared-override;
 };
 
 &ldb {
