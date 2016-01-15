@@ -12,6 +12,7 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  */
+#include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -436,6 +437,20 @@ static void ipu_di_config_clock(struct ipu_di *di,
 
 			clk_set_rate(clk, sig->mode.pixelclock);
 
+			/*
+			 * The clocks need time to stabilize before the clkgen
+			 * is enabled.  Without this, the clocks may not be
+			 * properly synchronized, and HSYNC and VSYNC may come
+			 * at unusual intervals.  This will manifest itself in
+			 * an unstable display, where the only solution is to
+			 * re-initialize the whole panel, e.g. by running:
+			 *    xrandr --output LVDS1 --off
+			 *    xrandr --output LVDS1 --auto
+			 * The Freescale drivers include this delay, which
+			 * solves the problem.
+			 */
+			msleep(15);
+
 			in_rate = clk_get_rate(clk);
 			div = DIV_ROUND_CLOSEST(in_rate, sig->mode.pixelclock);
 			div = clamp(div, 1U, 255U);
@@ -475,6 +490,20 @@ static void ipu_di_config_clock(struct ipu_di *di,
 			clk = di->clk_di;
 
 			clk_set_rate(clk, sig->mode.pixelclock);
+
+			/*
+			 * The clocks need time to stabilize before the clkgen
+			 * is enabled.  Without this, the clocks may not be
+			 * properly synchronized, and HSYNC and VSYNC may come
+			 * at unusual intervals.  This will manifest itself in
+			 * an unstable display, where the only solution is to
+			 * re-initialize the whole panel, e.g. by running:
+			 *    xrandr --output LVDS1 --off
+			 *    xrandr --output LVDS1 --auto
+			 * The Freescale drivers include this delay, which
+			 * solves the problem.
+			 */
+			msleep(15);
 
 			in_rate = clk_get_rate(clk);
 			div = DIV_ROUND_CLOSEST(in_rate, sig->mode.pixelclock);
