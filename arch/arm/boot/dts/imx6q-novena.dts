@@ -148,6 +148,7 @@
 			label = "User Button";
 			gpios = <&gpio4 14 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
+			wakeup-source;
 		};
 
 		lid {
@@ -217,6 +218,7 @@
 		cpu_thermal: cpu-thermal {
 			polling-delay-passive = <250>; /* milliseconds */
 			polling-delay = <500>; /* milliseconds */
+			hwmon; /* Enable setting up as an hwmon group */
 
 			thermal-sensors = <&tempmon 0>;
 
@@ -967,15 +969,17 @@
 			lvds_timing0: 1920x1080p60 {
 				clock-frequency = <137142857>;
 				hactive = <1920>;
+				hback-porch = <1>;
+				hfront-porch = <158>;
+				hsync-len = <1>;
+
 				vactive = <1080>;
-				hback-porch = <148>;
-				hfront-porch = <88>;
-				hsync-len = <44>;
-				vback-porch = <36>;
-				vfront-porch = <4>;
-				vsync-len = <5>;
-				hsync-active = <1>;
-				vsync-active = <1>;
+				vback-porch = <1>;
+				vfront-porch = <30>;
+				vsync-len = <1>;
+
+				hsync-active = <0>;
+				vsync-active = <0>;
 			};
 		};
 	};
