@@ -1,3 +1,4 @@
+#define DEBUG
 /*
  * i.MX drm driver - LVDS display bridge
  *
@@ -152,19 +153,19 @@ static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
 {
 	int ret;
 
-	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+	dev_dbg(ldb->dev, "%d:%s: now: %ld want: %ld\n", chno, __func__,
 			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
 	clk_set_rate(ldb->clk_pll[chno], serial_clk);
 
-	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+	dev_dbg(ldb->dev, "%d:%s after: %ld\n", chno, __func__,
 			clk_get_rate(ldb->clk_pll[chno]));
 
-	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+	dev_dbg(ldb->dev, "%d:%s: now: %ld want: %ld\n", chno, __func__,
 			clk_get_rate(ldb->clk[chno]),
 			(long int)di_clk);
 	clk_set_rate(ldb->clk[chno], di_clk);
 
-	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+	dev_dbg(ldb->dev, "%d:%s after: %ld\n", chno, __func__,
 			clk_get_rate(ldb->clk[chno]));
 
 	/* set display clock mux to LDB input clock */
