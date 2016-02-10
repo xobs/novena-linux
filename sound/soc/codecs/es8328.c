@@ -620,6 +620,16 @@ static struct snd_soc_dai_driver es8328_dai = {
 	.ops = &es8328_dai_ops,
 };
 
+static int es8328_resume(struct snd_soc_codec *codec)
+{
+	struct es8328_priv *es8328 = snd_soc_codec_get_drvdata(codec);
+
+	snd_soc_cache_sync(codec);
+	es8328_set_rates(codec, es8328);
+
+	return 0;
+}
+
 static int es8328_codec_probe(struct snd_soc_codec *codec)
 {
 	struct es8328_priv *es8328;
@@ -682,6 +692,7 @@ EXPORT_SYMBOL_GPL(es8328_regmap_config);
 
 static struct snd_soc_codec_driver es8328_codec_driver = {
 	.probe		  = es8328_codec_probe,
+	.resume		  = es8328_resume,
 	.remove		  = es8328_remove,
 	.set_bias_level	  = es8328_set_bias_level,
 	.suspend_bias_off = true,
