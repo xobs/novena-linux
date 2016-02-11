@@ -91,7 +91,6 @@
 		parent-supply = <&reg_display>;
 		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-		regulator-boot-on;
 	};
 
 	reg_display: display-regulator {
@@ -102,7 +101,6 @@
 		startup-delay-us = <2000000>;
 		gpio = <&gpio5 28 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-		regulator-boot-on;
 	};
 
 	reg_sata: sata-regulator {
