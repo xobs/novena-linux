@@ -279,12 +279,6 @@ static int it6251_init(struct it6251_bridge *it6251)
 	int reg;
 	int stable_delays;
 
-	/* The bootloader can leave the chip already initialized */
-	if (it6251_is_stable(it6251)) {
-		dev_info(it6251->dev, "eDP system is already stable\n");
-		return 0;
-	}
-
 	/* Reset DisplayPort half (setting bit 2 causes it to not respond
 	 * over i2c, which is considered "normal".  This write will report
 	 * failure, but will actually succeed. */
