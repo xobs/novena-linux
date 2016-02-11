@@ -10,7 +10,7 @@ fi
 
 
 echo "Building v${version} with ${threads} threads"
-git tag -d "v${version}" 2> /dev/null
+git tag -d "v${version}" 2> /dev/null || true
 git tag "v${version}"
 
 make novena_defconfig
