@@ -2071,13 +2071,13 @@ static int imx_serial_port_suspend_noirq(struct device *dev)
 	struct imx_port *sport = platform_get_drvdata(pdev);
 	int ret;
 
-	ret = clk_enable(sport->clk_ipg);
+	ret = clk_prepare_enable(sport->clk_ipg);
 	if (ret)
 		return ret;
 
 	serial_imx_save_context(sport);
 
-	clk_disable(sport->clk_ipg);
+	clk_disable_unprepare(sport->clk_ipg);
 
 	return 0;
 }
@@ -2088,13 +2088,13 @@ static int imx_serial_port_resume_noirq(struct device *dev)
 	struct imx_port *sport = platform_get_drvdata(pdev);
 	int ret;
 
-	ret = clk_enable(sport->clk_ipg);
+	ret = clk_prepare_enable(sport->clk_ipg);
 	if (ret)
 		return ret;
 
 	serial_imx_restore_context(sport);
 
-	clk_disable(sport->clk_ipg);
+	clk_disable_unprepare(sport->clk_ipg);
 
 	return 0;
 }
