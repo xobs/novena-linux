@@ -249,6 +249,8 @@ static void senoko_supply_power_off(void)
 {
 	struct senoko *senoko = g_senoko;
 	int err;
+	uint32_t sleep_counter = 0;
+	uint32_t sleep_counter_increment = 10000;
 
 	dev_info(senoko->dev, "shutting down\n");
 	regcache_cache_bypass(senoko->regmap, true);
@@ -256,7 +258,15 @@ static void senoko_supply_power_off(void)
 	while (1) {
 		err = senoko_write(senoko, REG_POWER,
 				   REG_POWER_STATE_OFF | REG_POWER_KEY_WRITE);
+
 		/* Board should be off now */
+
+		/* But in any case, sometimes i2c is blocked, so sleep for
+		 * an ever-increasing amount of time, trying to re-send
+		 * the power-off message.
+		 */
+		sleep_counter += sleep_counter_increment;
+		udelay(sleep_counter);
 	}
 }
 
