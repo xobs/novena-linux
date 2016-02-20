@@ -73,6 +73,16 @@ config RTC_DEBUG
 	  Say yes here to enable debugging support in the RTC framework
 	  and individual RTC drivers.
 
+config RTC_INVALID_2038
+	bool "Invalidate dates after 2038"
+	depends on !64BIT
+	default y
+	help
+	  Saying yes here will make any date after 03:09:07 on Jan 19 2038
+	  invalid (this is 5 minutes before the 31 bits overflow of a time_t).
+	  This is useful if your userspace is not yet ready to handle 64 bits
+	  times.
+
 comment "RTC interfaces"
 
 config RTC_INTF_SYSFS
