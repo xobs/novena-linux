@@ -1,7 +1,7 @@
 #!/bin/sh -e
 # A script to build the kernel .deb files, as used by Kosagi.
 threads=$(($(grep '^processor' /proc/cpuinfo  | cut -d: -f2 | tail -n1)+1))
-version=4.4-novena-r12
+version=4.4-novena-r13
 
 if git diff-index --name-only HEAD | grep -qv "^scripts/package"; then
 	echo "Repo has local changes.  Stash or commit them."
