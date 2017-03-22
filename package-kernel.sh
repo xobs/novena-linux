@@ -21,6 +21,7 @@ make -j${threads} \
 	KBUILD_DESTDIR=usr/share/linux-novena \
 	KDEB_PKGVERSION=${version} \
 	KDEB_PKGNAME="novena" \
+	KDEB_CHANGELOG_DIST="jessie" \
 	KDEB_SOURCENAME="linux-image-novena" \
 	EMAIL="xobs@kosagi.com" \
 	NAME="Sean Cross" \
@@ -36,6 +37,7 @@ make -j${threads} \
 	KBUILD_DESTDIR=usr/share/linux-novena \
 	KDEB_PKGVERSION=${version} \
 	KDEB_PKGNAME="novena" \
+	KDEB_CHANGELOG_DIST="jessie" \
 	KDEB_SOURCENAME="linux-image-novena" \
 	EMAIL="xobs@kosagi.com" \
 	NAME="Sean Cross" \
